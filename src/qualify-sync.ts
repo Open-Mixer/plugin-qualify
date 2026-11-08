@@ -681,7 +681,10 @@ export function refreshPins(ctx: SyncContext, state: SyncState): { state: SyncSt
       const pin = plugin.pin;
       if (pin === undefined || pin.integrity.files === undefined) return plugin;
       const r = hostdPinFiles(pin.uri, ctx.settings.lv2Dirs, ctx.env, ...(ctx.pinFilesRun === undefined ? [] : [ctx.pinFilesRun]));
-      if (!r.ok) return plugin;
+      if (!r.ok) {
+        ctx.log(`${pin.uri}: pin files not refreshed: ${r.detail}`);
+        return plugin;
+      }
       const old = new Map(pin.integrity.files.map((f) => [f.path, f.sha256]));
       const changed = r.files.filter((f) => old.has(f.path) && old.get(f.path) !== f.sha256).map((f) => f.path);
       const same = r.files.length === old.size && r.files.every((f) => old.get(f.path) === f.sha256);
