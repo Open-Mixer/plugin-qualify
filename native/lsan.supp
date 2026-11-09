@@ -2,3 +2,6 @@
 # lilv_world_free: a lilv program that does nothing else leaks the same 24 bytes. The leak check
 # ignores that one frame; a leak from this tree's own code still fails it.
 leak:lilv_world_add_plugin_class
+# The same leak through a stripped liblilv (Ubuntu's runner image): the frames below
+# lilv_world_load_plugin_classes carry no symbol, so the one above is the one that names it.
+leak:lilv_world_load_plugin_classes

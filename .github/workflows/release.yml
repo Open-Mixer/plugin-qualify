@@ -13,7 +13,15 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: 'Sign and publish; only a run on a tag publishes'
+        description: 'Sign and publish; only a run on a tag, or one naming a tag in source-ref, publishes'
+        type: boolean
+        default: false
+      source-ref:
+        description: 'Tag v<version> to release with this workflow (a tag whose own release workflow can no longer run); empty builds the branch'
+        type: string
+        default: ''
+      republish:
+        description: 'Let the release go out over a version the channel already serves (finish a partial publish)'
         type: boolean
         default: false
   workflow_call:
@@ -37,6 +45,8 @@ jobs:
     with:
       package-name: plugin-qualify
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
+      source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
+      republish: ${{ github.event_name == 'workflow_dispatch' && inputs.republish == true }}
       needs-mod-host: false
       # plugin-db-devel, whose pin.h the CLAP prober builds against, plugin-hostd-protocol-devel, and omx-clap-lv2-devel, the
       # LV2 measurer's host features
@@ -53,6 +63,8 @@ jobs:
     with:
       package-name: plugin-qualify
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
+      source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
+      republish: ${{ github.event_name == 'workflow_dispatch' && inputs.republish == true }}
       # the CLAP headers from the pin, plugin-db-dev (pin.h) and libplugin-hostd-protocol-dev from the channel: the CLAP prober's build;
       # libomx-clap-lv2-dev from the channel: the LV2 measurer's host features
       dependencies: 'clap-headers'
@@ -87,6 +99,8 @@ jobs:
           - { image: 'debian:trixie', artifact: plugin-qualify-debs-trixie-amd64 }
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref && format('refs/tags/{0}', inputs.source-ref) || '' }}
 
       - uses: actions/download-artifact@v4
         with:

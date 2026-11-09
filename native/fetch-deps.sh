@@ -32,16 +32,16 @@ fetch() { # <url> <tag> <into>
 
 mkdir -p "$dir"
 fetch https://github.com/free-audio/clap "$clap_ref" "$dir/clap"
-fetch https://github.com/FreeMixer/plugin-hostd "$hostd_ref" "$dir/plugin-hostd"
-fetch https://github.com/FreeMixer/plugin-db "$pin_ref" "$dir/plugin-db"
+fetch https://github.com/Open-Mixer/plugin-hostd "$hostd_ref" "$dir/plugin-hostd"
+fetch https://github.com/Open-Mixer/plugin-db "$pin_ref" "$dir/plugin-db"
 
 rm -rf "$dir/omx-contract"
 mkdir -p "$dir/omx-contract"
 curl -fsSL --retry 5 "https://registry.npmjs.org/@openmixer/omx-contract/-/omx-contract-$contract_version.tgz" |
   tar -xz -C "$dir/omx-contract" --strip-components=1 package/include
 
-fetch https://github.com/FreeMixer/omx-clap-core "v$clap_core_version" "$dir/omx-clap-core"
-fetch https://github.com/FreeMixer/omx-dsp "v$dsp_version" "$dir/omx-dsp"
+fetch https://github.com/Open-Mixer/omx-clap-core "v$clap_core_version" "$dir/omx-clap-core"
+fetch https://github.com/Open-Mixer/omx-dsp "v$dsp_version" "$dir/omx-dsp"
 abs=$(cd "$dir" && pwd)
 # the provider's hosted stage reads omx-dsp and omx-contract headers
 lv2_cflags="$(pkg-config --cflags lv2 lilv-0 2>/dev/null) -I$abs/omx-dsp/include -I$abs/omx-contract/include"
