@@ -13,7 +13,7 @@ import { PROBE_OOM } from "./memory-bound.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
-import { buildQualificationRecord } from "./qualification-record.js";
+import { buildQualificationRecord, unmeasuredWordOf } from "./qualification-record.js";
 
 function recordOf(patch: (d: Record<string, any>) => void) {
   const d = fixtureJson("success-msi");
@@ -60,5 +60,15 @@ describe("a record's cells all carry latency", () => {
     });
     expect(cell(rec, 48000, 128)?.latency).toEqual({ unmeasuredReason: "probe-error", code: HOSTING_CODE.latencyUnmeasured });
     expect(cell(rec, 96000, 128)?.latency).toEqual({ unmeasuredReason: "probe-error", code: HOSTING_CODE.latencyUnmeasured });
+  });
+
+  it("a cell the run did not attempt says not-attempted, in its latency and in a memory-only run's footprint, not probe-error (#316)", () => {
+    const rec = recordOf((d) => {
+      delete d.grid[0].latency;
+      d.grid[1] = { rate: 96000, quantum: 128, outcome: "probe.not-attempted" };
+    });
+    expect(cell(rec, 96000, 128)?.latency).toEqual({ unmeasuredReason: "not-attempted", code: HOSTING_CODE.latencyUnmeasured });
+    expect(unmeasuredWordOf("probe.not-attempted")).toBe("not-attempted");
+    expect(unmeasuredWordOf("probe.something-new")).toBe("probe-error");
   });
 });

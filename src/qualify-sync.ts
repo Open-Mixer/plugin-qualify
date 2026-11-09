@@ -24,7 +24,7 @@ import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { clapQualifyTools } from "./clap-qualify.js";
-import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOfBoard, outcomeOfVerdict, matchDistributed, readBoardModel, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
+import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOfBoard, hostClassOfMachine, outcomeOfVerdict, matchDistributed, readBoardModel, readMachine, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
 import { clapSearchPath, parseClapScan } from "./clap-loader.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
@@ -228,6 +228,7 @@ export function resolveSyncSettings(
   env: Readonly<Record<string, string | undefined>>,
   home: string = homedir(),
   boardModel: () => string | undefined = readBoardModel,
+  machineArch: () => string | undefined = readMachine,
 ): { ok: true; settings: SyncSettings } | { ok: false; error: string } {
   const get = (key: string): string | undefined => args.values.get(key) ?? file.get(key);
   const state = env["XDG_STATE_HOME"] !== undefined && env["XDG_STATE_HOME"] !== "" ? env["XDG_STATE_HOME"] : join(home, ".local", "state");
@@ -276,7 +277,7 @@ export function resolveSyncSettings(
         ? [DISTRIBUTED_DIR_SYSTEM]
         : [dataHome, ...dataDirs].map((d) => join(d, "omx", "qualification"));
   const classNamed = get("host_class");
-  const hostClass = classNamed !== undefined && classNamed !== "" ? classNamed : hostClassOfBoard(boardModel());
+  const hostClass = classNamed !== undefined && classNamed !== "" ? classNamed : hostClassOfBoard(boardModel()) ?? hostClassOfMachine(machineArch());
   if (hostClass !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(hostClass)) return { ok: false, error: `host_class ${hostClass} is not a directory name` };
   return {
     ok: true,
@@ -681,7 +682,10 @@ export function refreshPins(ctx: SyncContext, state: SyncState): { state: SyncSt
       const pin = plugin.pin;
       if (pin === undefined || pin.integrity.files === undefined) return plugin;
       const r = hostdPinFiles(pin.uri, ctx.settings.lv2Dirs, ctx.env, ...(ctx.pinFilesRun === undefined ? [] : [ctx.pinFilesRun]));
-      if (!r.ok) return plugin;
+      if (!r.ok) {
+        ctx.log(`${pin.uri}: pin files not refreshed: ${r.detail}`);
+        return plugin;
+      }
       const old = new Map(pin.integrity.files.map((f) => [f.path, f.sha256]));
       const changed = r.files.filter((f) => old.has(f.path) && old.get(f.path) !== f.sha256).map((f) => f.path);
       const same = r.files.length === old.size && r.files.every((f) => old.get(f.path) === f.sha256);
@@ -931,7 +935,9 @@ export function isolatedPass(ctx: SyncContext, state: SyncState): { readonly sta
           return rest.outcome === "qualified" && rebuilt.verdict === "refused" ? { ...rest, outcome: "refused" as const, pin: rebuilt } : { ...rest, pin: rebuilt };
         }
         ctx.log(`${p.uri}: isolated step ${done.step.result}${done.step.code === undefined ? "" : ` (${done.step.code})`}`);
-        const pin = pinAfterStep(p.pin, done.step);
+        // a plugin the state holds no pin for is pinned from the record the step now completes: the bytes it names and the word
+        // the step earned (plugin-qualify#316: 38 plugins read hosting.memory.unmeasured and had none)
+        const pin = p.pin !== undefined ? pinAfterStep(p.pin, done.step) : withHostdFiles(ctx, pinFromRecordWithPool(done.record));
         const { pin: _pin, code: _code, ...rest } = p;
         if (done.step.result === ISOLATED_RESULT.isolated) {
           count.isolated++;

@@ -20,7 +20,7 @@ import { join } from "node:path";
 
 import type { Adjustment } from "./history-adjust.js";
 import type { Judgment, RecordReason } from "./probe-judge.js";
-import { sha256Hex, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import type { VoicesHeld } from "./measurement/format.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
@@ -236,6 +236,7 @@ const OUTCOME_WORD: Readonly<Record<string, string>> = {
   "probe.timeout": word("probeTimeout"),
   "probe.refused-instantiation": word("refusedInstantiation"),
   "probe.non-finite-output": word("nonFiniteOutput"),
+  [PROBE_NOT_ATTEMPTED]: word("notAttempted"),
 };
 
 /**

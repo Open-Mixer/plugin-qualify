@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { DISTRIBUTED_DIR_SYSTEM, hostClassOfBoard } from "./distributed-records.js";
+import { DISTRIBUTED_DIR_SYSTEM, hostClassOfBoard, hostClassOfMachine } from "./distributed-records.js";
 import { FIXTURE_CLAP_ID, fixtureProvenance, writeFakeClap, writeFixtureSet } from "./distributed-records.support.js";
 import { parsePinLine } from "./pins-file.js";
 import { parseSyncArgs, resolveSyncSettings, runSync, summaryLine, type SyncSettings } from "./qualify-sync.js";
@@ -81,6 +81,25 @@ describe("the host class", () => {
     expect(hostClassOfBoard(undefined)).toBeUndefined();
   });
 
+  it("is x86-64 for a machine uname -m calls x86_64, and none for an architecture the layer has no class for (plugin-qualify#316)", () => {
+    expect(hostClassOfMachine("x86_64")).toBe("x86-64");
+    expect(hostClassOfMachine("x86_64\n")).toBe("x86-64");
+    expect(hostClassOfMachine("aarch64")).toBeUndefined();
+    expect(hostClassOfMachine("")).toBeUndefined();
+    const args = parseSyncArgs([]);
+    if (!args.ok) throw new Error("args");
+    const noBoard = (machine: string) => resolveSyncSettings(new Map(), args.args, {}, "/home/u", () => undefined, () => machine);
+    const x86 = noBoard("x86_64");
+    const arm = noBoard("aarch64");
+    if (!x86.ok || !arm.ok) throw new Error("settings");
+    expect(x86.settings.hostClass).toBe("x86-64");
+    expect(arm.settings.hostClass).toBeUndefined();
+    // a board names itself first: a Pi is rpi5, whatever uname -m says
+    const pi = resolveSyncSettings(new Map(), args.args, {}, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0", () => "aarch64");
+    if (!pi.ok) throw new Error("settings");
+    expect(pi.settings.hostClass).toBe("rpi5");
+  });
+
   it("is the setting when one is given, the board's otherwise, and the layer's directories are the system's or the XDG ones", () => {
     const sys = parseSyncArgs(["--system"]);
     const user = parseSyncArgs(["--host-class", "x86-desk"]);
@@ -92,7 +111,7 @@ describe("the host class", () => {
     expect([u.settings.hostClass, u.settings.distributedDirs]).toEqual(["x86-desk", ["/d/omx/qualification", "/a/omx/qualification", "/b/omx/qualification"]]);
     const plain = parseSyncArgs([]);
     if (!plain.ok) throw new Error("args");
-    const p = resolveSyncSettings(new Map(), plain.args, {}, "/home/u", () => undefined);
+    const p = resolveSyncSettings(new Map(), plain.args, {}, "/home/u", () => undefined, () => "riscv64");
     if (!p.ok) throw new Error("settings");
     expect([p.settings.hostClass, p.settings.distributedDirs]).toEqual([undefined, ["/home/u/.local/share/omx/qualification", "/usr/local/share/omx/qualification", "/usr/share/omx/qualification"]]);
     const off = parseSyncArgs(["--no-distributed"]);

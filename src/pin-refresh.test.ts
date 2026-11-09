@@ -106,6 +106,17 @@ describe("refreshPins: a pin from before 0.17.3, brought up to plugin-hostd's fi
     expect(logs).toEqual([`${URI}: pin files refreshed, presets.ttl added`]);
   });
 
+  it("says why a pin was not refreshed when plugin-hostd cannot name its files (plugin-qualify#316)", () => {
+    const dir = bundle("refresh-silent");
+    const logs: string[] = [];
+    const before = stateOf(dir, oldPin(dir));
+    const ctx = { ...ctxOf(dir, logs), pinFilesRun: (() => ({ status: 1, stdout: "", stderr: "no such plugin\n" })) as PinFilesRun };
+    const { state, refreshed } = refreshPins(ctx, before);
+    expect(refreshed).toEqual([]);
+    expect(state).toBe(before);
+    expect(logs).toEqual([`${URI}: pin files not refreshed: no such plugin`]);
+  });
+
   it("leaves a pin alone when a file both lists hold changed: those are other bytes, the sync's to measure", () => {
     const dir = bundle("refresh-b");
     const pin = oldPin(dir);

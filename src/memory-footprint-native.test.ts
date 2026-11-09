@@ -96,6 +96,7 @@ describe("an allocation per voice", () => {
     expect(m.atRestKb!).toBeLessThan(4 * MIB);
     expect(m.notesHeldKb! - m.atRestKb!).toBeGreaterThanOrEqual(8 * 4 * MIB);
     expect(m.basis).toBe("probe");
+    expect(m.notesHeld).toBe(8);
     expect(perInstanceKb(m)!).toBeGreaterThanOrEqual(8 * 4 * MIB);
     expect(judged(m, 16)).toMatchObject({ rating: "unsuitable", code: HOSTING_CODE.memoryAboveCeiling });
     expect(judged({ ...m, notesHeldKb: undefined as never }, 16).rating).toBe("suitable");
@@ -109,7 +110,7 @@ describe("an allocation per voice", () => {
   });
 
   live("LV2 reads notes held at the probe count, and says why with none", () => {
-    expect(lv2Memory("urn:plugin-qualify:fixture:lv2-synth", { OMX_PROBE_NOTES: "8" })).toMatchObject({ basis: "probe", notesHeldKb: expect.any(Number) });
+    expect(lv2Memory("urn:plugin-qualify:fixture:lv2-synth", { OMX_PROBE_NOTES: "8" })).toMatchObject({ basis: "probe", notesHeldKb: expect.any(Number), notesHeld: 8 });
     expect(lv2Memory("urn:plugin-qualify:fixture:lv2-synth").unmeasuredReason).toBe("voices-unknown");
   });
 });
@@ -172,7 +173,7 @@ describe("a memory-only run (plugin-qualify-sync --memory-only)", () => {
     const m = readMemoryFootprint(clapLine(join(FAULTY, "synth-voice-memory.clap"), { OMX_PROBE_NOTES: "16" }).cost.perRate[String(RATE)].memory)!;
     expect(m.basis).toBe("probe");
     expect(m.notesHeldKb! - m.atRestKb!).toBeGreaterThanOrEqual(16 * 4 * MIB);
-    expect(readMemoryFootprint(lv2Only("urn:plugin-qualify:fixture:lv2-synth", { OMX_PROBE_NOTES: "16" }).cost.perRate[String(RATE)].memory)).toMatchObject({ basis: "probe", notesHeldKb: expect.any(Number) });
+    expect(readMemoryFootprint(lv2Only("urn:plugin-qualify:fixture:lv2-synth", { OMX_PROBE_NOTES: "16" }).cost.perRate[String(RATE)].memory)).toMatchObject({ basis: "probe", notesHeldKb: expect.any(Number), notesHeld: 16 });
   });
 
   live("without the variable an ordinary run is untouched: its cost is timed", () => {

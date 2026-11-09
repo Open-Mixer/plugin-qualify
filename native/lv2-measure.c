@@ -1116,6 +1116,7 @@ enum { FP_INSTANTIATE = 1, FP_ACTIVATE = 2, FP_REST = 4, FP_NOTES = 8, FP_SECOND
 struct footprint {
   unsigned got;
   long instantiate, activate, rest, notes, second;
+  unsigned held; /* the notes struck for `notes` */
   char unmeasured[32];
   char detail[96];
 };
@@ -1169,6 +1170,7 @@ static void footprint_measure(struct host *H, double rate, uint32_t block, struc
     const long held = n ? atol(n) : 0;
     if (held > 0) {
       footprint_blocks(r, block, &seed, 1, held > (long)MIDI_KEYS ? MIDI_KEYS : (uint32_t)held);
+      fp->held = held > (long)MIDI_KEYS ? MIDI_KEYS : (uint32_t)held;
       fp->notes = grew(base), fp->got |= FP_NOTES;
     } else {
       snprintf(fp->unmeasured, sizeof fp->unmeasured, "voices-unknown");
@@ -1238,7 +1240,7 @@ static void emit_cost(double rate, const struct cost_at *C, uint32_t block, int 
   if (fp->got & FP_INSTANTIATE) fprintf(jout, "%s\"afterInstantiateKb\":%ld", sep, fp->instantiate), sep = ",";
   if (fp->got & FP_ACTIVATE) fprintf(jout, "%s\"afterActivateKb\":%ld", sep, fp->activate), sep = ",";
   if (fp->got & FP_REST) fprintf(jout, "%s\"atRestKb\":%ld", sep, fp->rest), sep = ",";
-  if (fp->got & FP_NOTES) fprintf(jout, "%s\"notesHeldKb\":%ld,\"basis\":\"probe\"", sep, fp->notes), sep = ",";
+  if (fp->got & FP_NOTES) fprintf(jout, "%s\"notesHeldKb\":%ld,\"notesHeld\":%u,\"basis\":\"probe\"", sep, fp->notes, fp->held), sep = ",";
   if (fp->got & FP_SECOND) fprintf(jout, "%s\"secondInstanceKb\":%ld", sep, fp->second), sep = ",";
   if (fp->unmeasured[0]) {
     fprintf(jout, "%s\"unmeasuredReason\":", sep);

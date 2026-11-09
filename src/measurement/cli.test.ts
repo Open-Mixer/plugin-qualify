@@ -443,3 +443,28 @@ describe("the hosting pass (the native lv2_measure)", () => {
     });
   });
 });
+
+describe("the pin beside a cost and latency run (plugin-qualify#316)", () => {
+  const NATIVE = { tool: "/x/lv2_measure", interposer: "/x/rt_interpose.so" };
+  const pin = { version: "1.0", integrity: { version: "1.0", files: [{ path: "a.so", sha256: "a".repeat(64) }], layout: { scheme: "omx-layout/1", sha256: "b".repeat(64) } } };
+  const catalog = [{ uri: "urn:a", audioInputs: 2, audioOutputs: 2, hasMidiIn: false, params: [], latency: { perRate: { "48000": { frames: 0, ms: 0 } } } }];
+
+  it("takes each plugin's pin with the measurer's --pin after the prober's passes, and only when the measurer is there", () => {
+    const withPin = buildPipeline(options({ dimensions: ["latency", "cost"] }), NATIVE);
+    expect(withPin.steps.map((s) => s.id)).toEqual(["scan", "latency-declared", "latency-measured", "cost", "pin"]);
+    expect(withPin.steps.at(-1)).toEqual({ id: "pin", command: NATIVE.tool, args: ["--pin"], perPlugin: true, produces: "/tmp/run/pins.jsonl" });
+    expect(withPin.hostingScan).toBe("/tmp/run/cost.json");
+    expect(buildPipeline(options({ dimensions: ["latency", "cost"] })).steps.map((s) => s.id)).toEqual(["scan", "latency-declared", "latency-measured", "cost"]);
+    // the hosting pass already writes the pin: no second step
+    expect(buildPipeline(options({ dimensions: ["cost", "stability"] }), NATIVE).steps.map((s) => s.id)).not.toContain("pin");
+  });
+
+  it("writes the integrity block of a plugin only the cost pass measured", () => {
+    const base = { options: options({ rates: [48000], dimensions: ["latency", "cost"] }), catalog, host: FIXTURE_HOST, runId: "run-6", measuredAt: "2026-08-01T10:00:00+02:00" };
+    expect(assembleDocument(base).plugins[0]?.integrity).toBeUndefined();
+    const document = assembleDocument({ ...base, pins: [{ uri: "urn:a", found: true, ...pin, exit: 0 }, { uri: "urn:gone", found: false, exit: 3 }] });
+    expect(document.plugins.map((p) => p.uri)).toEqual(["urn:a"]);
+    expect(document.plugins[0]?.integrity).toEqual(pin.integrity);
+    expect(document.plugins[0]?.version).toBe("1.0");
+  });
+});

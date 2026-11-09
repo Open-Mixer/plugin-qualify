@@ -50,6 +50,7 @@ import {
   buildPipeline,
   collectHostFacts,
   HOSTING_PASS_DIMENSIONS,
+  PROBED_DIMENSIONS,
   hostingLine,
   INITIAL_PROGRESS,
   parseMeasureArgs,
@@ -131,6 +132,20 @@ function hostingTools() {
   return { tool, interposer };
 }
 
+/**
+ * The native measurer for the pin step of a run with no hosting pass: absent, the run still measures and says on stderr
+ * that its plugins carry no integrity block (it does not need the interposer, so a half-populated pair is not refused here).
+ */
+function pinTools() {
+  const { tools } = locateNativeTools([LV2_MEASURE_TOOL_NAME, RT_INTERPOSE_NAME], process.env, existsSync);
+  const [tool, interposer] = tools;
+  if (tool?.path === undefined) {
+    process.stderr.write(`${TOOL_NAME}: no ${LV2_MEASURE_TOOL_NAME} at ${tool?.looked.join(", ") ?? "its places"}: the plugins are written with no integrity block (build it with make -C native or set ${tool?.setting})\n`);
+    return undefined;
+  }
+  return { tool: tool.path, interposer: interposer?.path ?? "" };
+}
+
 /** The hosting pass: the measurer once per plugin, each in its own process, its lines written as JSONL. */
 function runHosting(step, uris, onProgress) {
   const lines = [];
@@ -201,7 +216,8 @@ async function main() {
   const options = parsed.options;
 
   const hosting = options.dimensions.some((d) => HOSTING_PASS_DIMENSIONS.includes(d));
-  const pipeline = buildPipeline(options, hosting ? hostingTools() : undefined);
+  const probedOnly = !hosting && options.dimensions.some((d) => PROBED_DIMENSIONS.includes(d));
+  const pipeline = buildPipeline(options, hosting ? hostingTools() : probedOnly ? pinTools() : undefined);
 
   if (options.dryRun) {
     process.stderr.write(
@@ -242,11 +258,13 @@ async function main() {
   const measuredAt = new Date().toISOString();
   emit({ step: "start", steps: pipeline.steps.map((s) => s.id) });
   let hostingLines;
+  let pinLines;
   for (const step of pipeline.steps) {
     process.stderr.write(`== ${step.id}\n`);
     if (step.perPlugin) {
       const uris = options.plugins ?? urisFromScan(readJson(pipeline.hostingScan));
-      hostingLines = runHosting(step, uris, onProgress);
+      if (step.id === "pin") pinLines = runHosting(step, uris, onProgress);
+      else hostingLines = runHosting(step, uris, onProgress);
     } else {
       await runStep(step, onProgress);
     }
@@ -257,6 +275,7 @@ async function main() {
     options,
     ...(pipeline.finalCatalog === undefined ? {} : { catalog: readJson(pipeline.finalCatalog) }),
     ...(hostingLines === undefined ? {} : { hosting: hostingLines }),
+    ...(pinLines === undefined ? {} : { pins: pinLines }),
     costProvenance:
       pipeline.costProvenance !== undefined && existsSync(pipeline.costProvenance)
         ? readJson(pipeline.costProvenance)
