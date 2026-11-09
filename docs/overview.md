@@ -867,16 +867,24 @@ the plugins taken from the layer, `distributed N`, apart from the ones measured 
 applied plugin like one it measured: skipped while its files are unchanged, measured when they change. `--force`
 measures everything and reads no distributed record; `--no-distributed` keeps the layer out of a run.
 
-The package that installs a set is built from a device's `qualification_dir` by `plugin-qualify-records-package`:
+A record set is per machine class, rate and quantum. The packages that install a run's sets are built by
+`plugin-qualify-records-package`, from the run's root (each `b<rate>-<quantum>/qualification` under it is one cell) or
+from one qualification directory per cell:
 
 ```
-plugin-qualify-records-package /var/lib/omx/qualification --host-class rpi5 --set zynthian-vangelis \
+plugin-qualify-records-package run/ --host-class x86-64 --set fedora44 --provenance provenance.json --out .
+plugin-qualify-records-package /var/lib/omx/qualification --cell 48000/256 --host-class rpi5 --set zynthian-vangelis \
   --provenance provenance.json --out .
 ```
 
-It writes `plugin-db-qualification-<host class>-<set>_<version>_all.deb`, a package of plugin-db's qualification
+A directory's cell is the one its base is named for (`b48000-512`), else `--cell`, else the one cell every record's
+grid holds; a directory whose records hold several cells and that names none is refused, and so are two directories
+of one cell. Each cell's set is `<set>-<rate>-<quantum>`, and its `provenance.json` carries `cell`. A record whose grid
+does not hold its set's cell is left out and named. A sync applies a set only at the cell its records were measured at.
+
+It writes `plugin-db-qualification-<host class>-<set>-<rate>-<quantum>_<version>_all.deb` per cell, a package of plugin-db's qualification
 layer, the version the build date (`2026.10.29`) unless `--version` names one. The package installs the records under
-`/usr/share/omx/qualification/<host class>/<set>/` with `provenance.json`, depends on the minor of the plugin-qualify
+`/usr/share/omx/qualification/<host class>/<set>-<rate>-<quantum>/` with `provenance.json`, depends on the minor of the plugin-qualify
 that wrote it up to the next minor (`plugin-qualify (>= 0.19.0~), plugin-qualify (<< 0.20~)`), and is `Architecture: all`. `--provenance` names a JSON file (or holds the JSON itself) with what the tool
 cannot know: the image, the package versions and the source revisions of the device. The tool adds the set, the host
 class, the package and the date. A record whose probe output is missing or does not match its SHA-256 is left out

@@ -34,7 +34,7 @@ import { POOL_RESULT, completePool, judgePoolRun, pinAfterPool, pinFromRecordWit
 import { hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
 import type { Judgment } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { GRID_FULL, parseGridSpec, type GridSpec } from "./measurement-grid.js";
+import { GRID_FULL, hostCells, parseGridSpec, type GridCell, type GridSpec } from "./measurement-grid.js";
 import { adapterPass, type AdapterPassOptions, type AdapterPassResult } from "./qualify-adapter-pass.js";
 import { ISOLATED_RESULT, baseSteps, completeIsolated, isolatedCell, missingSteps, judgeIsolatedRun, owesIsolated, pinAfterStep, spawnedIsolatedRunner, type IsolatedRunner } from "./qualify-isolated.js";
 import { lv2World, rejudgeRecord, rejudgeState, rejudgeToolName, memoryPass, type MemoryPassResult, type RejudgeResult } from "./qualify-rejudge.js";
@@ -985,6 +985,14 @@ export function poolPass(ctx: SyncContext, state: SyncState): { readonly state: 
 
 // --- the distributed records ----------------------------------------------------------------------------------------
 
+/**
+ * The cells a sync runs at, which a distributed set must hold to apply (#317): the grid's own cells when it names them
+ * (`grid 48000/512`), else the cells the host profile judges cost and memory at.
+ */
+export function syncCells(settings: Pick<SyncSettings, "grid" | "hostProfile">): GridCell[] {
+  return settings.grid.kind === "cells" ? [...settings.grid.cells] : hostCells(settings.hostProfile);
+}
+
 /** The layer a run reads: none under `--force` or `--no-distributed`, or without a host class. */
 function distributedLayerOf(settings: SyncSettings, force: boolean, log: (line: string) => void): DistributedLayer {
   if (force || !settings.distributed) return EMPTY_LAYER;
@@ -1007,12 +1015,10 @@ function takeDistributed(ctx: SyncContext, layer: DistributedLayer, item: SyncIt
   if (layer.records === 0) return undefined;
   const started = Date.now();
   const host = ctx.settings.hostProfile.id;
-  const match = matchDistributed(layer, item, host, (paths) => digestFiles(item.root, paths, files));
+  const match = matchDistributed(layer, item, host, (paths) => digestFiles(item.root, paths, files), syncCells(ctx.settings));
   if (match.status === "none") return undefined;
-  if (match.status === "ignored") {
-    for (const line of match.lines) ctx.log(line);
-    return undefined;
-  }
+  for (const line of match.lines) ctx.log(line);
+  if (match.status === "ignored") return undefined;
   for (const r of match.records) {
     const missing = missingSteps(r.record);
     if (missing.length > 0) {
