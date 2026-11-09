@@ -133,3 +133,65 @@ export function judgedLayerOf(record: QualificationRecord, input: JudgedLayerInp
     },
   };
 }
+
+export interface JudgedLayerArgs {
+  readonly record: string;
+  readonly machineClass: string;
+  readonly files: string;
+  readonly layout: string | null;
+  readonly judgedBy?: string;
+  readonly address?: string;
+  /** Print the body only, as `plugin-db put <address> judged --writer plugin-qualify` reads it from stdin. */
+  readonly body: boolean;
+}
+
+export function judgedLayerHelpText(): string {
+  return [
+    "usage: plugin-qualify judged-layer <record.qualification.json> --machine-class <word> --files <sha256>",
+    "                                   [--layout <scheme>:<sha256>] [--judged-by <version>] [--address <address>] [--body]",
+    "",
+    "Print the plugin-db judged layer of a qualification record, for the pin plugin-db holds (its files digest and",
+    "layout). --judged-by names the plugin-qualify that judged a record stating no rules (the set's provenance). --body",
+    "prints the body only, for `plugin-db put <address> judged --writer plugin-qualify`. A record whose verdict under",
+    "plugin-hostd's worker was not measured has no layer: the reason is printed and the exit status is 1.",
+    "",
+  ].join("\n");
+}
+
+export type ParsedJudgedLayerArgs = { ok: true; args: JudgedLayerArgs } | { ok: true; help: true } | { ok: false; error: string };
+
+export function parseJudgedLayerArgs(argv: readonly string[]): ParsedJudgedLayerArgs {
+  const opts: Record<string, string> = {};
+  const files: string[] = [];
+  let body = false;
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a === "--help" || a === "-h") return { ok: true, help: true };
+    if (a === "--body") body = true;
+    else if (["--machine-class", "--files", "--layout", "--judged-by", "--address"].includes(a)) {
+      const v = argv[++i];
+      if (v === undefined || v.startsWith("--")) return { ok: false, error: `${a} needs a value` };
+      opts[a] = v;
+    } else if (a.startsWith("--")) return { ok: false, error: `unknown option ${a}` };
+    else files.push(a);
+  }
+  if (files.length !== 1) return { ok: false, error: "name one record" };
+  const machineClass = opts["--machine-class"];
+  const pinFiles = opts["--files"];
+  if (machineClass === undefined) return { ok: false, error: "--machine-class is required" };
+  if (pinFiles === undefined || !/^[0-9a-f]{64}$/.test(pinFiles)) return { ok: false, error: "--files must be the 64 hex digits of the files pin" };
+  const layout = opts["--layout"] ?? null;
+  if (layout !== null && !/^[^:]+:[0-9a-f]{64}$/.test(layout)) return { ok: false, error: "--layout must be <scheme>:<sha256>" };
+  return {
+    ok: true,
+    args: {
+      record: files[0]!,
+      machineClass,
+      files: pinFiles,
+      layout,
+      body,
+      ...(opts["--judged-by"] === undefined ? {} : { judgedBy: opts["--judged-by"] }),
+      ...(opts["--address"] === undefined ? {} : { address: opts["--address"] }),
+    },
+  };
+}

@@ -150,3 +150,38 @@ describe.skipIf(reader === undefined)("the round trip through plugin-db's reader
     expect(read(entry, { ...here, machineClass: "rpi5" }).state).not.toBe("qualified");
   });
 });
+
+describe("plugin-qualify judged-layer", () => {
+  it("parses a record, the class word and the pin; refuses a pin that is no digest and a missing class", async () => {
+    const { parseJudgedLayerArgs } = await import("./judged-layer.js");
+    const ok = parseJudgedLayerArgs(["r.json", "--machine-class", "x86-64", "--files", PIN.files, "--layout", PIN.layout, "--body"]);
+    expect(ok).toEqual({ ok: true, args: { record: "r.json", machineClass: "x86-64", files: PIN.files, layout: PIN.layout, body: true } });
+    expect(parseJudgedLayerArgs(["r.json", "--files", PIN.files])).toEqual({ ok: false, error: "--machine-class is required" });
+    expect(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", "abc"]).ok).toBe(false);
+    expect(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", PIN.files, "--layout", "nope"]).ok).toBe(false);
+    expect(parseJudgedLayerArgs(["--machine-class", "x", "--files", PIN.files]).ok).toBe(false);
+  });
+
+  it("the built command prints the layer, the body for plugin-db put, and exits 1 with the reason for no layer", async () => {
+    const { mkdtempSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { spawnSync } = await import("node:child_process");
+    const bin = new URL("../bin/plugin-qualify.mjs", import.meta.url).pathname;
+    if (!existsSync(new URL("../dist/index.js", import.meta.url))) return expect.fail("dist/ is not built: npm run build");
+    const dir = mkdtempSync(join(tmpdir(), "pq-judged-"));
+    const rec = recordOf();
+    const good = { ...rec, verdicts: rec.verdicts.map((v) => (v.host === "omx-clap-host" ? { ...v, rating: "suitable", measured: true } : v)) };
+    writeFileSync(join(dir, "good.json"), JSON.stringify(good));
+    const run = (...a: string[]) => spawnSync(process.execPath, [bin, "judged-layer", ...a], { encoding: "utf8" });
+    const out = run(join(dir, "good.json"), "--machine-class", "x86-64", "--files", PIN.files);
+    expect(out.status).toBe(0);
+    expect(JSON.parse(out.stdout)).toEqual(mustLayer(layerOf(good, { pin: { files: PIN.files, layout: null } })));
+    const body = run(join(dir, "good.json"), "--machine-class", "x86-64", "--files", PIN.files, "--body");
+    expect(JSON.parse(body.stdout).verdict).toBe("in-process");
+    const bad = { ...rec, verdicts: rec.verdicts.map((v) => (v.host === "omx-clap-host" ? { ...v, measured: false, rating: "unknown", deciding: "probe.timeout" } : v)) };
+    writeFileSync(join(dir, "bad.json"), JSON.stringify(bad));
+    const none = run(join(dir, "bad.json"), "--machine-class", "x86-64", "--files", PIN.files);
+    expect(none.status).toBe(1);
+    expect(none.stderr).toMatch(/no judged layer: omx-clap-host: not measured \(probe\.timeout\)/);
+  });
+});

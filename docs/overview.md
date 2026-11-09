@@ -277,6 +277,24 @@ word (`probe-crashed`, or `probe-error` for `probe.oom`); a run that took no lat
 older than the latency arm), `not-attempted`. The declared figure alone, for a plugin whose response could not be
 measured, is not in the probe output: plugin-hostd's runner writes a cell's latency only with both figures.
 
+A measured cell also carries `latencyMs`, the figure in milliseconds at its rate, and the record states the
+latency line those figures stand against, `latencyLineMs` (5 ms, declared once in `src/judgement-line.ts`), and the
+rules it was judged by, `rules` (`plugin-qualify-rules/<major>.<minor>`: a rule changes only in a minor). Over the
+line is information: the plugin still loads.
+
+### The judged layer of plugin-db
+
+plugin-qualify is the one writer of plugin-db's judged layer. `plugin-qualify judged-layer <record> --machine-class
+<word> --files <sha256> [--layout <scheme>:<sha256>]` prints it for the pin plugin-db holds; `--body` prints the body
+for `plugin-db put <address> judged --writer plugin-qualify`. The layer is one verdict under plugin-hostd: the
+omx-clap-host verdict, in the pins file's words (`in-process`, `isolated`, `refused`), with the probe runner's version
+as the host version, hosting epoch 0 (plugin-hostd has declared no hosting change), the record's rules (or, for a
+record that states none, `--judged-by <version>`, the plugin-qualify of its set), its schema, its measured cells with
+`latencyMs`, and the latency line. A CLAP plugin's omx-clap-host verdict is in its `custom` offer's record. A record
+whose omx-clap-host verdict was not measured has no layer: the command prints why and exits 1, and plugin-db's reader
+answers `unqualified` for the plugin. Over the x86-64 fedora44 set (plugin-qualify 0.19.1, 1109 records of 672
+plugins), 658 plugins have a layer (431 in-process records, 227 isolated) and 14 have none, not measured.
+
 
 The prober also scans: `OMX_CLAP_SCAN=native/build/clap-qualify` makes it the scanner, and its scan
 keeps what a console needs to draw a third-party plugin's controls: an enum parameter's labels (as
