@@ -100,16 +100,18 @@ function figuresOf(run: IsolatedRunFacts): IsolatedFigures | undefined {
 
 /**
  * A verdict whose only gap is memory nobody measured: it reads `unknown` and every reason that is not `suitable` is
- * `hosting.memory.unmeasured`. Nothing says the plugin is unfit, so it is hosted in a worker of its own until its
- * footprint is measured, and the isolated step is what shows it running alone.
+ * `hosting.memory.unmeasured`, or a `conditional` one the isolated step answers (an RT violation seen in the run). Nothing
+ * says the plugin is unfit, so it is hosted in a worker of its own until its footprint is measured, and the isolated step
+ * is what shows it running alone. A conditional reason beside the memory gap owes the step as a conditional verdict does:
+ * whether one run saw a violation and another did not must not decide whether the step is run (#319).
  */
 export function memoryGapOnly(v: Pick<RecordVerdict, "measured" | "rating" | "reasons">): boolean {
   if (!v.measured || v.rating !== "unknown") return false;
   const open = v.reasons.filter((r) => r.rating !== "suitable");
-  return open.length > 0 && open.every((r) => r.code === HOSTING_CODE.memoryUnmeasured);
+  return open.some((r) => r.code === HOSTING_CODE.memoryUnmeasured) && open.every((r) => r.code === HOSTING_CODE.memoryUnmeasured || r.rating === "conditional");
 }
 
-/** Whether a record's outcome calls for the isolated step: rated `conditional` by some host, a memory gap and nothing else, or a probe that crashed or hung. */
+/** Whether a record's outcome calls for the isolated step: rated `conditional` by some host, a memory gap and nothing else unanswered, or a probe that crashed or hung. */
 export function owesIsolated(record: QualificationRecord): boolean {
   return PROBE_FAILED_HARD.has(record.probe.outcome) || record.verdicts.some((v) => v.measured && (v.rating === "conditional" || memoryGapOnly(v)));
 }
