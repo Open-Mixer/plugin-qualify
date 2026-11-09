@@ -136,7 +136,7 @@ describe("the record of an LV2 plugin", () => {
     const record = recordOf(measure(LATENCY("declared"), 48000));
     expect(record.plugin).toMatchObject({ format: "lv2", id: LATENCY("declared") });
     const point = record.measurements.grid[0]!;
-    expect(Object.keys(point).sort()).toEqual(["cost", "latency", "noteSweep", "outcome", "quantum", "rate", "rtSafety"]);
+    expect(Object.keys(point).sort()).toEqual(["cost", "latency", "latencyMs", "noteSweep", "outcome", "quantum", "rate", "rtSafety"]);
     expect([point.rate, point.quantum]).toEqual([48000, 512]);
     expect(point.latency).toEqual({ declaredFrames: 480, measuredFrames: 480 });
     expect(point.cost).toMatchObject({ blocks: 512, warmupBlocks: 64, percentile: { p: 95 } });
