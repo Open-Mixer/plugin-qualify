@@ -26,12 +26,14 @@ import {
   type ModHostRun,
   JALV_HOSTED_MS,
   admissionRating,
+  ADAPTER_CONTENT_UNOBSERVED_CODE,
 } from "./host-admission.js";
+import { lv2ContentParams } from "./lv2-loader.js";
 import { JALV_PROFILE, MOD_HOST_PROFILE, OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import { pinVerdictOf } from "./pins-file.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fixtureJson, readFixture, withoutMemoryBudget } from "./probe-output-fixtures.js";
 import { buildQualificationRecord, tiersOf } from "./qualification-record.js";
 
@@ -379,16 +381,23 @@ const port = Number(process.argv[process.argv.indexOf("-p") + 1]);
 net.createServer((c) => c.on("data", (d) => {
   const line = d.toString().replace(/\\0$/, "");
   fs.appendFileSync(process.env.STAND_LOG, line + "\\n");
+  if (line.startsWith("patch_set")) {
+    const resp = Number(process.env.STAND_PATCH_RESP ?? 0);
+    if (resp === 0) fs.writeFileSync(process.env.STAND_LOG + ".loaded", line);
+    return c.write("resp " + resp + "\\0");
+  }
   c.write((line.startsWith("audio_ports") ? 'resp 0 in:main:1:2:stereo:"in":in_1,in_2 out:main:1:2:stereo:"out one":out_1,out_2 out:aux:1:2:stereo:"Scene A":aux_out_1_1,aux_out_1_2' : "resp 0") + "\\0");
 })).listen(port, "127.0.0.1");
 `,
     );
     write("omx-clap-scan", '#!/bin/sh\nprintf "plugin\\trdf:type\\tlv2:Plugin\\n"\n[ "$STAND_CLASS" = instrument ] && printf "plugin\\trdf:type\\tlv2:InstrumentPlugin\\n"\nexit 0\n');
-    const meter = write("jack_peak", '#!/bin/sh\nprintf "%s\\n" "$@" > "$STAND_LOG.ports"\necho ready\ncat > /dev/null\necho "{\\"peak\\":$STAND_PEAK,\\"frames\\":48000}"\n');
+    // a sample loaded makes the stand-in sound: the peak is STAND_LOADED_PEAK once the host took a patch_set
+    const meter = write("jack_peak", '#!/bin/sh\nprintf "%s\\n" "$@" > "$STAND_LOG.ports"\necho ready\ncat > /dev/null\np=$STAND_PEAK\n[ -f "$STAND_LOG.loaded" ] && p=${STAND_LOADED_PEAK:-0.3}\necho "{\\"peak\\":$p,\\"frames\\":48000}"\n');
     const helper = join(dirname(fileURLToPath(import.meta.url)), "..", "tools", "mod-host-admit.mjs");
     const log = join(dir, "log");
     const admit = (env: Record<string, string>): { run: ModHostRun; sent: string[] } => {
       rmSync(log, { force: true });
+      rmSync(`${log}.loaded`, { force: true });
       const r = spawnSync(process.execPath, [helper, "urn:x", "omx-clap-host"], {
         encoding: "utf8",
         env: { ...process.env, PATH: `${dir}:${process.env["PATH"]}`, STAND_LOG: log, OMX_JACK_PEAK: meter, STAND_PEAK: "0.2", ...env },
@@ -411,6 +420,50 @@ net.createServer((c) => c.on("data", (d) => {
       expect(run.sound?.problem).toBeDefined();
       expect(classifyProtocolRun(ADAPTER_HOST, run).code).toBe("omx-clap-host.level-unmeasured");
     });
+    // a sampler with nothing loaded by default, as samplv1 and drumkv1 are (#318): it declares its sample as a writable path
+    const lv2 = join(dir, "lv2");
+    const sampler = join(lv2, "sampler.lv2");
+    mkdirSync(sampler, { recursive: true });
+    writeFileSync(join(sampler, "manifest.ttl"), SAMPLER_MANIFEST);
+    writeFileSync(join(sampler, "sampler.ttl"), SAMPLER_TTL);
+    const output = readFixture("success-msi");
+    const asLv2 = { ...output, plugin: { ...output.plugin, format: "lv2" as const, id: "urn:x" } };
+
+    it("a sampler is given a sample through the path it declares before the notes, and sounds on it", () => {
+      const { run, sent } = admit({ STAND_CLASS: "instrument", STAND_PEAK: "0", LV2_PATH: lv2 });
+      expect(sent[0]).toBe("add urn:x 0");
+      expect(sent[1]).toBe("audio_ports 0");
+      expect(sent[2]).toMatch(/^patch_set 0 urn:x#sample ".*plugin-qualify-content\.wav"$/);
+      expect(sent[3]).toBe("note_on 0 0 36 100");
+      expect(run.sound).toEqual({ peak: 0.3, notes: 30, content: { params: ["urn:x#sample"], loaded: ["urn:x#sample"] } });
+      const a = classifyProtocolRun(ADAPTER_HOST, run);
+      expect(a).toEqual({ host: ADAPTER_HOST, measured: true, admitted: true, params: { peak: 0.3, notes: 30, content: "urn:x#sample", loaded: "urn:x#sample" } });
+      const j = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: a } });
+      expect(j.hosts[0]!.verdict.deciding).not.toBe("omx-clap-host.silent-under-note");
+      expect(j.hosts[0]!.verdict.rating).not.toBe("unknown");
+    });
+
+    it("a sampler the host gives no sample is not judged on its silence: admitted, the reason shown, no other host asked", () => {
+      const { run, sent } = admit({ STAND_CLASS: "instrument", STAND_PEAK: "0", STAND_PATCH_RESP: "-1", LV2_PATH: lv2 });
+      expect(sent.filter((l) => l.startsWith("patch_set"))).toHaveLength(1);
+      expect(run.sound?.content).toEqual({ params: ["urn:x#sample"], loaded: [], refused: ["urn:x#sample (resp -1)"] });
+      const a = classifyProtocolRun(ADAPTER_HOST, run);
+      expect(a).toMatchObject({ measured: true, admitted: true, code: ADAPTER_CONTENT_UNOBSERVED_CODE, params: { peak: 0, notes: 30, content: "urn:x#sample", loaded: "", refused: "urn:x#sample (resp -1)" } });
+      const j = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: a } });
+      const asIf = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: { host: ADAPTER_HOST, measured: true, admitted: true, params: {} } } });
+      // the verdict is the one an admitted run gives; the reason says why the note test could not be observed
+      expect(j.hosts[0]!.verdict).toEqual(asIf.hosts[0]!.verdict);
+      expect(j.hosts[0]!.verdict.qualified).toBe(true);
+      expect(j.hosts[0]!.reasons[0]).toMatchObject({ dimension: "hostAdmission", rating: "suitable", code: "omx-clap-host.silent-needs-content" });
+    });
+
+    it("an instrument that declares no content and is silent stays silent-under-note", () => {
+      const { run, sent } = admit({ STAND_CLASS: "instrument", STAND_PEAK: "0", LV2_PATH: join(dir, "no-lv2") });
+      expect(sent.some((l) => l.startsWith("patch_set"))).toBe(false);
+      expect(run.sound?.content).toBeUndefined();
+      expect(classifyProtocolRun(ADAPTER_HOST, run).code).toBe("omx-clap-host.silent-under-note");
+    });
+
     it("a plugin of no instrument class is not played", () => {
       const { run, sent } = admit({ STAND_CLASS: "effect" });
       expect(sent).toEqual(["add urn:x 0", "remove 0"]);
@@ -479,5 +532,43 @@ net.createServer((c) => c.on("data", () => c.write("resp ${resp}\\0"))).listen(p
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+const SAMPLER_MANIFEST = `@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<urn:x> a lv2:Plugin, lv2:InstrumentPlugin ;
+  lv2:binary <sampler.so> ;
+  rdfs:seeAlso <sampler.ttl> .
+<urn:other> a lv2:Plugin ; rdfs:seeAlso <sampler.ttl> .
+`;
+// samplv1's shape: the sample is a patch:writable parameter of range atom:Path; a float parameter is no content
+const SAMPLER_TTL = `@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix x: <urn:x#> .
+x:sample a lv2:Parameter ; rdfs:label "Sample" ; rdfs:range atom:Path .
+x:gain a lv2:Parameter ; rdfs:label "Gain" ; rdfs:range atom:Float .
+<urn:x> patch:writable x:sample , x:gain ;
+  lv2:port [ a lv2:InputPort , lv2:AtomPort ; lv2:index 0 ; lv2:symbol "in" ] .
+<urn:other> patch:writable x:gain .
+`;
+
+describe("the content an LV2 plugin declares it plays from (#318)", () => {
+  const root = mkdtempSync(join(tmpdir(), "lv2-content-"));
+  afterAll(() => rmSync(root, { recursive: true, force: true }));
+  const b = join(root, "sampler.lv2");
+  mkdirSync(b);
+  writeFileSync(join(b, "manifest.ttl"), SAMPLER_MANIFEST);
+  writeFileSync(join(b, "sampler.ttl"), SAMPLER_TTL);
+
+  it("is its writable parameters of range atom:Path, read through the manifest's files", () => {
+    expect(lv2ContentParams("urn:x", { LV2_PATH: root })).toEqual(["urn:x#sample"]);
+  });
+  it("is nothing for a plugin with no path parameter, one not on the path, or an empty path", () => {
+    expect(lv2ContentParams("urn:other", { LV2_PATH: root })).toEqual([]);
+    expect(lv2ContentParams("urn:absent", { LV2_PATH: root })).toEqual([]);
+    expect(lv2ContentParams("urn:x", { LV2_PATH: join(root, "none") })).toEqual([]);
   });
 });

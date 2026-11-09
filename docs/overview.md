@@ -557,8 +557,13 @@ verdict qualified, `isolated` when its verdict qualified or is `conditional`) an
 its own, never grouped, and its pin says `isolated`. An LV2 plugin is run once under the adapter, and
 that run decides its `omx-clap-host` verdict as a mod-host run decides mod-host's. An `lv2:InstrumentPlugin` is also played one
 held note there, its output read at its JACK ports (`jack_peak`): at or under -120 dBFS it reads `unknown`
-(`omx-clap-host.silent-under-note`), not qualified and not refused, since a sampler with nothing loaded is silent too. A level
-that could not be read reads the same way (`omx-clap-host.level-unmeasured`). A plugin that kills the isolated
+(`omx-clap-host.silent-under-note`), not qualified and not refused. A sampler or drum machine with nothing loaded is silent
+by design, so before the notes an instrument that declares content (a `patch:writable` parameter whose `rdfs:range` is
+`atom:Path`, as samplv1's sample and drumkv1's kit) is given a short sample of the run's own through that parameter
+(`patch_set`). When it sounds on it, the run admits it and names the content loaded; when the host refuses the sample or
+the plugin stays silent even so, the note test is not observable for it: the run admits it, and the record shows
+`omx-clap-host.silent-needs-content` with the parameters and what the host answered, a reason that never decides the
+verdict. No other host is asked instead. A level that could not be read reads `unknown` (`omx-clap-host.level-unmeasured`). A plugin that kills the isolated
 host and qualifies in-process is offered in-process only. The tiers are judged for every plugin whether or not
 `--host-profile` names them; mod-host and jalv are run only when `--host-profile` asks for them.
 

@@ -5,9 +5,13 @@
 // socket. Prints one JSON line, {installed, steps:[{cmd, resp | died}]}, for src/host-admission.ts to classify. The host
 // is always killed at the end, so the next plugin gets a fresh one.
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { lv2ContentParams } from "../dist/lv2-loader.js";
 
 const uri = process.argv[2];
 // the host to admit under: mod-host, or omx-clap-host for plugin-hostd's LV2 adapter, which answers the same protocol
@@ -68,6 +72,38 @@ function isInstrument() {
 // the JACK output ports of the instance, from audio_ports's reply: resp 0 [dry] in:... out:main:1:2:stereo:"out":out_1,out_2
 function outputPorts(reply) {
   return [...reply.matchAll(/ out:[^ "]*"[^"]*":([^ ]+)/g)].flatMap((m) => m[1].split(",")).map((p) => `effect_${INSTANCE}:${p}`);
+}
+
+// a sampler or a drum machine with nothing loaded is silent by design (#318): the content it declares (a patch:writable
+// parameter of range atom:Path) is given a short sample of its own before the notes, so the note test hears the plugin
+const CONTENT_RATE = 48000;
+const CONTENT_SECONDS = 0.5;
+const CONTENT_HZ = 220;
+const CONTENT_LOAD_MS = 500;
+
+// a mono 16-bit WAV of a decaying sine: the sample a content parameter is given
+function writeContentSample(dir) {
+  const frames = Math.round(CONTENT_RATE * CONTENT_SECONDS);
+  const wav = Buffer.alloc(44 + frames * 2);
+  wav.write("RIFF", 0);
+  wav.writeUInt32LE(36 + frames * 2, 4);
+  wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(CONTENT_RATE, 24);
+  wav.writeUInt32LE(CONTENT_RATE * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36);
+  wav.writeUInt32LE(frames * 2, 40);
+  for (let i = 0; i < frames; i++) {
+    const v = Math.sin((2 * Math.PI * CONTENT_HZ * i) / CONTENT_RATE) * Math.exp((-3 * i) / frames) * 0.5;
+    wav.writeInt16LE(Math.round(v * 32767), 44 + i * 2);
+  }
+  const path = join(dir, "plugin-qualify-content.wav");
+  writeFileSync(path, wav);
+  return path;
 }
 
 const PEAK_TOOL_DIRS = [fileURLToPath(new URL("../native/build/", import.meta.url)), "/usr/libexec/plugin-qualify/", "/usr/lib/plugin-qualify/"];
@@ -132,6 +168,23 @@ async function main() {
     // an instrument the adapter took: does a held note sound? A plugin that dies on the note dies at the remove below
     if (cmd === "remove" && bin === ADAPTER && isInstrument()) {
       const ports = outputPorts((await ask(`audio_ports ${INSTANCE}`)) ?? "");
+      let content;
+      const params = lv2ContentParams(uri, process.env);
+      if (params.length > 0) {
+        const dir = mkdtempSync(join(tmpdir(), "plugin-qualify-content-"));
+        const file = writeContentSample(dir);
+        const loaded = [];
+        const refused = [];
+        for (const param of params) {
+          const reply = await ask(`patch_set ${INSTANCE} ${param} "${file}"`);
+          const resp = reply === undefined ? undefined : Number(/resp (-?\d+)/.exec(reply)?.[1]);
+          if (resp === 0) loaded.push(param);
+          else refused.push(resp === undefined ? `${param} (no answer)` : `${param} (resp ${String(resp)})`);
+        }
+        if (loaded.length > 0) await sleep(CONTENT_LOAD_MS);
+        content = { params, loaded, ...(refused.length === 0 ? {} : { refused }) };
+        cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+      }
       sound =
         ports.length === 0
           ? { problem: "no output port" }
@@ -141,6 +194,7 @@ async function main() {
               await sleep(NOTE_WINDOW_MS);
             });
       if (sound.peak !== undefined) sound.notes = NOTE_COUNT;
+      if (content !== undefined) sound.content = content;
     }
     buffer = "";
     sock.write(`${line}\0`);
@@ -164,7 +218,9 @@ async function main() {
   return { installed: true, steps, ...(sound === undefined ? {} : { sound }) };
 }
 
+const cleanups = [];
 const result = await main();
+for (const c of cleanups) c();
 try {
   process.kill(-host.pid, "SIGKILL");
 } catch {
