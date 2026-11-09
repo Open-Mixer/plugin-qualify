@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * The judged layer of a plugin-db entry, from a qualification record: plugin-qualify is that layer's one writer
- * (plugin-db docs/design/records.md). The reader never parses a record; it reads the layer this writes, so every field
+ * (plugin-db's records design note, FreeMixer/plugin-db#10). The reader never parses a record; it reads the layer this writes, so every field
  * the state function reads is set here, from the record and from what plugin-qualify declares once:
  *
  * - the latency line (`LATENCY_LINE_MS`), written beside each cell's figure (`latencyMs`), so a surface shows the
