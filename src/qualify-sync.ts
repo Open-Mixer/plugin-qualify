@@ -987,7 +987,7 @@ export function poolPass(ctx: SyncContext, state: SyncState): { readonly state: 
 
 /**
  * The cells a sync runs at, which a distributed set must hold to apply (#317): the grid's own cells when it names them
- * (`grid 96000/256`), else the cells the host profile judges cost and memory at.
+ * (`grid 48000/512`), else the cells the host profile judges cost and memory at.
  */
 export function syncCells(settings: Pick<SyncSettings, "grid" | "hostProfile">): GridCell[] {
   return settings.grid.kind === "cells" ? [...settings.grid.cells] : hostCells(settings.hostProfile);
