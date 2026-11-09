@@ -1,22 +1,27 @@
 .TH PLUGIN-QUALIFY-RECORDS-PACKAGE 1 "October 2026" "plugin-qualify" "User Commands"
 .SH NAME
-plugin-qualify-records-package \- the Debian package of a device's qualification records
+plugin-qualify-records-package \- the Debian packages of a device's qualification records, one per rate and quantum
 .SH SYNOPSIS
 .B plugin-qualify-records-package
-.I qualification-dir
-\fB\-\-host\-class\fR \fIclass\fR \fB\-\-set\fR \fIset\fR \fB\-\-provenance\fR \fIjson\fR
+.IR qualification-dir | run-root ...
+[\fB\-\-cell\fR \fIrate\fB/\fIquantum\fR] \fB\-\-host\-class\fR \fIclass\fR \fB\-\-set\fR \fIset\fR \fB\-\-provenance\fR \fIjson\fR
 [\fB\-\-version\fR \fIversion\fR] [\fB\-\-out\fR \fIdir\fR] [\fB\-\-maintainer\fR \fIwho\fR]
 .SH DESCRIPTION
-Builds \fBplugin-db-qualification-\fIclass\fB-\fIset\fB_\fIversion\fB_all.deb\fR, a package of plugin-db's qualification layer, from the qualification directory
-plugin-qualify-sync(1) left on a device. The package installs every record, with the probe output it judged, under
-/usr/share/omx/qualification/\fIclass\fR/\fIset\fR/ beside \fBprovenance.json\fR, and depends on the minor
+A record set is per machine class, rate and quantum. Builds one
+\fBplugin-db-qualification-\fIclass\fB-\fIset\fB-\fIrate\fB-\fIquantum\fB_\fIversion\fB_all.deb\fR per cell, a package of plugin-db's
+qualification layer, from the qualification directories plugin-qualify-sync(1) left on a device: each directory is a
+cell, named by its base (\fIrun\fB/b48000-512/qualification\fR), and a run root stands for every
+\fBb\fIrate\fB-\fIquantum\fB/qualification\fR under it. Each package installs every record of its cell, with the probe
+output it judged, under /usr/share/omx/qualification/\fIclass\fR/\fIset\fB-\fIrate\fB-\fIquantum\fR/ beside
+\fBprovenance.json\fR, which names the cell, and depends on the minor
 of the plugin-qualify that wrote it, up to the next minor. On another device of the class, plugin-qualify-sync takes a plugin from
 those records instead of measuring it, and only when every file of the installed plugin hashes as the measured one
 did.
 .PP
 A record whose probe output is missing, or is not the copy it names, is left out and named on standard error; so is
-an unmeasured record, which never applies. The last line on standard output names the package, its records and its
-files.
+an unmeasured record, which never applies, and a record whose grid does not hold its set's cell. Each line on standard
+output names one package, its set and cell, its records and its files. Two directories of one cell, or a directory
+whose records hold several cells and whose name says none, are refused before any package is written.
 .SH OPTIONS
 .TP
 .BI \-\-host\-class " class"
@@ -24,6 +29,9 @@ The machine class the records were measured on (\fBrpi5\fR).
 .TP
 .BI \-\-set " set"
 The plugin set they cover (\fBzynthian-vangelis\fR).
+.TP
+.BI \-\-cell " rate/quantum"
+The cell of one directory whose name says none and whose records hold several.
 .TP
 .BI \-\-provenance " json"
 A JSON file, or the JSON itself, with what the tool cannot know: the image, the package versions and the source
@@ -35,6 +43,6 @@ The package's version; the default is the build date, \fB2026.10.29\fR.
 .BI \-\-out " dir"
 Where the package is written (default: the current directory).
 .SH EXIT STATUS
-0 the package was written; 2 it could not be.
+0 every package was written; 2 one could not be.
 .SH SEE ALSO
 .BR plugin-qualify-sync (1)

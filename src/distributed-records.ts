@@ -15,6 +15,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { machine } from "node:os";
 import { join, resolve } from "node:path";
 
+import { cellKey, type GridCell } from "./measurement-grid.js";
 import { clapPinUri, pinVerdictOf, type PinEntry } from "./pins-file.js";
 import { integrityOfProbeOutput } from "./probe-judge.js";
 import { readProbeOutput, sha256Hex } from "./probe-output.js";
@@ -171,26 +172,38 @@ export function outcomeOfVerdict(v: Pick<RecordVerdict, "measured" | "rating" | 
   return v.rating === "unsuitable" ? "refused" : "unmeasured";
 }
 
+/** The cells a record's grid holds, by rate then quantum: where the set it came in was measured. */
+export function recordCells(record: Pick<QualificationRecord, "measurements">): GridCell[] {
+  const seen = new Map<string, GridCell>();
+  for (const p of record.measurements?.grid ?? []) seen.set(cellKey(p), { rate: p.rate, quantum: p.quantum });
+  return [...seen.values()].sort((a, b) => a.rate - b.rate || a.quantum - b.quantum);
+}
+
 /** What the layer makes of one item. */
 export type DistributedMatch =
   /** No distributed record names the plugin: it is measured, and nothing is said. */
   | { readonly status: "none" }
   /** Every reason a record found was not taken, one line each; the plugin is measured. */
   | { readonly status: "ignored"; readonly lines: readonly string[] }
-  | { readonly status: "applies"; readonly set: string; readonly records: readonly DistributedRecord[]; readonly files: readonly string[] };
+  /** A set applies; `lines` names every set tried before it and why it was passed over. */
+  | { readonly status: "applies"; readonly set: string; readonly records: readonly DistributedRecord[]; readonly files: readonly string[]; readonly lines: readonly string[] };
 
 /**
  * Whether the item is taken from the layer. The records that find it are tried one set at a time, in the order the
  * layer read them. Of a set, only the records whose every file is installed with the SHA-256 it recorded (computed
  * here by `digest`) count: a record of other bytes is another build of the plugin and is passed over. The set applies
  * when at least one record of these bytes holds a verdict for `host`, and none of those verdicts is one the source
- * could not measure; a set with no record of these bytes is a binary that differs.
+ * could not measure; a set with no record of these bytes is a binary that differs. A set is per machine class, rate
+ * and quantum: of these records, only the ones whose grid holds every cell in `cells` (the cells the sync runs at)
+ * count, so a set measured at another cell is passed over, naming the cells it was measured at, and never answers a
+ * sync at this one by the order its name sorts in (#317). No cells given asks nothing of the grid.
  */
 export function matchDistributed(
   layer: DistributedLayer,
   item: SyncItem,
   host: string,
   digest: (files: readonly string[]) => readonly FileDigest[] | undefined,
+  cells: readonly GridCell[] = [],
 ): DistributedMatch {
   const found = item.format === "clap" ? layer.clap.get(resolve(join(item.root, item.files[0]!))) : layer.lv2.get(item.uri ?? "");
   if (found === undefined || found.length === 0) return { status: "none" };
@@ -210,7 +223,16 @@ export function matchDistributed(
       say(`distributed: ${distributedUri(item, found.find((r) => r.set === set)!)}: binary differs`);
       continue;
     }
-    const judged = records.filter((r) => r.record.verdicts.some((v) => v.host === host));
+    const atCell = records.filter((r) => {
+      const held = new Set(recordCells(r.record).map(cellKey));
+      return cells.every((c) => held.has(cellKey(c)));
+    });
+    if (atCell.length === 0) {
+      const measuredAt = [...new Set(records.flatMap((r) => recordCells(r.record).map(cellKey)))];
+      say(`distributed: ${distributedUri(item, records[0]!)}: set ${set} measured at ${measuredAt.length === 0 ? "no cell" : measuredAt.join(", ")}`);
+      continue;
+    }
+    const judged = atCell.filter((r) => r.record.verdicts.some((v) => v.host === host));
     if (judged.length === 0) {
       say(`distributed: ${distributedUri(item, records[0]!)}: no verdict for ${host} in ${set}`);
       continue;
@@ -220,7 +242,7 @@ export function matchDistributed(
       say(`distributed: ${distributedUri(item, unmeasured)}: unmeasured in ${set}, measured here`);
       continue;
     }
-    return { status: "applies", set, records, files: [...new Set(records.flatMap((r) => r.record.binary.files.map((f) => f.path)))] };
+    return { status: "applies", set, records: atCell, files: [...new Set(atCell.flatMap((r) => r.record.binary.files.map((f) => f.path)))], lines };
   }
   return { status: "ignored", lines };
 }

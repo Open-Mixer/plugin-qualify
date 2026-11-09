@@ -281,3 +281,38 @@ describe("a distributed record", () => {
     expect(lines).toContain(`distributed: ${dir}: no provenance.json, not read`);
   });
 });
+
+describe("the sets of one class, one per cell (#317)", () => {
+  /** The fixture's probe output with one more grid point, at `cell`: the run's own cell, beside the host's. */
+  const atCell = (rate: number, quantum: number) => (doc: Record<string, any>): void => {
+    const first = doc["grid"][0] as Record<string, unknown>;
+    doc["grid"] = [...doc["grid"], { ...first, rate, quantum }];
+  };
+  const LOW = { set: `${SET}-48000-512`, rate: 48000, quantum: 512 };
+  const HIGH = { set: `${SET}-96000-256`, rate: 96000, quantum: 256 };
+
+  it("a sync takes the set measured at its own cell, whichever name sorts first, and passes the other over with its cell", async () => {
+    for (const [want, other] of [[LOW, HIGH], [HIGH, LOW]] as const) {
+      const m = machine(`cell-${String(want.rate)}`, ["--grid", `${String(want.rate)}/${String(want.quantum)}`]);
+      writeFixtureSet(m.share, CLASS, LOW.set, m.clap, atCell(LOW.rate, LOW.quantum));
+      writeFixtureSet(m.share, CLASS, HIGH.set, m.clap, atCell(HIGH.rate, HIGH.quantum));
+      const { summary, lines } = await sync(m.settings);
+      const uri = `clap:${m.clap}#${FIXTURE_CLAP_ID}`;
+      expect(lines).toContain(`distributed: ${uri}: applied (${want.set})`);
+      expect(summary.distributed).toBe(1);
+      const record = JSON.parse(readFileSync(join(m.settings.qualificationDir, readdirSync(m.settings.qualificationDir).find((f) => f.endsWith(".qualification.json"))!), "utf8"));
+      expect(record.provenance.set).toBe(want.set);
+      // the other set was read first or after; either way it is not the one taken, and when read first it is named
+      if (other.set < want.set) expect(lines).toContain(`distributed: ${uri}: set ${other.set} measured at 48000/128, 48000/512, 96000/128`);
+    }
+  });
+
+  it("a set measured at no cell the sync runs at is passed over with its cells, and the plugin is measured", async () => {
+    const m = machine("cell-none", ["--grid", "192000/64"]);
+    writeFixtureSet(m.share, CLASS, LOW.set, m.clap, atCell(LOW.rate, LOW.quantum));
+    const { summary, lines } = await sync(m.settings);
+    expect(lines).toContain(`distributed: clap:${m.clap}#${FIXTURE_CLAP_ID}: set ${LOW.set} measured at 48000/128, 48000/512, 96000/128`);
+    expect(summary.distributed).toBe(0);
+    expect(measured(summary)).toBeGreaterThan(0);
+  });
+});

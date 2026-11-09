@@ -4,10 +4,13 @@
  * `plugin-qualify-records-package`: the Debian package of a device's qualification records, so other devices of the
  * machine class install them as the distributed layer instead of measuring the same plugin set again.
  *
- * In: a qualification directory as plugin-qualify-sync leaves it. Out: `plugin-db-qualification-<class>-<set>_<version>_all.deb`,
- * a package of plugin-db's qualification layer,
- * installing every record and the probe output it judged under `/usr/share/omx/qualification/<class>/<set>/`, beside
- * the set's `provenance.json`. A record goes in only with its probe output, byte for byte the copy the record names;
+ * A record set is per machine class, rate and quantum (#317). In: the qualification directories of a run, one per
+ * cell it was measured at, as plugin-qualify-sync leaves them, or the run's root holding `b<rate>-<quantum>/qualification`.
+ * Out: one `plugin-db-qualification-<class>-<set>-<rate>-<quantum>_<version>_all.deb` per cell, a package of plugin-db's
+ * qualification layer, installing every record of that cell and the probe output it judged under
+ * `/usr/share/omx/qualification/<class>/<set>-<rate>-<quantum>/`, beside the set's `provenance.json`, which names the
+ * cell. A directory's cell is the one its base is named for (`b48000-512`), else `--cell`, else the one cell every
+ * record's grid holds; a record whose grid does not hold its set's cell stays out, named. A record goes in only with its probe output, byte for byte the copy the record names;
  * an unmeasured record never applies and stays out. The archive is written here, `ar` and two `tar.xz` members, so a
  * machine without dpkg builds it too; the tar members are GNU tar's, owned by root, in name order, at one time.
  */
@@ -15,14 +18,18 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { closeSync, copyFileSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
-import { DISTRIBUTED_DIR_SYSTEM, DISTRIBUTED_PROVENANCE_FILE, DISTRIBUTED_PROVENANCE_SCHEMA, type DistributedProvenance } from "./distributed-records.js";
+import { cellKey, type GridCell } from "./measurement-grid.js";
+import { DISTRIBUTED_DIR_SYSTEM, recordCells, DISTRIBUTED_PROVENANCE_FILE, DISTRIBUTED_PROVENANCE_SCHEMA, type DistributedProvenance } from "./distributed-records.js";
 import { sha256Hex } from "./probe-output.js";
 import { QUALIFICATION_RECORD_SCHEMA } from "./qualification-record.js";
 
 export interface RecordsPackageArgs {
-  readonly stateDir: string;
+  /** Qualification directories, or run roots holding `b<rate>-<quantum>/qualification`: one set per cell. */
+  readonly sources: readonly string[];
+  /** The cell of a lone directory whose name says none. */
+  readonly cell?: GridCell;
   readonly hostClass: string;
   readonly set: string;
   /** A JSON file, or the JSON itself. */
@@ -44,18 +51,22 @@ export function recordsPackageHelp(): string {
   return [
     "plugin-qualify-records-package: the Debian package of a device's qualification records, for the distributed layer",
     "",
-    "  plugin-qualify-records-package <qualification dir> --host-class <class> --set <set> --provenance <json> [options]",
+    "  plugin-qualify-records-package <qualification dir|run root>... --host-class <class> --set <set> --provenance <json> [options]",
+    "",
+    "  one package per cell (rate and quantum): each qualification directory is a cell, named by its base",
+    "  (<run>/b48000-512/qualification); a run root stands for every b<rate>-<quantum>/qualification under it",
     "",
     "  --host-class <class>     the machine class the records were measured on (rpi5): the directory they install in",
-    "  --set <set>              the plugin set they cover (zynthian-vangelis)",
+    "  --set <set>              the plugin set they cover (zynthian-vangelis); each package's set is <set>-<rate>-<quantum>",
+    "  --cell <rate>/<quantum>  the cell of a lone directory not named b<rate>-<quantum> whose records hold several",
     "  --provenance <json>      a JSON file, or the JSON itself: the image, the package versions, the source revisions",
     "  --version <version>      the package's version (default: today, 2026.10.29)",
     "  --out <dir>              where the .deb is written (default: .)",
     "  --maintainer <who>       the package's Maintainer field",
     "  --help                   this text",
     "",
-    `the package installs ${DISTRIBUTED_DIR_SYSTEM}/<class>/<set>/ and depends on this plugin-qualify's minor, up to the next one`,
-    "exit 0 the package was written, 2 it could not be",
+    `each package installs ${DISTRIBUTED_DIR_SYSTEM}/<class>/<set>-<rate>-<quantum>/ and depends on this plugin-qualify's minor, up to the next one`,
+    "exit 0 every package was written, 2 one could not be",
     "",
   ].join("\n");
 }
@@ -63,7 +74,7 @@ export function recordsPackageHelp(): string {
 export function parseRecordsPackageArgs(argv: readonly string[]): { ok: true; args: RecordsPackageArgs } | { ok: true; help: true } | { ok: false; error: string } {
   const values = new Map<string, string>();
   const positional: string[] = [];
-  const valued = new Set(["--host-class", "--set", "--provenance", "--version", "--out", "--maintainer"]);
+  const valued = new Set(["--host-class", "--set", "--cell", "--provenance", "--version", "--out", "--maintainer"]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--help") return { ok: true, help: true };
@@ -74,19 +85,24 @@ export function parseRecordsPackageArgs(argv: readonly string[]): { ok: true; ar
     } else if (a.startsWith("--")) return { ok: false, error: `unknown argument ${a}` };
     else positional.push(a);
   }
-  if (positional.length !== 1) return { ok: false, error: "name one qualification directory" };
+  if (positional.length === 0) return { ok: false, error: "name a qualification directory or a run root" };
   for (const flag of ["--host-class", "--set", "--provenance"]) if (!values.has(flag)) return { ok: false, error: `${flag} is needed` };
   const hostClass = values.get("--host-class")!;
   const set = values.get("--set")!;
   for (const [what, v] of [["--host-class", hostClass], ["--set", set]] as const) {
     if (!DEB_WORD.test(v)) return { ok: false, error: `${what} ${v}: a package name holds lowercase letters, digits, + - and . only` };
   }
+  const cellText = values.get("--cell");
+  const cell = cellText === undefined ? undefined : parseCell(cellText);
+  if (cellText !== undefined && cell === undefined) return { ok: false, error: `--cell ${cellText} is not <rate>/<quantum>` };
+  if (cell !== undefined && positional.length !== 1) return { ok: false, error: "--cell names the cell of one directory; name one" };
   const version = values.get("--version");
   if (version !== undefined && !DEB_VERSION.test(version)) return { ok: false, error: `--version ${version} is not a Debian version` };
   return {
     ok: true,
     args: {
-      stateDir: positional[0]!,
+      sources: positional,
+      ...(cell === undefined ? {} : { cell }),
       hostClass,
       set,
       provenance: values.get("--provenance")!,
@@ -95,6 +111,68 @@ export function parseRecordsPackageArgs(argv: readonly string[]): { ok: true; ar
       maintainer: values.get("--maintainer") ?? RECORDS_PACKAGE_MAINTAINER,
     },
   };
+}
+
+function parseCell(text: string): GridCell | undefined {
+  const m = /^(\d+)\/(\d+)$/.exec(text.trim());
+  if (m === null) return undefined;
+  const [rate, quantum] = [Number(m[1]), Number(m[2])];
+  return rate > 0 && quantum > 0 && Number.isSafeInteger(rate) && Number.isSafeInteger(quantum) ? { rate, quantum } : undefined;
+}
+
+/** A run's base directory names its cell: `b48000-512`. */
+const BASE_NAME = /^b(\d+)-(\d+)$/;
+
+/** The set of a cell: `<set>-<rate>-<quantum>`. */
+export const recordsSetName = (set: string, cell: GridCell): string => `${set}-${String(cell.rate)}-${String(cell.quantum)}`;
+
+/** One qualification directory of a run and the cell its name says, when it says one. */
+export interface RecordsSource {
+  readonly dir: string;
+  readonly named?: GridCell;
+}
+
+/**
+ * The qualification directories the arguments stand for, in name order: a directory holding records is one; a run
+ * root stands for every `b<rate>-<quantum>/qualification` (or `b<rate>-<quantum>` holding records) under it.
+ */
+export function recordsSources(args: readonly string[]): RecordsSource[] {
+  const holdsRecords = (d: string): boolean => {
+    try {
+      return readdirSync(d).some((n) => n.endsWith(".qualification.json") || n.endsWith(".unmeasured.json"));
+    } catch {
+      return false;
+    }
+  };
+  const namedBy = (d: string): GridCell | undefined => {
+    for (const part of [basename(d), basename(dirname(d))]) {
+      const m = BASE_NAME.exec(part);
+      if (m !== null) return { rate: Number(m[1]), quantum: Number(m[2]) };
+    }
+    return undefined;
+  };
+  const out: RecordsSource[] = [];
+  for (const a of args) {
+    const dir = resolve(a);
+    statSync(dir);
+    if (holdsRecords(dir)) {
+      const named = namedBy(dir);
+      out.push({ dir, ...(named === undefined ? {} : { named }) });
+      continue;
+    }
+    const bases = readdirSync(dir).filter((n) => BASE_NAME.test(n)).sort();
+    let found = 0;
+    for (const b of bases) {
+      for (const d of [join(dir, b, "qualification"), join(dir, b)]) {
+        if (!holdsRecords(d)) continue;
+        out.push({ dir: d, named: namedBy(d)! });
+        found++;
+        break;
+      }
+    }
+    if (found === 0) throw new Error(`${dir} holds no record and no b<rate>-<quantum> base with records`);
+  }
+  return out;
 }
 
 /** The package of a class and a set. */
@@ -122,7 +200,7 @@ export function today(now = new Date()): { version: string; date: string } {
 }
 
 /** The files of a qualification directory that go in the package: each record with its probe output, and what stays out, by name and why. */
-export function collectRecords(stateDir: string): { records: string[]; files: string[]; left: { name: string; why: string }[] } {
+export function collectRecords(stateDir: string, cell?: GridCell): { records: string[]; files: string[]; left: { name: string; why: string }[] } {
   const names = readdirSync(stateDir).sort();
   const records: string[] = [];
   const files: string[] = [];
@@ -133,7 +211,7 @@ export function collectRecords(stateDir: string): { records: string[]; files: st
       continue;
     }
     if (!name.endsWith(".qualification.json")) continue;
-    let record: { schema?: unknown; probe?: { file?: unknown; sha256?: unknown } };
+    let record: { schema?: unknown; probe?: { file?: unknown; sha256?: unknown }; measurements?: { grid?: readonly GridCell[] } };
     try {
       record = JSON.parse(readFileSync(join(stateDir, name), "utf8"));
     } catch {
@@ -142,6 +220,11 @@ export function collectRecords(stateDir: string): { records: string[]; files: st
     }
     if (record.schema !== QUALIFICATION_RECORD_SCHEMA || typeof record.probe?.file !== "string" || record.probe.file.includes("/")) {
       left.push({ name, why: `not a ${QUALIFICATION_RECORD_SCHEMA} naming its probe output` });
+      continue;
+    }
+    const cells = gridCellsOf(record);
+    if (cell !== undefined && !cells.includes(cellKey(cell))) {
+      left.push({ name, why: `measured at ${cells.length === 0 ? "no cell" : cells.join(", ")}, not at its set's ${cellKey(cell)}` });
       continue;
     }
     let probe: Buffer;
@@ -159,6 +242,29 @@ export function collectRecords(stateDir: string): { records: string[]; files: st
     files.push(name, record.probe.file);
   }
   return { records, files: [...new Set(files)].sort(), left };
+}
+
+/** The cells of a record's grid, `rate/quantum`, by rate then quantum: `recordCells`, keyed. */
+const gridCellsOf = (record: { measurements?: { grid?: readonly GridCell[] } }): string[] =>
+  recordCells({ measurements: { grid: Array.isArray(record.measurements?.grid) ? record.measurements.grid : [] } } as unknown as Parameters<typeof recordCells>[0]).map(cellKey);
+
+/**
+ * The cell of a source: its base's name, else the one given, else the one cell every record of it holds alone.
+ * Throws, naming the cells, when none decides it.
+ */
+export function cellOfSource(source: RecordsSource, given?: GridCell): GridCell {
+  if (source.named !== undefined) return source.named;
+  if (given !== undefined) return given;
+  const seen = new Set<string>();
+  for (const name of readdirSync(source.dir).filter((n) => n.endsWith(".qualification.json"))) {
+    try {
+      for (const c of gridCellsOf(JSON.parse(readFileSync(join(source.dir, name), "utf8")))) seen.add(c);
+    } catch {
+      // a record that does not read is named by the collection, and decides no cell
+    }
+  }
+  if (seen.size === 1) return parseCell([...seen][0]!)!;
+  throw new Error(`${source.dir}: its records are measured at ${seen.size === 0 ? "no cell" : [...seen].join(", ")}; a set is one cell: name the base b<rate>-<quantum> or give --cell`);
 }
 
 /** The provenance argument read: a file's JSON, or the JSON itself. */
@@ -203,6 +309,9 @@ function tarXz(tree: string, out: string, mtime: number): void {
 
 export interface BuiltRecordsPackage {
   readonly path: string;
+  /** The set, `<set>-<rate>-<quantum>`, and its cell. */
+  readonly set: string;
+  readonly cell: GridCell;
   readonly name: string;
   readonly version: string;
   readonly records: number;
@@ -211,28 +320,49 @@ export interface BuiltRecordsPackage {
   readonly left: readonly { name: string; why: string }[];
 }
 
-/** The package of `args`, written into `args.out`. Throws, naming why, when it cannot be built. */
-export function buildRecordsPackage(args: RecordsPackageArgs, now = new Date()): BuiltRecordsPackage {
-  const name = recordsPackageName(args.hostClass, args.set);
+/**
+ * One package per cell of `args.sources`, written into `args.out`, in the order of the cells. Every source's cell is
+ * decided and no two may share one before any package is written; throws, naming why, when one cannot be built.
+ */
+export function buildRecordsPackages(args: RecordsPackageArgs, now = new Date()): BuiltRecordsPackage[] {
+  const sources = recordsSources(args.sources);
+  if (args.cell !== undefined && sources.length !== 1) throw new Error("--cell names the cell of one directory, and these are several");
+  const cells = sources.map((s) => ({ source: s, cell: cellOfSource(s, args.cell) }));
+  const seen = new Map<string, string>();
+  for (const { source, cell } of cells) {
+    const other = seen.get(cellKey(cell));
+    if (other !== undefined) throw new Error(`${source.dir} and ${other} are both measured at ${cellKey(cell)}: one set per cell`);
+    seen.set(cellKey(cell), source.dir);
+  }
+  return cells
+    .sort((a, b) => a.cell.rate - b.cell.rate || a.cell.quantum - b.cell.quantum)
+    .map(({ source, cell }) => buildRecordsPackage({ ...args, stateDir: source.dir, cell }, now));
+}
+
+/** The package of one cell's directory, written into `args.out`. Throws, naming why, when it cannot be built. */
+function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: string; readonly cell: GridCell }, now: Date): BuiltRecordsPackage {
+  const set = recordsSetName(args.set, args.cell);
+  const name = recordsPackageName(args.hostClass, set);
   const range = recordsDependsRange(ownVersion());
   if (range === undefined) throw new Error("this plugin-qualify names no version, so the package cannot say which one reads it");
   const day = today(now);
   const version = args.version ?? day.version;
   statSync(args.stateDir);
-  const { records, files, left } = collectRecords(args.stateDir);
+  const { records, files, left } = collectRecords(args.stateDir, args.cell);
   if (records.length === 0) throw new Error(`${args.stateDir} holds no record that can go in the package`);
   const provenance: DistributedProvenance = {
     ...readProvenanceArg(args.provenance),
     schema: DISTRIBUTED_PROVENANCE_SCHEMA,
-    set: args.set,
+    set,
     hostClass: args.hostClass,
+    cell: { rate: args.cell.rate, quantum: args.cell.quantum },
     package: { name, version },
     date: day.date,
   };
   const work = mkdtempSync(join(tmpdir(), "records-package-"));
   try {
     const data = join(work, "data");
-    const rel = join("usr", "share", "omx", "qualification", args.hostClass, args.set);
+    const rel = join("usr", "share", "omx", "qualification", args.hostClass, set);
     const dir = join(data, rel);
     mkdirSync(dir, { recursive: true });
     for (const f of files) copyFileSync(join(args.stateDir, f), join(dir, f));
@@ -259,9 +389,10 @@ export function buildRecordsPackage(args: RecordsPackageArgs, now = new Date()):
         "Section: sound",
         "Priority: optional",
         "Multi-Arch: foreign",
-        `Description: plugin-db qualification layer: ${args.set} set for ${args.hostClass}`,
+        `Description: plugin-db qualification layer: ${args.set} set for ${args.hostClass} at ${String(args.cell.rate)} Hz, ${String(args.cell.quantum)} frames`,
         ` The qualification layer of the plugin database: the plugin-qualify records`,
-        ` of the ${args.set} plugin set, measured on a ${args.hostClass} device. plugin-qualify-sync takes a plugin from them instead of`,
+        ` of the ${args.set} plugin set, measured on a ${args.hostClass} device at ${String(args.cell.rate)} Hz`,
+        ` and a quantum of ${String(args.cell.quantum)} frames. plugin-qualify-sync takes a plugin from them instead of`,
         " measuring it, and only when every file of the installed plugin hashes as the",
         " measured one did; any other plugin is measured on the device as before.",
         "",
@@ -282,7 +413,7 @@ export function buildRecordsPackage(args: RecordsPackageArgs, now = new Date()):
       ],
       mtime,
     );
-    return { path, name, version, records: records.length, files: installed.length, left };
+    return { path, set, cell: args.cell, name, version, records: records.length, files: installed.length, left };
   } finally {
     rmSync(work, { recursive: true, force: true });
   }
