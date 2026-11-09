@@ -1,3 +1,18 @@
+plugin-qualify (0.20.1) unstable; urgency=medium
+
+  * Record sets per cell: the sync takes only a set measured at the cell it
+    runs at, and plugin-qualify-records-package writes one package per cell
+    (#317).
+  * The isolated step also runs for a verdict with a conditional reason
+    beside the memory gap (#319).
+  * Records carry plugin-db's judged layer: the latency line, the rules and
+    the hosting epoch.
+  * Records say what was measured: not-attempted cells, the pins of a cost
+    pass, the host class and the voices (#316).
+  * Built against omx-contract >= 3.12.0 and << 4.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Mon, 09 Nov 2026 14:30:00 +0100
+
 plugin-qualify (0.20.0) unstable; urgency=medium
 
   * Built and run against the one-panel wave's releases: plugin-hostd

@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.0
+Version:        0.20.1
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -22,7 +22,7 @@ BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
 BuildRequires: (pkgconfig(plugin-db) >= 0.3.0 with pkgconfig(plugin-db) < 0.4)
 BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.1 with pkgconfig(plugin-hostd-protocol) < 0.6)
-BuildRequires: (pkgconfig(omx-contract) >= 3.11.0 with pkgconfig(omx-contract) < 4)
+BuildRequires: (pkgconfig(omx-contract) >= 3.12.0 with pkgconfig(omx-contract) < 4)
 BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.31.0 with pkgconfig(omx-clap-lv2) < 0.32)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
 BuildRequires: systemd-rpm-macros
@@ -133,6 +133,17 @@ fi
 %{_libexecdir}/%{name}/
 
 %changelog
+* Mon Nov 09 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.1-1
+- record sets per cell: the sync takes only a set measured at the cell it runs
+  at, and plugin-qualify-records-package writes one package per cell (#317)
+- the isolated step also runs for a verdict with a conditional reason beside
+  the memory gap (#319)
+- records carry plugin-db's judged layer: the latency line, the rules and the
+  hosting epoch
+- records say what was measured: not-attempted cells, the pins of a cost pass,
+  the host class and the voices (#316)
+- built against omx-contract >= 3.12.0 and < 4
+
 * Mon Nov 09 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.0-1
 - built and run against the wave's releases: plugin-hostd >= 0.20.0 and < 0.21,
   omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.0 and < 0.32,
