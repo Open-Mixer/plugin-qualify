@@ -39,14 +39,14 @@ CLAP_REF := 1.2.6
 PLUGIN_HOSTD_REF := v0.15.3
 PLUGIN_DB_REF := v0.1.0
 # the omx-contract `make deps` fetches where no omx-contract-devel is installed: the packages' floor, so the build
-# reads the contract the packages do (3.9.1: the first with <omxcontract/omx_json_write.h>, the one JSON string writer
+# reads the contract the packages do (3.11.0, the floor; 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer
 # every tool here spells its literals through).
-OMX_CONTRACT_VERSION := 3.9.1
+OMX_CONTRACT_VERSION := 3.11.0
 # the omx-clap-core whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
 # packages' floor
-OMX_CLAP_CORE_VERSION := 0.26.2
+OMX_CLAP_CORE_VERSION := 0.31.0
 # the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap-core's provider read: the packages' floor
-OMX_DSP_VERSION := 0.25.0
+OMX_DSP_VERSION := 0.32.0
 
 ifeq ($(shell $(PKG_CONFIG) --exists clap && echo true),true)
 CLAP_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags clap)
