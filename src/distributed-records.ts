@@ -12,6 +12,7 @@
  * treats the plugin as one it measured.
  */
 import { readFileSync, readdirSync } from "node:fs";
+import { machine } from "node:os";
 import { join, resolve } from "node:path";
 
 import { cellKey, type GridCell } from "./measurement-grid.js";
@@ -59,6 +60,20 @@ export function hostClassOfBoard(model: string | undefined): string | undefined 
   if (model === undefined) return undefined;
   const m = /^Raspberry Pi (?:Compute Module )?(\d)(?:\s|$)/.exec(model.replace(/\0/g, "").trim());
   return m === null ? undefined : `rpi${m[1]!}`;
+}
+
+/** The architecture `uname -m` names, or `undefined` when it cannot be read. */
+export function readMachine(): string | undefined {
+  try {
+    return machine();
+  } catch {
+    return undefined;
+  }
+}
+
+/** The host class of a machine with no board name, by `uname -m`: `x86-64` for an x86_64 one; none for an architecture without a class. */
+export function hostClassOfMachine(arch: string | undefined): string | undefined {
+  return arch?.trim() === "x86_64" ? "x86-64" : undefined;
 }
 
 /** One distributed record, read: where it is, what it says, and the set it came with. */

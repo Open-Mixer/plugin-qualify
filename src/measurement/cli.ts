@@ -35,7 +35,7 @@
 import { join } from "node:path";
 
 import type { MeasurementDocument, MeasurementRun, MeasuredPlugin } from "./format.js";
-import { buildMeasurementDocument } from "./format.js";
+import { buildMeasurementDocument, readIntegrity } from "./format.js";
 import { measuredPluginsFromProbeOutput } from "./probe-json.js";
 import { buildRun, costMethodFromProbeProvenance, hostFromProbeProvenance } from "./provenance.js";
 import type { MeasurementHost, LatencyMethod } from "./format.js";
@@ -237,10 +237,17 @@ export function buildPipeline(options: MeasureOptions, native?: HostingTools): P
     });
   }
 
+  // a run of the prober's dimensions alone takes the pin too: a plugin measured with no integrity block cannot be pinned
+  // from its figures (plugin-qualify#316), and the measurer names the files without instantiating anything
+  const pinned = !hosting && probed && native !== undefined && (options.plugins !== undefined || current !== undefined);
+  if (pinned && native !== undefined) {
+    steps.push({ id: "pin", command: native.tool, args: ["--pin"], perPlugin: true, produces: join(options.workDir, "pins.jsonl") });
+  }
+
   return {
     steps,
     ...(probed && current !== undefined ? { finalCatalog: current } : {}),
-    ...(hosting && options.plugins === undefined && current !== undefined ? { hostingScan: current } : {}),
+    ...((hosting || pinned) && options.plugins === undefined && current !== undefined ? { hostingScan: current } : {}),
     ...(costProvenance === undefined ? {} : { costProvenance }),
   };
 }
@@ -599,6 +606,8 @@ export interface AssemblyInput {
   readonly catalog?: unknown;
   /** The hosting pass's lines ({@link hostingLine}), one per plugin. Absent when it did not run. */
   readonly hosting?: readonly unknown[];
+  /** The measurer's `--pin` lines ({@link hostingLine}), one per plugin, for a run with no hosting pass. Absent when the pin step did not run. */
+  readonly pins?: readonly unknown[];
   /** The cost pass's provenance JSON, already parsed. Absent on a latency-only run. */
   readonly costProvenance?: unknown;
   /** Host facts, for a run whose provenance the cost pass did not write. */
@@ -636,6 +645,7 @@ export function assembleDocument(input: AssemblyInput): MeasurementDocument {
   const plugins: MeasuredPlugin[] =
     probed.length > 0 && input.catalog !== undefined ? measuredPluginsFromProbeOutput(input.catalog, probed) : [];
   if (input.hosting !== undefined) mergeHosting(plugins, measuredPluginsFromSweep({ measurements: input.hosting }), input.options.dimensions);
+  if (input.pins !== undefined) mergePins(plugins, input.pins);
   const costMethod = costMethodFromProbeProvenance(input.costProvenance);
   const host = hostFromProbeProvenance(input.costProvenance) ?? input.host;
   const run: MeasurementRun = buildRun({
@@ -653,6 +663,20 @@ export function assembleDocument(input: AssemblyInput): MeasurementDocument {
     ...(input.options.label === undefined ? {} : { label: input.options.label }),
   });
   return buildMeasurementDocument(run, plugins);
+}
+
+/** The pin lines folded into the prober's plugins, by URI: a plugin without one keeps none, and a line for a plugin not measured adds none. */
+function mergePins(plugins: MeasuredPlugin[], rows: readonly unknown[]): void {
+  for (const row of rows) {
+    if (typeof row !== "object" || row === null) continue;
+    const r = row as Record<string, unknown>;
+    const integrity = readIntegrity(r["integrity"]);
+    const at = plugins.findIndex((p) => p.uri === r["uri"]);
+    if (integrity === undefined || at < 0) continue;
+    const p = plugins[at]!;
+    const version = typeof r["version"] === "string" && r["version"] !== "" ? r["version"] : undefined;
+    plugins[at] = { ...p, ...(p.integrity === undefined ? { integrity } : {}), ...(p.version === undefined && version !== undefined ? { version } : {}) };
+  }
 }
 
 /**

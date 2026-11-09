@@ -289,6 +289,28 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     // a pin the state already holds is left as it is
     expect(isolatedPass(ctx, r.state).repinned).toBe(0);
   });
+
+  it("a plugin the state holds no pin for, whose step is still owed, is pinned once the step has run (plugin-qualify#316)", () => {
+    const dir = mkdtempSync(join(scratch, "owed-"));
+    writeFileSync(join(dir, "a.so"), "so");
+    const bytes = { files: [{ path: "a.so", sha256: "a".repeat(64) }], layout: { scheme: "omx-layout/1", sha256: "c".repeat(64) } };
+    const owed = { ...withVerdict(gap([clean, memory])), binary: { path: "a.so", ...bytes }, run: { id: "r", steps: baseSteps(record()) } };
+    for (const n of ["ok", "no", "off"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify({ ...owed, plugin: { ...owed.plugin, id: `urn:${n}` } }));
+    const facts: Record<string, IsolatedRunFacts> = { "urn:ok": WELL, "urn:no": { ...WELL, silent: true }, "urn:off": { started: false, problem: "no jackd" } };
+    const ctx = {
+      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [] },
+      env: {},
+      log: () => {},
+      isolatedRunner: (uri: string) => facts[uri]!,
+      pinFilesRun: () => ({ status: 0, stdout: `root ${dir}\nfile a.so\n`, stderr: "" }),
+    } as unknown as SyncContext;
+    const state = { entries: { k: { plugins: ["ok", "no", "off"].map((n) => ({ uri: `urn:${n}`, outcome: "unmeasured", record: join(dir, `${n}.qualification.json`) })) } } } as unknown as SyncState;
+    const [ok, no, off] = isolatedPass(ctx, state).state.entries["k"]!.plugins;
+    expect([ok?.outcome, ok?.pin?.verdict, ok?.pin?.integrity.files?.map((f) => f.path)]).toEqual(["qualified", "isolated", ["a.so"]]);
+    expect([no?.outcome, no?.pin?.verdict]).toEqual(["refused", "refused"]);
+    // a step that could not run decided nothing: no word to pin, and the next pass tries it again
+    expect([off?.outcome, off?.pin]).toEqual(["unmeasured", undefined]);
+  });
 });
 
 describe("two plugins owing the step in one run, whichever comes first (#319)", () => {

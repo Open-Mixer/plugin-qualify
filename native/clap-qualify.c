@@ -463,6 +463,7 @@ enum { FP_INSTANTIATE = 1, FP_ACTIVATE = 2, FP_REST = 4, FP_NOTES = 8, FP_SECOND
 struct footprint {
   unsigned got;
   long instantiate, activate, rest, notes, second;
+  unsigned held; /* the notes struck for `notes` */
   enum voice_basis basis;
   char unmeasured[32];
   char detail[96];
@@ -1067,6 +1068,7 @@ static void footprint_measure(const clap_plugin_factory_t *factory, const clap_p
     if (held) {
       for (uint32_t k = 0; k < held; k++) note_key(clap_dialect, 0, 1, held_key(k, held), HELD_VELOCITY);
       footprint_blocks(p, &ins, &outs, frames, &seed);
+      fp->held = held;
       fp->notes = grew(base) + g_load_kb, fp->got |= FP_NOTES;
     } else {
       snprintf(fp->detail, sizeof fp->detail, "no count of notes to hold for the footprint");
@@ -1247,7 +1249,7 @@ static void put_cost(const struct facts *f, uint32_t frames) {
     if (fp->got & FP_INSTANTIATE) fprintf(g_out, "%s\"afterInstantiateKb\":%ld", sep, fp->instantiate), sep = ",";
     if (fp->got & FP_ACTIVATE) fprintf(g_out, "%s\"afterActivateKb\":%ld", sep, fp->activate), sep = ",";
     if (fp->got & FP_REST) fprintf(g_out, "%s\"atRestKb\":%ld", sep, fp->rest), sep = ",";
-    if (fp->got & FP_NOTES) fprintf(g_out, "%s\"notesHeldKb\":%ld,\"basis\":\"%s\"", sep, fp->notes, BASIS_NAME[fp->basis]), sep = ",";
+    if (fp->got & FP_NOTES) fprintf(g_out, "%s\"notesHeldKb\":%ld,\"notesHeld\":%u,\"basis\":\"%s\"", sep, fp->notes, fp->held, BASIS_NAME[fp->basis]), sep = ",";
     if (fp->got & FP_SECOND) fprintf(g_out, "%s\"secondInstanceKb\":%ld", sep, fp->second), sep = ",";
     if (fp->unmeasured[0]) {
       fprintf(g_out, "%s\"unmeasuredReason\":", sep);
