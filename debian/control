@@ -11,7 +11,7 @@ Build-Depends: debhelper-compat (= 13),
                lv2-dev,
                plugin-db-dev (>= 0.3.0~), plugin-db-dev (<< 0.4~),
                libplugin-hostd-protocol-dev (>= 0.5.1~), libplugin-hostd-protocol-dev (<< 0.6~),
-               libomx-contract-dev (>= 3.11.0~), libomx-contract-dev (<< 4~),
+               libomx-contract-dev (>= 3.12.0~), libomx-contract-dev (<< 4~),
                libomx-clap-lv2-dev (>= 0.31.0~), libomx-clap-lv2-dev (<< 0.32~),
                libomxdsp-dev (>= 0.32.0~), libomxdsp-dev (<< 0.33~)
 Standards-Version: 4.6.2
