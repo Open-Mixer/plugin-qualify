@@ -259,6 +259,9 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     expect(owesIsolated(withVerdict(gap([clean, memory, { rating: "unknown", code: "hosting.rt-safety.unmeasured" }])))).toBe(false);
     expect(owesIsolated(withVerdict(gap([clean, { rating: "unsuitable", code: "hosting.memory.above-ceiling" }], "unsuitable")))).toBe(false);
     expect(owesIsolated(withVerdict(gap([clean])))).toBe(false);
+    // a conditional reason beside the gap is one the step answers, as a conditional verdict's is (#319)
+    expect(owesIsolated(withVerdict(gap([clean, memory, { rating: "conditional", code: "hosting.rt-safety.violations-in-run" }])))).toBe(true);
+    expect(owesIsolated(withVerdict(gap([{ rating: "conditional", code: "hosting.rt-safety.violations-in-run" }])))).toBe(false);
   });
 
   it("the pass gives the pin back from the record: the files hostd names, hashed, and the word the step earned", () => {
@@ -285,5 +288,38 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     expect([no?.outcome, no?.pin?.verdict]).toEqual(["refused", "refused"]);
     // a pin the state already holds is left as it is
     expect(isolatedPass(ctx, r.state).repinned).toBe(0);
+  });
+});
+
+describe("two plugins owing the step in one run, whichever comes first (#319)", () => {
+  // the records a Raspberry Pi 5 wrote at 48000/256 (plugin-qualify 0.19.1): drumkv1 and samplv1, both silent under notes
+  // for omx-clap-host, samplv1's run also seeing an RT violation; drumkv1 got the step and samplv1 did not
+  const PI = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "records-rpi5-20261109");
+  const STEMS = ["http___drumkv1.sourceforge.net_lv2@0.2-7d179bdcf9e5.default", "http___samplv1.sourceforge.net_lv2@0.2-c9cd8fb3102f.default"];
+  /** The record as the sweep wrote it before any isolated step. */
+  const before = (stem: string): QualificationRecord => {
+    const r = JSON.parse(readFileSync(join(PI, `${stem}.qualification.json`), "utf8")) as QualificationRecord;
+    return { ...r, run: { ...r.run!, steps: r.run!.steps.filter((s) => s.step !== RUN_STEP.isolated) } };
+  };
+
+  it("both records owe the step", () => {
+    expect(STEMS.map((s) => owesIsolated(before(s)))).toEqual([true, true]);
+  });
+
+  it.each([
+    ["drumkv1 first", STEMS],
+    ["samplv1 first", [...STEMS].reverse()],
+  ])("%s: the pass runs the step for both and both end qualified, pinned isolated", (_order, stems) => {
+    const dir = mkdtempSync(join(scratch, "order-"));
+    for (const s of stems) writeFileSync(join(dir, `${s}.qualification.json`), JSON.stringify(before(s)));
+    const ran: string[] = [];
+    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" } }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
+    const state = {
+      entries: { k: { plugins: stems.map((s) => ({ uri: before(s).plugin.id, outcome: "unmeasured", code: "omx-clap-host.silent-under-note", pin: { uri: before(s).plugin.id, integrity: {} }, record: join(dir, `${s}.qualification.json`) })) } },
+    } as unknown as SyncState;
+    const done = isolatedPass(ctx, state);
+    expect(ran).toEqual(stems.map((s) => before(s).plugin.id));
+    expect(done).toMatchObject({ isolated: 2, refused: 0, notRun: 0 });
+    expect(done.state.entries["k"]!.plugins.map((p) => [p.outcome, p.pin?.verdict])).toEqual([["qualified", "isolated"], ["qualified", "isolated"]]);
   });
 });
