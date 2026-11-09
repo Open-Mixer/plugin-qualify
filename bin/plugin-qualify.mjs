@@ -29,6 +29,9 @@ import {
   clapPinEntries,
   defaultQualificationDir,
   judgeExitCode,
+  judgedLayerHelpText,
+  judgedLayerOf,
+  parseJudgedLayerArgs,
   judgeFiles,
   mergeRunsByRecord,
   judgeHelpText,
@@ -94,6 +97,37 @@ if (process.argv[2] === "judge") {
       : textTable(result.verdicts),
   );
   process.exit(judgeExitCode(result));
+}
+
+if (process.argv[2] === "judged-layer") {
+  const j = parseJudgedLayerArgs(process.argv.slice(3));
+  if (!j.ok) {
+    process.stderr.write(`plugin-qualify judged-layer: ${j.error}\n\n${judgedLayerHelpText()}`);
+    process.exit(2);
+  }
+  if ("help" in j) {
+    process.stdout.write(judgedLayerHelpText());
+    process.exit(0);
+  }
+  let record;
+  try {
+    record = JSON.parse(readFileSync(j.args.record, "utf8"));
+  } catch (e) {
+    process.stderr.write(`plugin-qualify judged-layer: ${j.args.record}: cannot read: ${e.message}\n`);
+    process.exit(2);
+  }
+  const l = judgedLayerOf(record, {
+    machineClass: j.args.machineClass,
+    pin: { files: j.args.files, layout: j.args.layout },
+    ...(j.args.judgedBy === undefined ? {} : { judgedBy: j.args.judgedBy }),
+    ...(j.args.address === undefined ? {} : { address: j.args.address }),
+  });
+  if (l.layer === null) {
+    process.stderr.write(`plugin-qualify judged-layer: ${j.args.record}: no judged layer: ${l.reason}\n`);
+    process.exit(1);
+  }
+  process.stdout.write(`${JSON.stringify(j.args.body ? l.body : l, null, 2)}\n`);
+  process.exit(0);
 }
 
 if (process.argv[2] === "adjust") {
