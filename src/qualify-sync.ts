@@ -935,7 +935,9 @@ export function isolatedPass(ctx: SyncContext, state: SyncState): { readonly sta
           return rest.outcome === "qualified" && rebuilt.verdict === "refused" ? { ...rest, outcome: "refused" as const, pin: rebuilt } : { ...rest, pin: rebuilt };
         }
         ctx.log(`${p.uri}: isolated step ${done.step.result}${done.step.code === undefined ? "" : ` (${done.step.code})`}`);
-        const pin = pinAfterStep(p.pin, done.step);
+        // a plugin the state holds no pin for is pinned from the record the step now completes: the bytes it names and the word
+        // the step earned (plugin-qualify#316: 38 plugins read hosting.memory.unmeasured and had none)
+        const pin = p.pin !== undefined ? pinAfterStep(p.pin, done.step) : withHostdFiles(ctx, pinFromRecordWithPool(done.record));
         const { pin: _pin, code: _code, ...rest } = p;
         if (done.step.result === ISOLATED_RESULT.isolated) {
           count.isolated++;
