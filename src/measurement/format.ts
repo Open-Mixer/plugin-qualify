@@ -303,6 +303,8 @@ export interface MemoryFootprint {
   /** Activated, after processing: what a long-running host carries. */
   readonly atRestKb?: number;
   readonly notesHeldKb?: number;
+  /** The notes held (voices sounding) when `notesHeldKb` was read, the count `basis` says where it came from. */
+  readonly notesHeld?: number;
   readonly secondInstanceKb?: number;
   readonly basis?: VoiceBasis;
   readonly unmeasuredReason?: string;
@@ -950,6 +952,11 @@ function readLatency(value: unknown): LatencyMeasurement | undefined {
 }
 
 /** A KB figure: finite and never negative. */
+function notesCount(value: unknown): number | undefined {
+  const n = positiveNumber(value);
+  return n !== undefined && Number.isInteger(n) ? n : undefined;
+}
+
 function kilobytes(value: unknown): number | undefined {
   const n = finiteNumber(value);
   return n !== undefined && n >= 0 ? n : undefined;
@@ -963,6 +970,7 @@ export function readMemoryFootprint(value: unknown): MemoryFootprint | undefined
     ...optional("afterActivateKb", kilobytes(value.afterActivateKb)),
     ...optional("atRestKb", kilobytes(value.atRestKb)),
     ...optional("notesHeldKb", kilobytes(value.notesHeldKb)),
+    ...optional("notesHeld", notesCount(value.notesHeld)),
     ...optional("secondInstanceKb", kilobytes(value.secondInstanceKb)),
     ...optional("basis", isVoiceBasis(value.basis) ? value.basis : undefined),
     ...reasonOf(value),

@@ -24,7 +24,7 @@ import { mergeProbeRuns } from "./probe-merge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { mergeRunsByRecord, writeQualification } from "./qualification-record.js";
+import { buildQualificationRecord, mergeRunsByRecord, writeQualification } from "./qualification-record.js";
 import {
   CLAP_QUALIFY_TOOL_ENV,
   LV2_MEASURE_TOOL_ENV,
@@ -176,6 +176,20 @@ describe("the verdict reads the host's own cell", () => {
     expect(partial.firstInstanceKb).toBeUndefined();
     expect(partial.perInstanceKb).toBeUndefined();
     expect(partial.atRestKb).toBe(1000);
+  });
+
+  it("a record states the voices a footprint held its notes at: Surge XT's 64, declared, with the figure they gave (plugin-qualify#316)", () => {
+    const d = fixtureJson("success-msi");
+    d.plugin.id = "org.surge-synth-team.surge-xt";
+    d.grid[0].memory = { afterActivateKb: 900, atRestKb: 1000, notesHeldKb: 1500, notesHeld: 64, basis: "declared", secondInstanceKb: 100 };
+    const r = readProbeOutput(JSON.stringify(d));
+    if (!r.ok) throw new Error(r.problem);
+    const record = buildQualificationRecord(judgeProbeOutput(r.output, [OMX_CLAP_HOST_PROFILE]), { file: "x.probe.json", sha256: "0".repeat(64), bytes: 1 });
+    expect(record.measurements.grid[0]?.memory).toMatchObject({ notesHeldKb: 1500, notesHeld: 64, basis: "declared" });
+    // a count that is no whole number of notes is no figure
+    d.grid[0].memory.notesHeld = 0.5;
+    const bad = readProbeOutput(JSON.stringify(d));
+    expect(bad.ok && bad.output.grid[0]?.memory?.notesHeld).toBeUndefined();
   });
 
   it("a cell that outgrew the bound is named by its outcome, with the limit, and leaves the other hosts judged", () => {
