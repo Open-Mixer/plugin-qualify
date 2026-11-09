@@ -41,7 +41,7 @@ permissions:
 
 jobs:
   rpm:
-    uses: Open-Mixer/.github/.github/workflows/build-rpm.yml@main
+    uses: Open-Mixer/.github/.github/workflows/build-rpm.yml@openmixer-v1
     with:
       package-name: plugin-qualify
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
@@ -59,7 +59,7 @@ jobs:
     needs: rpm
     # only after the RPM passed: a DEB never ships beside a failed RPM (the shared release-order check)
     if: ${{ !cancelled() && needs.rpm.result == 'success' }}
-    uses: Open-Mixer/.github/.github/workflows/build-deb.yml@main
+    uses: Open-Mixer/.github/.github/workflows/build-deb.yml@openmixer-v1
     with:
       package-name: plugin-qualify
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
@@ -113,7 +113,7 @@ jobs:
       # come after that check.
       - name: Add the OpenMixer channel (Fedora)
         if: startsWith(matrix.image, 'fedora')
-        uses: Open-Mixer/.github/.github/actions/add-openmixer@main
+        uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Fedora)
         if: startsWith(matrix.image, 'fedora')
@@ -149,7 +149,7 @@ jobs:
 
       - name: Add the OpenMixer channel (Debian)
         if: startsWith(matrix.image, 'debian')
-        uses: Open-Mixer/.github/.github/actions/add-openmixer@main
+        uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Debian)
         if: startsWith(matrix.image, 'debian')
