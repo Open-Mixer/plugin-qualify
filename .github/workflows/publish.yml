@@ -5,7 +5,7 @@ name: Publish to npm
 # Publishes @openmixer/plugin-qualify to npmjs.org by npm trusted publishing (OIDC, no token anywhere), with
 # provenance. npmjs.com trusts the CALLER of the publish by repository + workflow filename (+ environment when
 # one is set there; none is), so:
-#   Repository: FreeMixer/plugin-qualify    Workflow filename: publish.yml    Environment: (none)
+#   Repository: Open-Mixer/plugin-qualify    Workflow filename: publish.yml    Environment: (none)
 # A version tag publishes; a manual dispatch is a dry run unless asked otherwise. Only the public repository
 # publishes: a tag on any other copy of this tree stops before npm.
 
@@ -25,7 +25,7 @@ permissions:
 jobs:
   publish:
     name: npm publish
-    if: github.repository == 'FreeMixer/plugin-qualify'
+    if: github.repository == 'Open-Mixer/plugin-qualify'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
