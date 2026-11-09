@@ -1,3 +1,14 @@
+plugin-qualify (0.20.0) unstable; urgency=medium
+
+  * Built and run against the one-panel wave's releases: plugin-hostd
+    >= 0.20.0 and < 0.21, omx-clap-host, libomx-clap-core1 and
+    libomx-clap-lv2-dev >= 0.31.0 and < 0.32, plugin-hostd-protocol
+    >= 0.5.1 and < 0.6, plugin-db >= 0.3.0 and < 0.4, omx-dsp >= 0.32.0
+    and < 0.33, omx-contract >= 3.11.0 and < 4, and the CLAP headers
+    >= 1.2.10 (1.2.7 on Fedora) and < 2.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Mon, 09 Nov 2026 03:15:09 +0100
+
 plugin-qualify (0.19.4) unstable; urgency=medium
 
   * A probe run's child stderr is kept beside its record, as
