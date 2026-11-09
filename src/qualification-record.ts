@@ -25,6 +25,7 @@ import type { VoicesHeld } from "./measurement/format.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { MEASUREMENT_UNMEASURED_REASONS } from "@openmixer/omx-contract";
+import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
 
 export const QUALIFICATION_RECORD_SCHEMA = "plugin-qualify.qualification-record/1";
 
@@ -201,6 +202,8 @@ export type RecordGridPoint = Omit<ProbeGridPoint, "latency" | "memory"> & {
   /** The footprint as measured, with what it comes to: what a client adding the plugin reads (`memory-budget.ts`). */
   readonly memory?: MemoryFootprint & { readonly firstInstanceKb?: number; readonly perInstanceKb?: number };
   readonly latency: (Omit<NonNullable<ProbeGridPoint["latency"]>, "measuredFrames"> & { readonly measuredFrames: number }) | UnmeasuredLatency;
+  /** The measured latency in milliseconds at the cell's rate, beside the record's `latencyLineMs`; absent when none was measured. */
+  readonly latencyMs?: number;
 };
 
 const UNMEASURED_WORDS: ReadonlySet<string> = new Set(Object.values(MEASUREMENT_UNMEASURED_REASONS).map((r) => r.word));
@@ -218,6 +221,13 @@ export function memoryOfCell(p: ProbeGridPoint): Pick<RecordGridPoint, "memory">
   const first = p.memory.unmeasuredReason === undefined ? firstInstanceKb(p.memory) : undefined;
   const per = p.memory.unmeasuredReason === undefined ? perInstanceKb(p.memory) : undefined;
   return { memory: { ...p.memory, ...(first === undefined ? {} : { firstInstanceKb: first }), ...(per === undefined ? {} : { perInstanceKb: per }) } };
+}
+
+/** A grid point as the record writes it: its footprint, its latency or why there is none, and the latency in milliseconds. */
+export function gridPointOf(output: ProbeOutput, p: ProbeGridPoint): RecordGridPoint {
+  const latency = latencyOfCell(output, p);
+  const frames = (latency as { measuredFrames?: number }).measuredFrames;
+  return { ...p, ...memoryOfCell(p), latency, ...(frames === undefined ? {} : { latencyMs: latencyMsOf(frames, p.rate) }) };
 }
 
 /** The unmeasured word of a cell whose run did not end well, by its outcome code. */
@@ -361,6 +371,10 @@ export interface QualificationRecord {
   /** Who measured and when. */
   readonly tool: Readonly<Record<string, string>>;
   readonly measuredAt: string;
+  /** The latency line the cells' `latencyMs` stand against (`LATENCY_LINE_MS`); absent on a record written before it was declared. */
+  readonly latencyLineMs?: number;
+  /** The rules the verdicts were judged by (`judgementRules`); absent on a record written before they were stated. */
+  readonly rules?: string;
   /** The second verdict, per host class of the history that was read; absent until `adjust --history` has run. */
   readonly history?: readonly HistoryBlock[];
   /** Where the record came from when it was not measured on this device: the distributed set's provenance, as the set's package wrote it. */
@@ -483,13 +497,15 @@ export function buildQualificationRecord(
     tiers: tiersOf(judgment),
     cost: judgment.hosts.map((h) => ({ host: h.verdict.host, ...h.cost })),
     measurements: {
-      grid: o.grid.map((p) => ({ ...p, ...memoryOfCell(p), latency: latencyOfCell(o, p) })),
+      grid: o.grid.map((p) => gridPointOf(o, p)),
       ...(o.behaviour === undefined ? {} : { behaviour: o.behaviour }),
       ...(unmeasuredFigures(o).length === 0 ? {} : { unmeasured: unmeasuredFigures(o) }),
     },
     ...(notMeasured.length === 0 ? {} : { notMeasured }),
     tool: o.run.tools,
     measuredAt: o.run.startedAt,
+    latencyLineMs: LATENCY_LINE_MS,
+    rules: judgementRules(),
     probe: {
       file: copy.file,
       sha256: copy.sha256,
