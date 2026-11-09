@@ -294,7 +294,7 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
 describe("two plugins owing the step in one run, whichever comes first (#319)", () => {
   // the records a Raspberry Pi 5 wrote at 48000/256 (plugin-qualify 0.19.1): drumkv1 and samplv1, both silent under notes
   // for omx-clap-host, samplv1's run also seeing an RT violation; drumkv1 got the step and samplv1 did not
-  const PI = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "records-rpi5-20261109");
+  const PI = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "records-rpi5-0.19.1");
   const STEMS = ["http___drumkv1.sourceforge.net_lv2@0.2-7d179bdcf9e5.default", "http___samplv1.sourceforge.net_lv2@0.2-c9cd8fb3102f.default"];
   /** The record as the sweep wrote it before any isolated step. */
   const before = (stem: string): QualificationRecord => {
