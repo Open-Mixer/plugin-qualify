@@ -51,7 +51,7 @@ jobs:
       # plugin-db-devel, whose pin.h the CLAP prober builds against, plugin-hostd-protocol-devel, and omx-clap-lv2-devel, the
       # LV2 measurer's host features
       channel-deps: true
-      arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false) && '["x86_64"]' || '["x86_64", "aarch64"]' }}
+      arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && '["x86_64"]' || '["x86_64", "aarch64"]' }}
     secrets: inherit
 
   # after the RPM: both publish into one tree, and a push that loses a race is refused
@@ -72,7 +72,7 @@ jobs:
       # the release-notes filter of the build (changelog.sh) runs python3, which the debian: image does not carry
       build-packages: python3
       channel-deps: true
-      arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false) && '["amd64"]' || '["amd64", "arm64"]' }}
+      arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && '["amd64"]' || '["amd64", "arm64"]' }}
     secrets: inherit
 
   # the built package, installed in its own distribution, qualifies the fixture plugins with no
