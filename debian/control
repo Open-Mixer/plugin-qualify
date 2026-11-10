@@ -15,7 +15,7 @@ Build-Depends: debhelper-compat (= 13),
                libomx-clap-lv2-dev (>= 0.31.2~), libomx-clap-lv2-dev (<< 0.32~),
                libomxdsp-dev (>= 0.32.0~), libomxdsp-dev (<< 0.33~)
 Standards-Version: 4.6.2
-Homepage: https://github.com/FreeMixer/plugin-qualify
+Homepage: https://github.com/Open-Mixer/plugin-qualify
 Rules-Requires-Root: no
 
 Package: plugin-qualify
