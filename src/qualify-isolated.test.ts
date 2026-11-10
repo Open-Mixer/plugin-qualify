@@ -232,7 +232,7 @@ describe("the completion of a record already judged", () => {
     const names = ["a", "b", "c"].map((n) => `${n}.qualification.json`);
     for (const n of names) writeFileSync(join(dir, n), JSON.stringify(record()));
     const facts: Record<string, IsolatedRunFacts> = { "urn:a": WELL, "urn:b": { ...WELL, silent: true }, "urn:c": { started: false, problem: "no jackd" } };
-    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" } }, env: {}, log: () => {}, isolatedRunner: (uri: string) => facts[uri]! } as unknown as SyncContext;
+    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => facts[uri]! } as unknown as SyncContext;
     const state = {
       entries: { k: { plugins: ["a", "b", "c"].map((n) => ({ uri: `urn:${n}`, outcome: "qualified", record: join(dir, `${n}.qualification.json`), pin: { uri: `urn:${n}`, integrity: {}, verdict: "isolated" } })) } },
     } as unknown as SyncState;
@@ -272,7 +272,7 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     const rec = (result: string) => ({ ...withVerdict(gap([clean, memory])), binary: { path: "a.so", ...bytes }, run: { id: "r", steps: [...baseSteps(record()), { step: "isolated", result }] } });
     for (const n of ["ok", "no"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify(rec(n === "ok" ? "isolated" : "refused")));
     const ctx = {
-      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [] },
+      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
       env: {},
       log: () => {},
       isolatedRunner: () => { throw new Error("nothing is run again"); },
@@ -298,7 +298,7 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     for (const n of ["ok", "no", "off"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify({ ...owed, plugin: { ...owed.plugin, id: `urn:${n}` } }));
     const facts: Record<string, IsolatedRunFacts> = { "urn:ok": WELL, "urn:no": { ...WELL, silent: true }, "urn:off": { started: false, problem: "no jackd" } };
     const ctx = {
-      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [] },
+      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
       env: {},
       log: () => {},
       isolatedRunner: (uri: string) => facts[uri]!,
@@ -335,7 +335,7 @@ describe("two plugins owing the step in one run, whichever comes first (#319)", 
     const dir = mkdtempSync(join(scratch, "order-"));
     for (const s of stems) writeFileSync(join(dir, `${s}.qualification.json`), JSON.stringify(before(s)));
     const ran: string[] = [];
-    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" } }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
+    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
     const state = {
       entries: { k: { plugins: stems.map((s) => ({ uri: before(s).plugin.id, outcome: "unmeasured", code: "omx-clap-host.silent-under-note", pin: { uri: before(s).plugin.id, integrity: {} }, record: join(dir, `${s}.qualification.json`) })) } },
     } as unknown as SyncState;
