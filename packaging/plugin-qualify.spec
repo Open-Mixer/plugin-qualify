@@ -5,7 +5,7 @@ Version:        0.20.1
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
-URL: https://github.com/FreeMixer/plugin-qualify
+URL: https://github.com/Open-Mixer/plugin-qualify
 
 Source0: %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
 
