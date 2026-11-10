@@ -6,12 +6,12 @@
   "license": "GPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/FreeMixer/plugin-qualify.git"
+    "url": "git+https://github.com/Open-Mixer/plugin-qualify.git"
   },
   "author": "Pau Aliagas <linuxnow@gmail.com>",
-  "homepage": "https://github.com/FreeMixer/plugin-qualify#readme",
+  "homepage": "https://github.com/Open-Mixer/plugin-qualify#readme",
   "bugs": {
-    "url": "https://github.com/FreeMixer/plugin-qualify/issues"
+    "url": "https://github.com/Open-Mixer/plugin-qualify/issues"
   },
   "engines": {
     "node": ">=18"
