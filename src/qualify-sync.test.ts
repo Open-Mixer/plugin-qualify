@@ -464,8 +464,9 @@ describe("plugin-hostd in its default mode, on the pin file the sweep wrote", ()
       expect(sync(m.flags()).summary).toMatchObject({ qualified: 2 });
       const env = await jack();
       const uri = `clap:${join(m.clap, "rt-safe.clap")}#${GOOD_ID}`;
-      // the daemon's defaults (require_pins 1, pin_mode first-use); only its own files are the test's
-      const base = (d: string) => ({ clap_host: CLAP_HOST!, state_root: d, pin_store: join(d, "pins"), lv2_path: m.lv2 });
+      // the daemon's defaults (require_pins 1, pin_mode first-use); only its own files are the test's, and its search
+      // paths are the ones the sync scanned, as on a device: first use learns nothing outside them (plugin-hostd 0.20.1)
+      const base = (d: string) => ({ clap_host: CLAP_HOST!, state_root: d, pin_store: join(d, "pins"), lv2_path: m.lv2, clap_path: m.clap });
       const chainWith = async (conf: Record<string, string>): Promise<string[]> => {
         const d = mkdtempSync(join(scratch, "state-"));
         const daemon: RunningDaemon = await startDaemon(HOSTD!, scratch, { ...base(d), ...conf }, env);

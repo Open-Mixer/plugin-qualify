@@ -28,7 +28,7 @@ import {
   stepsCalledFor,
   type IsolatedRunFacts,
 } from "./qualify-isolated.js";
-import { isolatedPass, type SyncContext, type SyncState } from "./qualify-sync.js";
+import { hostdSearchEnv, isolatedPass, type SyncContext, type SyncState } from "./qualify-sync.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-isolated-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -118,6 +118,13 @@ describe("the steps a record's outcome calls for", () => {
   });
 });
 
+/** The environment the sync gives a step for a .clap it scanned: the plugin's directory is the daemon's clap_path, as the
+ * sync's clap_path is (hostdSearchEnv); plugin-hostd from 0.20.1 refuses a first use outside its search path (-508). */
+const onItsClapPath = (uri: string): NodeJS.ProcessEnv => ({
+  ...process.env,
+  ...hostdSearchEnv({ lv2Dirs: [], clapDirs: [dirname(uri.slice("clap:".length).split("#")[0]!)] }),
+});
+
 describe("the step itself, on a private server", () => {
   const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "..", "native", "build", "fixtures", "rt-safe.clap");
   const ID = "org.freemixer.plugin-qualify.fixture.rt-safe";
@@ -131,7 +138,7 @@ describe("the step itself, on a private server", () => {
       if (process.env["CI"] !== undefined) throw new Error("jackd, plugin-hostd or native/build is missing: CI installs them");
       ctx.skip("needs jackd, plugin-hostd and native/build");
     }
-    const facts = spawnedIsolatedRunner()(`clap:${FIXTURE}#${ID}`, CELL, process.env);
+    const facts = spawnedIsolatedRunner()(`clap:${FIXTURE}#${ID}`, CELL, onItsClapPath(`clap:${FIXTURE}#${ID}`));
     const step = judgeIsolatedRun(facts);
     expect(step.result, JSON.stringify(facts)).toBe(ISOLATED_RESULT.isolated);
     expect(facts.xruns).toBeGreaterThanOrEqual(0);
@@ -143,7 +150,7 @@ describe("the step itself, on a private server", () => {
       if (process.env["CI"] !== undefined) throw new Error("jackd, plugin-hostd or native/build is missing: CI installs them");
       ctx.skip("needs jackd, plugin-hostd and native/build");
     }
-    const facts = spawnedIsolatedRunner()(`clap:${SYNTH}#${SYNTH_ID}`, CELL, process.env);
+    const facts = spawnedIsolatedRunner()(`clap:${SYNTH}#${SYNTH_ID}`, CELL, onItsClapPath(`clap:${SYNTH}#${SYNTH_ID}`));
     const step = judgeIsolatedRun(facts);
     expect(step.result, JSON.stringify(facts)).toBe(ISOLATED_RESULT.isolated);
     expect(facts.midiInputsLinked, JSON.stringify(facts)).toBeGreaterThan(0);
@@ -154,7 +161,7 @@ describe("the step itself, on a private server", () => {
       if (process.env["CI"] !== undefined) throw new Error("jackd, plugin-hostd or native/build is missing: CI installs them");
       ctx.skip("needs jackd, plugin-hostd and native/build");
     }
-    const facts = spawnedIsolatedRunner()(`clap:${join(dirname(FIXTURE), "synth-drum.clap")}#${SYNTH_ID}-drum`, CELL, process.env);
+    const facts = spawnedIsolatedRunner()(`clap:${join(dirname(FIXTURE), "synth-drum.clap")}#${SYNTH_ID}-drum`, CELL, onItsClapPath(`clap:${join(dirname(FIXTURE), "synth-drum.clap")}#${SYNTH_ID}-drum`));
     expect(judgeIsolatedRun(facts).result, JSON.stringify(facts)).toBe(ISOLATED_RESULT.isolated);
   });
 
@@ -165,7 +172,7 @@ describe("the step itself, on a private server", () => {
     }
     const runner = spawnedIsolatedRunner();
     for (const run of ["first", "second", "third"]) {
-      const facts = runner(`clap:${FIXTURE}#${ID}`, CELL, process.env);
+      const facts = runner(`clap:${FIXTURE}#${ID}`, CELL, onItsClapPath(`clap:${FIXTURE}#${ID}`));
       expect(judgeIsolatedRun(facts).result, `${run}: ${JSON.stringify(facts)}`).toBe(ISOLATED_RESULT.isolated);
     }
   });
@@ -232,7 +239,7 @@ describe("the completion of a record already judged", () => {
     const names = ["a", "b", "c"].map((n) => `${n}.qualification.json`);
     for (const n of names) writeFileSync(join(dir, n), JSON.stringify(record()));
     const facts: Record<string, IsolatedRunFacts> = { "urn:a": WELL, "urn:b": { ...WELL, silent: true }, "urn:c": { started: false, problem: "no jackd" } };
-    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" } }, env: {}, log: () => {}, isolatedRunner: (uri: string) => facts[uri]! } as unknown as SyncContext;
+    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => facts[uri]! } as unknown as SyncContext;
     const state = {
       entries: { k: { plugins: ["a", "b", "c"].map((n) => ({ uri: `urn:${n}`, outcome: "qualified", record: join(dir, `${n}.qualification.json`), pin: { uri: `urn:${n}`, integrity: {}, verdict: "isolated" } })) } },
     } as unknown as SyncState;
@@ -272,7 +279,7 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     const rec = (result: string) => ({ ...withVerdict(gap([clean, memory])), binary: { path: "a.so", ...bytes }, run: { id: "r", steps: [...baseSteps(record()), { step: "isolated", result }] } });
     for (const n of ["ok", "no"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify(rec(n === "ok" ? "isolated" : "refused")));
     const ctx = {
-      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [] },
+      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
       env: {},
       log: () => {},
       isolatedRunner: () => { throw new Error("nothing is run again"); },
@@ -298,7 +305,7 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     for (const n of ["ok", "no", "off"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify({ ...owed, plugin: { ...owed.plugin, id: `urn:${n}` } }));
     const facts: Record<string, IsolatedRunFacts> = { "urn:ok": WELL, "urn:no": { ...WELL, silent: true }, "urn:off": { started: false, problem: "no jackd" } };
     const ctx = {
-      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [] },
+      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
       env: {},
       log: () => {},
       isolatedRunner: (uri: string) => facts[uri]!,
@@ -335,7 +342,7 @@ describe("two plugins owing the step in one run, whichever comes first (#319)", 
     const dir = mkdtempSync(join(scratch, "order-"));
     for (const s of stems) writeFileSync(join(dir, `${s}.qualification.json`), JSON.stringify(before(s)));
     const ran: string[] = [];
-    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" } }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
+    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
     const state = {
       entries: { k: { plugins: stems.map((s) => ({ uri: before(s).plugin.id, outcome: "unmeasured", code: "omx-clap-host.silent-under-note", pin: { uri: before(s).plugin.id, integrity: {} }, record: join(dir, `${s}.qualification.json`) })) } },
     } as unknown as SyncState;
