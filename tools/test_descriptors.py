@@ -60,6 +60,8 @@ class FileName(unittest.TestCase):
 
     def test_lv2_uri_and_no_version(self):
         self.assertEqual(d.descriptor_file_name("http://x.org/p#a b", None, SHA_A), "http___x.org_p_a_b@unversioned-aaaaaaaaaaaa.json")
+        # one '_' per UTF-8 byte, as plugin-hostd reads the name: é is two bytes
+        self.assertEqual(d.descriptor_file_name("org.example.caf\u00e9", None, SHA_A), "org.example.caf__@unversioned-aaaaaaaaaaaa.json")
 
     def test_a_changed_binary_is_a_new_name(self):
         self.assertNotEqual(d.descriptor_file_name("org.example.plate", "1", SHA_A), d.descriptor_file_name("org.example.plate", "1", SHA_B))
@@ -349,7 +351,7 @@ class Lv2RoundTrip(unittest.TestCase):
     def test_every_fixture_plugin_is_written_and_none_refused(self):
         self.assertEqual(self.refused, [])
         self.assertEqual(sorted(self.docs()), sorted(self.rows))
-        self.assertEqual(len(self.rows), 19)  # activate-reads, needs-display and abi-breaker joined the 16
+        self.assertEqual(len(self.rows), 21)  # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19
 
     def test_each_file_is_named_by_id_version_and_its_binary_hash(self):
         plugins = self.scanner.w.get_all_plugins()

@@ -11,13 +11,13 @@
 # build with no omx-clap-lv2-devel installed. The same checkout's own ts/ (committed, not built) is
 # tools/gen-hosting-codes.mjs's fallback when no omx-clap-core-devel is installed (<dir>/omx-clap-core/ts).
 #
-#   fetch-deps.sh <dir> <clap-tag> <plugin-hostd-tag> <omx-contract-version> <omx-clap-core-version> <omx-dsp-version> <plugin-db-tag>
+#   fetch-deps.sh <dir> <clap-tag> <plugin-hostd-protocol-tag> <omx-contract-version> <omx-clap-core-version> <omx-dsp-version> <plugin-db-tag>
 set -eu
 
-usage="usage: fetch-deps.sh <dir> <clap-tag> <plugin-hostd-tag> <omx-contract-version> <omx-clap-core-version> <omx-dsp-version> <plugin-db-tag>"
+usage="usage: fetch-deps.sh <dir> <clap-tag> <plugin-hostd-protocol-tag> <omx-contract-version> <omx-clap-core-version> <omx-dsp-version> <plugin-db-tag>"
 dir=${1:?$usage}
 clap_ref=${2:?$usage}
-hostd_ref=${3:?$usage}
+protocol_ref=${3:?$usage}
 contract_version=${4:?$usage}
 clap_core_version=${5:?$usage}
 dsp_version=${6:?$usage}
@@ -32,7 +32,7 @@ fetch() { # <url> <tag> <into>
 
 mkdir -p "$dir"
 fetch https://github.com/free-audio/clap "$clap_ref" "$dir/clap"
-fetch https://github.com/Open-Mixer/plugin-hostd "$hostd_ref" "$dir/plugin-hostd"
+fetch https://github.com/Open-Mixer/plugin-hostd-protocol "$protocol_ref" "$dir/plugin-hostd-protocol"
 fetch https://github.com/Open-Mixer/plugin-db "$pin_ref" "$dir/plugin-db"
 
 rm -rf "$dir/omx-contract"

@@ -83,7 +83,17 @@ export interface ModHostRun {
    * not be read. Absent for a plugin that is no instrument, and for any plugin under mod-host.
    */
   /** `notes`: how many keys were played; a run from when one key was played has none. */
-  readonly sound?: { readonly peak?: number; readonly notes?: number; readonly problem?: string };
+  readonly sound?: { readonly peak?: number; readonly notes?: number; readonly problem?: string; readonly content?: AdapterContent };
+}
+
+/**
+ * The content an instrument declares it plays from (its `patch:writable` parameters of range `atom:Path`, `lv2ContentParams`)
+ * and what came of giving each a short sample before the notes: `loaded` the host took, `refused` it did not (with its answer).
+ */
+export interface AdapterContent {
+  readonly params: readonly string[];
+  readonly loaded: readonly string[];
+  readonly refused?: readonly string[];
 }
 
 /** At or under this magnitude (-120 dBFS) a held note is taken as digital silence: clap-qualify's own SILENCE. */
@@ -97,6 +107,22 @@ export const SILENT_PEAK = 1e-6;
 export const ADAPTER_SILENT_CODE = `${ADAPTER_HOST}.silent-under-note`;
 export const ADAPTER_LEVEL_UNMEASURED_CODE = `${ADAPTER_HOST}.level-unmeasured`;
 const UNPROVEN_SOUND: readonly string[] = [ADAPTER_SILENT_CODE, ADAPTER_LEVEL_UNMEASURED_CODE];
+/**
+ * An instrument that declares content it plays from and stayed silent under the notes even so: the content could not be
+ * given (the host refused the sample) or the sample did not reach the keys played. Its silence says nothing of the plugin,
+ * so the note test is not observable for it: the run admits it, and the record names this code and the content (#318).
+ * No other host is asked instead.
+ */
+export const ADAPTER_CONTENT_UNOBSERVED_CODE = `${ADAPTER_HOST}.silent-needs-content`;
+
+/** The run's content, as a reason's params carry it: the declared parameters, the ones loaded, the ones refused. */
+function contentParams(content: AdapterContent): Record<string, string> {
+  return {
+    content: content.params.join(" "),
+    loaded: content.loaded.join(" "),
+    ...(content.refused === undefined || content.refused.length === 0 ? {} : { refused: content.refused.join("; ") }),
+  };
+}
 
 /** The rating a run that did not admit the plugin gives its host's verdict. */
 export function admissionRating(admission: HostAdmission): "unsuitable" | "unknown" {
@@ -108,6 +134,19 @@ export function admissionRating(admission: HostAdmission): "unsuitable" | "unkno
  * which says nothing of the plugin. omx-clap-host opens JACK at the first add since 0.26.1, so a host with no server answers these.
  */
 const JACK_CLIENT_RESPS: readonly number[] = [-201, -202];
+
+/** The name of the reason a run stops on when no JACK server answers: the admission cannot say anything of any plugin. */
+export const NO_JACK_SERVER = "no JACK server";
+
+/**
+ * The refusal to go on when an admission found no JACK client to have (`<host>.no-jack-client`): the server the host is
+ * pointed at (the default one, or `JACK_DEFAULT_SERVER`) is not there, and every plugin would be recorded with the same
+ * resp -201 as if it were the plugin's. `undefined` for any other run.
+ */
+export function noJackServerProblem(admission: HostAdmission | undefined): string | undefined {
+  if (admission === undefined || admission.measured || !admission.code?.endsWith(".no-jack-client")) return undefined;
+  return `${NO_JACK_SERVER}: ${admission.host} could not open a JACK client (resp ${String(admission.params["resp"] ?? "-201")}), so nothing is learned of any plugin; start the JACK server it is pointed at (JACK_DEFAULT_SERVER names it) and run again`;
+}
 
 /** The verdict of a run of a host that speaks mod-host's protocol: the first step that did not answer `resp 0` decides. */
 export function classifyProtocolRun(host: ProtocolHost, run: ModHostRun): HostAdmission {
@@ -128,7 +167,14 @@ export function classifyProtocolRun(host: ProtocolHost, run: ModHostRun): HostAd
   if (run.sound !== undefined) {
     const { peak, problem } = run.sound;
     if (peak === undefined) return { host, measured: true, admitted: false, code: ADAPTER_LEVEL_UNMEASURED_CODE, params: { problem: problem ?? "no figure" } };
-    if (!(peak > SILENT_PEAK)) return { host, measured: true, admitted: false, code: ADAPTER_SILENT_CODE, params: { peak, ...(run.sound.notes === undefined ? {} : { notes: run.sound.notes }) } };
+    const notes: Record<string, number> = run.sound.notes === undefined ? {} : { notes: run.sound.notes };
+    const content = run.sound.content;
+    if (!(peak > SILENT_PEAK)) {
+      if (content !== undefined && content.params.length > 0) return { host, measured: true, admitted: true, code: ADAPTER_CONTENT_UNOBSERVED_CODE, params: { peak, ...notes, ...contentParams(content) } };
+      return { host, measured: true, admitted: false, code: ADAPTER_SILENT_CODE, params: { peak, ...notes } };
+    }
+    // it sounded on the content it was given: the record says which
+    if (content !== undefined && content.loaded.length > 0) return { ...admitted(host), params: { peak, ...notes, ...contentParams(content) } };
   }
   return admitted(host);
 }

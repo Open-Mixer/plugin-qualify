@@ -320,6 +320,11 @@ export function judgeProbeOutput(output: ProbeOutput, profiles: readonly HostPro
         };
       }
     }
+    // a run that admitted the plugin and says why its note test could not be observed (a sampler with nothing to play): shown,
+    // never deciding (#318)
+    if (ran && admission !== undefined && admission.admitted && admission.code !== undefined) {
+      reasons = [{ dimension: "hostAdmission", rating: "suitable", code: admission.code, params: admission.params }, ...reasons];
+    }
     const owed = facts.owed?.[profile.id];
     if (owed !== undefined) reasons = [owed, ...reasons];
     const rating = worstRating(reasons.map((r) => r.rating));
