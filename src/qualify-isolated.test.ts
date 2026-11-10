@@ -28,7 +28,7 @@ import {
   stepsCalledFor,
   type IsolatedRunFacts,
 } from "./qualify-isolated.js";
-import { isolatedPass, type SyncContext, type SyncState } from "./qualify-sync.js";
+import { hostdSearchEnv, isolatedPass, type SyncContext, type SyncState } from "./qualify-sync.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-isolated-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -118,6 +118,13 @@ describe("the steps a record's outcome calls for", () => {
   });
 });
 
+/** The environment the sync gives a step for a .clap it scanned: the plugin's directory is the daemon's clap_path, as the
+ * sync's clap_path is (hostdSearchEnv); plugin-hostd from 0.20.1 refuses a first use outside its search path (-508). */
+const onItsClapPath = (uri: string): NodeJS.ProcessEnv => ({
+  ...process.env,
+  ...hostdSearchEnv({ lv2Dirs: [], clapDirs: [dirname(uri.slice("clap:".length).split("#")[0]!)] }),
+});
+
 describe("the step itself, on a private server", () => {
   const FIXTURE = join(dirname(fileURLToPath(import.meta.url)), "..", "native", "build", "fixtures", "rt-safe.clap");
   const ID = "org.freemixer.plugin-qualify.fixture.rt-safe";
@@ -131,7 +138,7 @@ describe("the step itself, on a private server", () => {
       if (process.env["CI"] !== undefined) throw new Error("jackd, plugin-hostd or native/build is missing: CI installs them");
       ctx.skip("needs jackd, plugin-hostd and native/build");
     }
-    const facts = spawnedIsolatedRunner()(`clap:${FIXTURE}#${ID}`, CELL, process.env);
+    const facts = spawnedIsolatedRunner()(`clap:${FIXTURE}#${ID}`, CELL, onItsClapPath(`clap:${FIXTURE}#${ID}`));
     const step = judgeIsolatedRun(facts);
     expect(step.result, JSON.stringify(facts)).toBe(ISOLATED_RESULT.isolated);
     expect(facts.xruns).toBeGreaterThanOrEqual(0);
@@ -143,7 +150,7 @@ describe("the step itself, on a private server", () => {
       if (process.env["CI"] !== undefined) throw new Error("jackd, plugin-hostd or native/build is missing: CI installs them");
       ctx.skip("needs jackd, plugin-hostd and native/build");
     }
-    const facts = spawnedIsolatedRunner()(`clap:${SYNTH}#${SYNTH_ID}`, CELL, process.env);
+    const facts = spawnedIsolatedRunner()(`clap:${SYNTH}#${SYNTH_ID}`, CELL, onItsClapPath(`clap:${SYNTH}#${SYNTH_ID}`));
     const step = judgeIsolatedRun(facts);
     expect(step.result, JSON.stringify(facts)).toBe(ISOLATED_RESULT.isolated);
     expect(facts.midiInputsLinked, JSON.stringify(facts)).toBeGreaterThan(0);
@@ -154,7 +161,7 @@ describe("the step itself, on a private server", () => {
       if (process.env["CI"] !== undefined) throw new Error("jackd, plugin-hostd or native/build is missing: CI installs them");
       ctx.skip("needs jackd, plugin-hostd and native/build");
     }
-    const facts = spawnedIsolatedRunner()(`clap:${join(dirname(FIXTURE), "synth-drum.clap")}#${SYNTH_ID}-drum`, CELL, process.env);
+    const facts = spawnedIsolatedRunner()(`clap:${join(dirname(FIXTURE), "synth-drum.clap")}#${SYNTH_ID}-drum`, CELL, onItsClapPath(`clap:${join(dirname(FIXTURE), "synth-drum.clap")}#${SYNTH_ID}-drum`));
     expect(judgeIsolatedRun(facts).result, JSON.stringify(facts)).toBe(ISOLATED_RESULT.isolated);
   });
 
@@ -165,7 +172,7 @@ describe("the step itself, on a private server", () => {
     }
     const runner = spawnedIsolatedRunner();
     for (const run of ["first", "second", "third"]) {
-      const facts = runner(`clap:${FIXTURE}#${ID}`, CELL, process.env);
+      const facts = runner(`clap:${FIXTURE}#${ID}`, CELL, onItsClapPath(`clap:${FIXTURE}#${ID}`));
       expect(judgeIsolatedRun(facts).result, `${run}: ${JSON.stringify(facts)}`).toBe(ISOLATED_RESULT.isolated);
     }
   });

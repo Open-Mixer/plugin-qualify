@@ -33,6 +33,7 @@ import {
   type PoolRunFacts,
   type PoolWindowFacts,
 } from "./qualify-pool.js";
+import { hostdSearchEnv } from "./qualify-sync.js";
 
 const CELL = { rate: 48000, quantum: 128 };
 const win = (over: Partial<PoolWindowFacts> = {}): PoolWindowFacts => ({ alive: true, workers: 1, xruns: 0, finite: true, silent: false, dspLoad: 40, poolOfWorker: "qualified", ...over });
@@ -202,12 +203,19 @@ describe("what owes the step", () => {
   });
 });
 
+/** The environment the sync gives a step for a .clap it scanned: the plugin's directory is the daemon's clap_path, as the
+ * sync's clap_path is (hostdSearchEnv); plugin-hostd from 0.20.1 refuses a first use outside its search path (-508). */
+const onItsClapPath = (uri: string): NodeJS.ProcessEnv => ({
+  ...process.env,
+  ...hostdSearchEnv({ lv2Dirs: [], clapDirs: [dirname(uri.slice("clap:".length).split("#")[0]!)] }),
+});
+
 describe("the step itself, on a private server, under a real plugin-hostd with omx-clap-host's pool", () => {
   const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "native", "build", "fixtures");
   const installed = (tool: string): boolean => spawnSync("sh", ["-c", `command -v ${tool}`]).status === 0;
   const uri = (file: string, id: string): string => `clap:${join(FIXTURES, file)}#org.freemixer.plugin-qualify.fixture.${id}`;
   const ready = existsSync(join(FIXTURES, "pool-synth.clap")) && installed("jackd") && installed("plugin-hostd") && installed("omx-clap-host");
-  const run = (file: string, id: string): PoolRunFacts => spawnedPoolRunner()(uri(file, id), CELL, process.env);
+  const run = (file: string, id: string): PoolRunFacts => spawnedPoolRunner()(uri(file, id), CELL, onItsClapPath(uri(file, id)));
   /**
    * A gain is only ever lost to what else runs on the machine (the helpers need idle cores), never made by it, so an arm
    * that expects the pool to be granted may take it from the best of three runs; the arms that expect it refused take the
@@ -216,7 +224,7 @@ describe("the step itself, on a private server, under a real plugin-hostd with o
   const granted = (file: string, id: string, uriOf: (f: string, i: string) => string = uri): { facts: PoolRunFacts; step: ReturnType<typeof judgePoolRun>; tries: number } => {
     let last: { facts: PoolRunFacts; step: ReturnType<typeof judgePoolRun> } | undefined;
     for (let tries = 1; tries <= 3; tries++) {
-      const facts = spawnedPoolRunner()(uriOf(file, id), CELL, process.env);
+      const facts = spawnedPoolRunner()(uriOf(file, id), CELL, onItsClapPath(uriOf(file, id)));
       last = { facts, step: judgePoolRun(facts) };
       if (last.step.result === POOL_RESULT.cores) return { ...last, tries };
     }
