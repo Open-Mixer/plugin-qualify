@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { machineReason, parseSyncArgs, resolveSyncSettings, runSync, SYNC_CODE } from "./qualify-sync.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-machine-"));
@@ -74,9 +75,10 @@ describe("a plugin the machine left unmeasured (#192)", () => {
   it("a run where every plugin is unmeasured by one machine reason says it once and carries it to the end", async () => {
     const m = stands(["a.one", "a.two"]);
     writeFileSync(m.deny, "");
-    const args = parseSyncArgs(m.flags);
+    const sp = splitPathFlags(m.flags);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u");
+    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const lines: string[] = [];
     const summary = await runSync(r.settings, { env: m.env, log: (l) => lines.push(l) });
@@ -88,9 +90,10 @@ describe("a plugin the machine left unmeasured (#192)", () => {
   it("the next run measures them again although their files are unchanged", async () => {
     const m = stands(["b.one", "b.two"]);
     writeFileSync(m.deny, "");
-    const args = parseSyncArgs(m.flags);
+    const sp = splitPathFlags(m.flags);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u");
+    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     await runSync(r.settings, { env: m.env, log: () => {} });
     rmSync(m.deny);

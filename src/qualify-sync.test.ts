@@ -22,7 +22,6 @@ import { manifestPlugins } from "./lv2-loader.js";
 import { parsePinLine } from "./pins-file.js";
 import {
   SYNC_SETTINGS,
-  ZYNTHIAN_LV2_DIRS,
   changedPinLines,
   digestFiles,
   discoverSyncItems,
@@ -37,6 +36,8 @@ import {
   type SyncState,
 } from "./qualify-sync.js";
 import { clapQualifyToolPath, lv2MeasureNativePath, rtInterposePath } from "./tool-paths.js";
+import type { SearchPathRun } from "./hostd-search-path.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(PKG, "native", "build", "fixtures");
@@ -80,9 +81,9 @@ function needs(what: Record<string, boolean>, name: string, body: () => void | P
 
 describe("the settings", () => {
   it("are read from key value lines, a comment dropped, an unknown key refused by line", () => {
-    const ok = parseSyncConf("# Zynthian\nlv2_extra /a:/b   # two\n\nbudget_s 30\n");
+    const ok = parseSyncConf("# Zynthian\nhostd_conf /etc/omx/plugin-hostd.conf   # the daemon's\n\nbudget_s 30\n");
     expect(ok.ok && [...ok.values]).toEqual([
-      ["lv2_extra", "/a:/b"],
+      ["hostd_conf", "/etc/omx/plugin-hostd.conf"],
       ["budget_s", "30"],
     ]);
     const bad = parseSyncConf("budget_s 30\npin_flie /x\n", "q.conf");
@@ -93,7 +94,7 @@ describe("the settings", () => {
     for (const s of SYNC_SETTINGS) expect(parseSyncArgs([flagOf(s.key), "v"]).ok).toBe(true);
     const args = parseSyncArgs(["--budget-s", "9", "--system"]);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map([["budget_s", "30"], ["lv2_extra", ""]]), args.args, { LV2_PATH: "/x/lv2" }, "/home/u");
+    const r = resolveSyncSettings(new Map([["budget_s", "30"]]), args.args, {}, "/home/u", undefined, undefined, searchPathOf(["/x/lv2"], []));
     if (!r.ok) throw new Error(r.error);
     expect(r.settings.budgetS).toBe(9);
     expect(r.settings.lv2Dirs).toEqual(["/x/lv2"]);
@@ -103,12 +104,15 @@ describe("the settings", () => {
     expect(r.settings.hostProfile.id).toBe("omx-clap-host");
   });
 
-  it("defaults: plugin-hostd's LV2 directories then Zynthian's, the CLAP path, a 60 s budget, port 5555", () => {
+  it("defaults: the directories plugin-hostd searches with its own settings file, a 60 s budget, port 5555", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, {}, "/home/u");
+    const asked: (string | undefined)[] = [];
+    const run: SearchPathRun = (conf, env) => (asked.push(conf), searchPathOf(["/usr/lib/lv2", "/opt/lv2", "/usr/lib/lv2"], ["/home/u/.clap", "/usr/lib/clap"])(conf, env));
+    const r = resolveSyncSettings(new Map(), args.args, {}, "/home/u", undefined, undefined, run);
     if (!r.ok) throw new Error(r.error);
-    expect(r.settings.lv2Dirs).toEqual(["/usr/lib64/lv2", "/usr/lib/lv2", "/usr/local/lib/lv2", "/zynthian/zynthian-plugins/lv2", "/zynthian/zynthian-my-data/plugins/lv2"]);
+    expect(asked).toEqual([undefined]);
+    expect(r.settings.lv2Dirs).toEqual(["/usr/lib/lv2", "/opt/lv2"]);
     expect(r.settings.clapDirs).toEqual(["/home/u/.clap", "/usr/lib/clap"]);
     expect([r.settings.budgetS, r.settings.hostdPort, r.settings.hostdFeedbackPort, r.settings.settleS]).toEqual([60, 5555, 5556, 0]);
     expect(r.settings.pinFile).toBe("/home/u/.local/state/omx/qualified.pins");
@@ -117,25 +121,25 @@ describe("the settings", () => {
   it("the grid is the full one by default, hosts (also --grid-hosts) or named cells when set, with a cell budget and a memory bound (#193)", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
-    const d = resolveSyncSettings(new Map(), args.args, {}, "/home/u");
+    const d = resolveSyncSettings(new Map(), args.args, {}, "/home/u", undefined, undefined, searchPathOf([], []));
     if (!d.ok) throw new Error(d.error);
     expect(d.settings.grid).toEqual({ kind: "full" });
     const fast = parseSyncArgs(["--grid-hosts"]);
     if (!fast.ok) throw new Error(fast.error);
-    const h = resolveSyncSettings(new Map(), fast.args, {}, "/home/u");
+    const h = resolveSyncSettings(new Map(), fast.args, {}, "/home/u", undefined, undefined, searchPathOf([], []));
     expect(h.ok && h.settings.grid).toEqual({ kind: "hosts" });
     expect(d.settings.cellsPerPluginBudget).toBe(0);
     expect(d.settings.memory?.bytes).toBeGreaterThan(0);
-    const set = resolveSyncSettings(new Map([["grid", "48000/128,96000/1024"], ["cells_per_plugin_budget", "2"], ["memory_limit", "1G"]]), args.args, {}, "/home/u");
+    const set = resolveSyncSettings(new Map([["grid", "48000/128,96000/1024"], ["cells_per_plugin_budget", "2"], ["memory_limit", "1G"]]), args.args, {}, "/home/u", undefined, undefined, searchPathOf([], []));
     if (!set.ok) throw new Error(set.error);
     expect(set.settings.grid).toEqual({ kind: "cells", cells: [{ rate: 48000, quantum: 128 }, { rate: 96000, quantum: 1024 }] });
     expect(set.settings.cellsPerPluginBudget).toBe(2);
     expect(set.settings.memory).toEqual({ bytes: 2 ** 30, mechanism: "rlimit-data" });
-    const off = resolveSyncSettings(new Map([["memory_limit", "off"], ["grid", "full"]]), args.args, {}, "/home/u");
+    const off = resolveSyncSettings(new Map([["memory_limit", "off"], ["grid", "full"]]), args.args, {}, "/home/u", undefined, undefined, searchPathOf([], []));
     expect(off.ok && off.settings.memory).toBeUndefined();
     expect(off.ok && off.settings.grid).toEqual({ kind: "full" });
     for (const [k, v] of [["grid", "48000"], ["cells_per_plugin_budget", "1.5"], ["memory_limit", "much"]] as const) {
-      expect(resolveSyncSettings(new Map([[k, v]]), args.args, {}).ok, k).toBe(false);
+      expect(resolveSyncSettings(new Map([[k, v]]), args.args, {}, undefined, undefined, undefined, searchPathOf([], [])).ok, k).toBe(false);
     }
   });
 
@@ -143,7 +147,7 @@ describe("the settings", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     for (const [k, v] of [["budget_s", "0"], ["hostd_port", "70000"], ["host_profile", "nobody"]] as const) {
-      expect(resolveSyncSettings(new Map([[k, v]]), args.args, {}).ok).toBe(false);
+      expect(resolveSyncSettings(new Map([[k, v]]), args.args, {}, undefined, undefined, undefined, searchPathOf([], [])).ok).toBe(false);
     }
   });
 });
@@ -180,14 +184,9 @@ describe("the units the packages ship", () => {
     ]);
   });
 
-  it("the path unit watches every standard directory a system service searches by default; the directories it adds come from the settings file", () => {
+  it("the path unit watches the standard plugin directories; the others plugin-hostd searches come from its --search-path", () => {
     const watched = [...unit("plugin-qualify-sync.path").matchAll(/^PathChanged=(.*)$/gm)].map((m) => m[1]);
-    const args = parseSyncArgs(["--system"]);
-    if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, {}, "/root");
-    if (!r.ok) throw new Error(r.error);
-    // the sync's own default for lv2_extra (Zynthian's two) is a setting, not a standard folder: the generated drop-in carries it
-    for (const dir of [...r.settings.lv2Dirs.filter((d) => !ZYNTHIAN_LV2_DIRS.includes(d)), ...r.settings.clapDirs.filter((d) => !d.startsWith("/root"))]) expect(watched).toContain(dir);
+    for (const dir of ["/usr/lib/lv2", "/usr/lib64/lv2", "/usr/local/lib/lv2", "/usr/lib/clap", "/usr/lib64/clap"]) expect(watched).toContain(dir);
   });
 
   it("the settings file names only settings", () => {
@@ -536,11 +535,10 @@ describe("a scoped run (#247)", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const values = new Map([
-      ["clap_path", join(root, "clap-scanned")], ["clap_extra", ""], ["lv2_path", join(root, "lv2-scanned")], ["lv2_extra", ""],
       ["pin_file", join(root, "q.pins")], ["qualification_dir", join(root, "qualification")], ["descriptor_dir", join(root, "descriptors")],
       ["state_file", join(root, "state", "qualify-sync.json")], ["hostd_port", "0"], ["host_class", ""], ["settle_s", "0"],
     ]);
-    const r = resolveSyncSettings(values, args.args, {}, root);
+    const r = resolveSyncSettings(values, args.args, {}, root, undefined, undefined, searchPathOf([join(root, "lv2-scanned")], [join(root, "clap-scanned")]));
     if (!r.ok) throw new Error(r.error);
     const entry = (format: "clap" | "lv2", entryRoot: string, uri: string) => ({
       format, root: entryRoot, files: [], plugins: [{ uri, outcome: "qualified" }], qualifiedAt: "2026-10-30T00:00:00Z", seconds: 1,
@@ -576,11 +574,10 @@ describe("the lock", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const values = new Map([
-      ["clap_path", join(root, "clap")], ["clap_extra", ""], ["lv2_path", join(root, "lv2")], ["lv2_extra", ""],
       ["pin_file", join(root, "q.pins")], ["qualification_dir", join(root, "qualification")], ["descriptor_dir", join(root, "descriptors")],
       ["state_file", join(root, "state", "qualify-sync.json")], ["hostd_port", "0"], ["host_class", ""], ["settle_s", settleS],
     ]);
-    const r = resolveSyncSettings(values, args.args, {}, root);
+    const r = resolveSyncSettings(values, args.args, {}, root, undefined, undefined, searchPathOf([join(root, "lv2")], [join(root, "clap")]));
     if (!r.ok) throw new Error(r.error);
     return r.settings;
   }
