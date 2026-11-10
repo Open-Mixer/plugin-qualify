@@ -740,8 +740,19 @@ function writeUnmeasuredRecord(ctx: SyncContext, item: SyncItem, files: readonly
   return path;
 }
 
-/** The step's environment: each of its commands has the sync's budget. */
-const isolatedEnv = (ctx: SyncContext): Readonly<Record<string, string | undefined>> => ({ ...ctx.env, [ADMIT_STEP_MS_ENV]: String(ctx.settings.budgetS * 1000) });
+/** The directories the sync scanned, as the plugin-hostd a step starts reads them: with neither variable set it searches
+ * only its own defaults, and every plugin of `lv2_extra` or of a directory the settings add is refused at add. */
+export const hostdSearchEnv = (settings: Pick<SyncSettings, "lv2Dirs" | "clapDirs">): Record<string, string> => ({
+  LV2_PATH: settings.lv2Dirs.join(":"),
+  CLAP_PATH: settings.clapDirs.join(":"),
+});
+
+/** The step's environment: the sync's directories, and each of its commands has the sync's budget. */
+export const isolatedEnv = (ctx: Pick<SyncContext, "env" | "settings">): Readonly<Record<string, string | undefined>> => ({
+  ...ctx.env,
+  ...hostdSearchEnv(ctx.settings),
+  [ADMIT_STEP_MS_ENV]: String(ctx.settings.budgetS * 1000),
+});
 
 /** Each judged run of a pass as the plugins it qualified: the record written, the pin taken, the outcome. */
 function judgedPlugins(ctx: SyncContext, runs: readonly { bytes: Buffer; judgment: Judgment; stderr?: readonly Buffer[] }[], describeProblem?: string): SyncPlugin[] {
@@ -777,7 +788,7 @@ function judgedPlugins(ctx: SyncContext, runs: readonly { bytes: Buffer; judgmen
     // the pool is for a CLAP plugin that runs: the thread pool is granted by measuring it, here and nowhere else
     if (judgment.output.plugin.format === "clap" && pin !== undefined && pin.verdict !== "refused" && outcome === "qualified") {
       const runner = ctx.poolRunner ?? spawnedPoolRunner();
-      const step = judgePoolRun(runner(pin.uri, isolatedCell(record, host), poolEnv(ctx.env, ctx.settings.budgetS)));
+      const step = judgePoolRun(runner(pin.uri, isolatedCell(record, host), poolEnv({ ...ctx.env, ...hostdSearchEnv(ctx.settings) }, ctx.settings.budgetS)));
       steps.push(step);
       pin = pinAfterPool(pin, step);
     }
@@ -980,7 +991,7 @@ export function poolPass(ctx: SyncContext, state: SyncState): { readonly state: 
           ctx.log(`${p.uri}: its record does not read; no pool step`);
           return p;
         }
-        const done = completePool(path, record, p.pin.uri, isolatedCell(record, host), runner, poolEnv(ctx.env, ctx.settings.budgetS));
+        const done = completePool(path, record, p.pin.uri, isolatedCell(record, host), runner, poolEnv({ ...ctx.env, ...hostdSearchEnv(ctx.settings) }, ctx.settings.budgetS));
         if (done === undefined) return p;
         ctx.log(`${p.uri}: pool step ${done.step.result}${done.step.code === undefined ? "" : ` (${done.step.code})`}`);
         if (done.step.result === POOL_RESULT.cores) count.cores++;
