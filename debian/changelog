@@ -1,3 +1,14 @@
+plugin-qualify (0.20.2) unstable; urgency=medium
+
+  * Built and run against the inner layers' latest releases: plugin-hostd
+    >= 0.20.2, omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.1,
+    plugin-hostd-protocol >= 0.5.3, plugin-db >= 0.3.1, each below the next
+    minor.
+  * make deps fetches the protocol header from plugin-hostd-protocol v0.5.3
+    and pin.h from plugin-db v0.3.1, the packages' floors.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Tue, 10 Nov 2026 01:59:06 +0000
+
 plugin-qualify (0.20.1) unstable; urgency=medium
 
   * Record sets per cell: the sync takes only a set measured at the cell it
