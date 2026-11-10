@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.2
+Version:        0.20.3
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -23,7 +23,7 @@ BuildRequires: pkgconfig(lv2)
 BuildRequires: (pkgconfig(plugin-db) >= 0.3.1 with pkgconfig(plugin-db) < 0.4)
 BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.3 with pkgconfig(plugin-hostd-protocol) < 0.6)
 BuildRequires: (pkgconfig(omx-contract) >= 3.12.0 with pkgconfig(omx-contract) < 4)
-BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.31.1 with pkgconfig(omx-clap-lv2) < 0.32)
+BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.31.2 with pkgconfig(omx-clap-lv2) < 0.32)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
 BuildRequires: systemd-rpm-macros
 
@@ -44,12 +44,12 @@ Requires: (plugin-hostd >= 0.20.3 with plugin-hostd < 0.21)
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: (omx-clap-host >= 0.31.1 with omx-clap-host < 0.32)
+Requires: (omx-clap-host >= 0.31.2 with omx-clap-host < 0.32)
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: (omx-clap-core >= 0.31.1 with omx-clap-core < 0.32)
+Requires: (omx-clap-core >= 0.31.2 with omx-clap-core < 0.32)
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
@@ -134,9 +134,21 @@ fi
 %{_libexecdir}/%{name}/
 
 %changelog
+* Wed Nov 11 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.3-1
+- the directories the sync scans are the ones plugin-hostd --search-path prints
+  for hostd_conf, a new setting (plugin-hostd's own settings file by default);
+  lv2_path, lv2_extra, clap_path and clap_extra are refused in qualify.conf and
+  as flags, with a pointer to plugin-hostd's settings file; a list plugin-hostd
+  takes from its environment or default is said to possibly differ from the running
+  daemon's (#9)
+- the path unit's drop-in holds the folders plugin-hostd --search-path prints
+- built and run against the inner layers' latest releases: plugin-hostd >= 0.20.3
+  (its --search-path), omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.2,
+  each below the next minor
+
 * Tue Nov 10 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.2-1
 - built and run against the inner layers' latest releases: plugin-hostd >= 0.20.2,
-  omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.1, plugin-hostd-protocol
+  omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.2, plugin-hostd-protocol
   >= 0.5.3, plugin-db >= 0.3.1, each below the next minor
 - make deps fetches the protocol header from plugin-hostd-protocol v0.5.3 and
   pin.h from plugin-db v0.3.1, the packages' floors
