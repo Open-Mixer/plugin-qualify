@@ -5,7 +5,7 @@
 // added alone, worker_list read, a sine through it for a window, and worker_list read again. Prints one JSON line for
 // src/qualify-isolated.ts to judge. A host that never listened says started: false: nothing was learned about the plugin.
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -25,7 +25,11 @@ const CLOCK_TICKS = 100;
 const WORKER_SPAWN = -503;
 
 const state = mkdtempSync(join(tmpdir(), "plugin-qualify-isolated-"));
-const host = spawn(hostd, ["-n", "-p", String(port)], { stdio: "ignore", detached: true, env: { ...process.env, XDG_STATE_HOME: state } });
+// the daemon says why it refused a plugin on stderr only: kept, so a refused add carries that reason into the record
+const hostLog = join(state, "plugin-hostd.stderr");
+const hostLogFd = openSync(hostLog, "a");
+const host = spawn(hostd, ["-n", "-p", String(port)], { stdio: ["ignore", "ignore", hostLogFd], detached: true, env: { ...process.env, XDG_STATE_HOME: state } });
+closeSync(hostLogFd);
 let ended = false;
 host.on("exit", () => (ended = true));
 host.on("error", () => (ended = true));
@@ -78,6 +82,19 @@ function cpuTicks(pid) {
   }
 }
 
+/** The last thing the daemon said of `uri` beyond its having no pin yet (first-use learns one at add): "" when nothing. */
+function daemonReason() {
+  let text = "";
+  try {
+    text = readFileSync(hostLog, "utf8");
+  } catch {
+    return "";
+  }
+  const prefix = `plugin-hostd: ${uri}: `;
+  const said = text.split("\n").filter((l) => l.startsWith(prefix)).map((l) => l.slice(prefix.length).trim()).filter((l) => l !== "" && l !== "no pin");
+  return said.at(-1) ?? "";
+}
+
 async function main() {
   const sock = await connect();
   if (sock === undefined) return { started: false, problem: `${hostd} did not listen` };
@@ -85,7 +102,11 @@ async function main() {
   const added = await send(`add ${pinWord(uri)} ${String(INSTANCE)}`);
   // WORKER_SPAWN: no worker came up to hold the plugin, which says nothing of the plugin. The next pass tries it again.
   if (added?.code === WORKER_SPAWN) return { started: false, problem: `no worker came up: add answered ${String(WORKER_SPAWN)}` };
-  if (added === undefined || added.code < 0) return { started: true, added: false, problem: added === undefined ? "the host gave no answer to add" : `add answered ${String(added.code)}` };
+  if (added === undefined || added.code < 0) {
+    const why = daemonReason();
+    const answered = added === undefined ? "the host gave no answer to add" : `add answered ${String(added.code)}`;
+    return { started: true, added: false, problem: why === "" ? answered : `${answered}: ${why}` };
+  }
   const before = workersOf(await send("worker_list"));
   const worker = before[0];
   const ticksBefore = worker === undefined ? undefined : cpuTicks(worker.pid);
