@@ -36,7 +36,8 @@ Requires: python3-lilv
 Requires: python3-jsonschema
 # plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
-Requires: (plugin-hostd >= 0.20.2 with plugin-hostd < 0.21)
+# 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
+Requires: (plugin-hostd >= 0.20.3 with plugin-hostd < 0.21)
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.

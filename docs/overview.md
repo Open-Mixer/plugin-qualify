@@ -682,9 +682,7 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 
 | key | default |
 | --- | --- |
-| `lv2_path` | `$LV2_PATH`, else plugin-hostd's: `/usr/lib64/lv2:/usr/lib/lv2:/usr/local/lib/lv2` |
-| `lv2_extra` | `/zynthian/zynthian-plugins/lv2:/zynthian/zynthian-my-data/plugins/lv2` |
-| `clap_path`, `clap_extra` | `$CLAP_PATH`, then `~/.clap`, then `/usr/lib/clap`; none |
+| `hostd_conf` | plugin-hostd's own settings file: `$XDG_CONFIG_HOME/plugin-hostd.conf`, else `~/.config/plugin-hostd.conf` |
 | `pin_file` | `/var/lib/omx/qualified.pins` |
 | `qualification_dir`, `descriptor_dir` | `/var/lib/omx/qualification`, `/var/lib/omx/descriptors` |
 | `state_file` | `/var/lib/omx/qualify-sync.json` |
@@ -698,9 +696,15 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 | `host_class` | the board's own, from the device tree (`rpi5`); none elsewhere |
 | `distributed_dir` | `/usr/share/omx/qualification` |
 
-Those are the service's (`--system`); run by a user, the files go under `$XDG_STATE_HOME/omx`. An LV2
-directory added here belongs in plugin-hostd's `lv2_path` too, or the daemon cannot find the bundle it
-pinned. `--force` qualifies everything again, and `--no-distributed` reads no distributed record. A second `plugin-qualify-sync` waits for the run in progress (a lock on `<state_file>.lock`); `--no-wait` exits 0 at once and leaves a marker, and the holder runs once more at its end over what changed meanwhile.
+Those are the service's (`--system`); run by a user, the files go under `$XDG_STATE_HOME/omx`.
+
+The directories scanned are plugin-hostd's, never this file's: the run asks `plugin-hostd --search-path -c
+<hostd_conf>` (plugin-hostd 0.20.3 and later) and scans the LV2 list (`lv2_path`, then `lv2_extra`) and the CLAP list it
+prints, so a plugin the sync pins is one the daemon finds. `lv2_path`, `lv2_extra`, `clap_path` and `clap_extra` in this
+file, or as flags, are refused with a pointer to plugin-hostd's settings file. When plugin-hostd takes `lv2_path` or
+`clap_path` from its environment (`LV2_PATH`, `CLAP_PATH`) or its default rather than the file, the run says so: the
+running daemon, started with another environment, may search other directories. Writing both lists in plugin-hostd's
+settings file makes them agree exactly, since the file is over the environment. `--force` qualifies everything again, and `--no-distributed` reads no distributed record. A second `plugin-qualify-sync` waits for the run in progress (a lock on `<state_file>.lock`); `--no-wait` exits 0 at once and leaves a marker, and the holder runs once more at its end over what changed meanwhile.
 
 Every run starts by bringing each pin's files up to the ones `plugin-hostd --pin-files` names, measuring nothing: a pin
 written before 0.17.3 lacks the preset files an LV2's manifest names, which plugin-hostd 0.15.0 also checks, and its add
@@ -709,9 +713,9 @@ stands; a changed file is measured again by the run. `--refresh-pins` does only 
 changed pins to a running plugin-hostd; the package's upgrade runs it (plugin-qualify#239).
 
 The path unit names the standard folders (`/usr/lib/lv2`, `/usr/lib64/lv2`, `/usr/local/lib/lv2`,
-`/usr/lib/clap`, `/usr/lib64/clap`). The folders the settings file adds (`lv2_path`, `lv2_extra`, `clap_path`,
-`clap_extra`) are written into a drop-in of the unit by a systemd generator at boot and at every
-`systemctl daemon-reload`, so the file is the one place a machine's extra folders are written.
+`/usr/lib/clap`, `/usr/lib64/clap`). The other folders plugin-hostd searches (`plugin-hostd --search-path -c
+<hostd_conf>`) are written into a drop-in of the unit by a systemd generator at boot and at every
+`systemctl daemon-reload`, so plugin-hostd's settings file is the one place a machine's extra folders are written.
 
 The path unit watches a folder, not the bundles inside it: a new bundle appearing in a watched folder is
 seen at once, but a package's own files being replaced in place (an upgrade) is not a change of the folder
