@@ -14,9 +14,16 @@ import { ORACLE_FLOOR_RATES, RT_HARD_TARGET } from "@openmixer/omx-contract";
 export const COST_REFERENCE_RATE = 96000;
 
 /**
- * The reference quantum in frames: the rig's buffer, and the block `benchmark.py` runs.
+ * The reference quantum in frames: the buffer the console aims at (96000/256), the quantum its budget is judged at,
+ * and the block `benchmark.py` runs.
  */
-export const QUANTUM_FRAMES = 1024;
+export const QUANTUM_FRAMES = 256;
+
+/**
+ * The long quantum, in frames: the console's basis until 0.20.2, kept as a measured cell so a plugin's cost at a large
+ * buffer stays on record beside its cost at the console's.
+ */
+export const LONG_QUANTUM_FRAMES = 1024;
 
 /** The rate the offline capture window is sized at; other rates scale from it. */
 export const MEASURE_BASE_RATE = 48000;
@@ -31,8 +38,8 @@ export const OPERATIONAL_RATE_FLOOR = 48000;
 /** The rates a run measures when `--rates` is not given — recorded in `run.rates`: omx-contract's ORACLE_FLOOR_RATES. */
 export const QUALIFY_RATES: readonly number[] = ORACLE_FLOOR_RATES;
 
-/** The quanta (frames) a run rates cost at when `--quanta` is not given: the contract's hard-target quantum, then 256, 512 and the reference. */
-export const QUALIFY_QUANTA: readonly number[] = [RT_HARD_TARGET.quantum, 256, 512, QUANTUM_FRAMES];
+/** The quanta (frames) a run rates cost at when `--quanta` is not given: the contract's hard-target quantum, the reference, 512 and the long quantum. */
+export const QUALIFY_QUANTA: readonly number[] = [RT_HARD_TARGET.quantum, QUANTUM_FRAMES, 512, LONG_QUANTUM_FRAMES];
 
 /** Seconds one plugin's offline pass may take before its worker is killed and it reads as a timeout. */
 export const PLUGIN_TIMEOUT_S = 15;
