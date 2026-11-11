@@ -16,7 +16,7 @@ import tempfile
 import unittest
 
 import descriptors as d
-from _declarations import DESCRIPTOR_CODE_BINARY_UNHASHED, DESCRIPTOR_CODE_SCHEMA
+from _declarations import DESCRIPTOR_CODE_BINARY_UNHASHED, DESCRIPTOR_CODE_DUPLICATE_SYMBOL, DESCRIPTOR_CODE_SCHEMA
 
 try:
     import lilv  # noqa: F401
@@ -250,9 +250,12 @@ def lv2_row(doc, class_label):
         if c.get("hidden") or c.get("readonly") or c["id"] in patch_symbols:
             continue
         t = c.get("travel", {})
+        # a toggle's 0..1 range is the port's own, and a descriptor carries no travel for it
+        lo, hi, df = (0.0, 1.0, 1.0 if c.get("default") else 0.0) if c["kind"] == "toggle" else (
+            t.get("min"), t.get("max"), t.get("default", t.get("min")))
         params.append({
             "kind": "control", "symbol": c["id"], "name": c["name"],
-            "min": t.get("min"), "max": t.get("max"), "default": t.get("default", t.get("min")),
+            "min": lo, "max": hi, "default": df,
             "isInteger": t.get("scale") == "stepped", "isToggle": c["kind"] == "toggle",
             "isEnumeration": c["kind"] == "choice", "isLogarithmic": t.get("scale") == "log",
             "isTrigger": c["kind"] == "trigger", "unit": catalog_unit(t.get("unit")),
@@ -348,10 +351,35 @@ class Lv2RoundTrip(unittest.TestCase):
             out[doc["plugin"]["id"]] = (os.path.basename(path), doc)
         return out
 
-    def test_every_fixture_plugin_is_written_and_none_refused(self):
+    EQ10QM = "urn:plugin-qualify:fixture:lv2-eq10qm"
+    EQ10QS = "urn:plugin-qualify:fixture:lv2-eq10qs"
+
+    def test_every_fixture_plugin_is_written_but_the_one_with_a_duplicate_symbol(self):
         self.assertEqual(self.refused, [])
-        self.assertEqual(sorted(self.docs()), sorted(self.rows))
-        self.assertEqual(len(self.rows), 21)  # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19
+        self.assertEqual(sorted(self.docs()), sorted(u for u in self.rows if u != self.EQ10QS))
+        # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19,
+        # eq10qm and eq10qs (plugin-qualify#27) the 21
+        self.assertEqual(len(self.rows), 23)
+
+    def test_a_duplicate_port_symbol_refuses_the_descriptor_by_its_code_naming_the_symbol(self):
+        """eq10qs's TTL names both output meters out_2_vu_ctl (EQ10Q's eq1qs..eq10qs): not drawn, refused."""
+        self.assertEqual([(u, code, args) for u, code, _problem, args in self.scanner.refusals],
+                         [(self.EQ10QS, DESCRIPTOR_CODE_DUPLICATE_SYMBOL, {"symbol": "out_2_vu_ctl"})])
+        [(_, _, problem, _)] = self.scanner.refusals
+        self.assertIn("out_2_vu_ctl", problem)
+        self.assertNotIn(self.EQ10QS, self.docs())
+
+    def test_the_refused_plugin_stays_listed_in_the_catalog_with_its_reason(self):
+        row = self.rows[self.EQ10QS]
+        self.assertEqual(row["refused"]["code"], DESCRIPTOR_CODE_DUPLICATE_SYMBOL)
+        self.assertEqual(row["refused"]["args"], {"symbol": "out_2_vu_ctl"})
+        self.assertIn("out_2_vu_ctl", row["refused"]["text"])
+        self.assertNotIn("refused", self.rows[self.EQ10QM])
+
+    def test_a_toggle_named_bypass_means_bypass_with_no_designation(self):
+        """eq10qm's toggle has the symbol bypass and no lv2:designation (EQ10Q's eq1qm..eq10qm)."""
+        [control] = self.docs()[self.EQ10QM][1]["controls"]
+        self.assertEqual((control["id"], control["kind"], control["meaning"]), ("bypass", "toggle", "bypass"))
 
     def test_each_file_is_named_by_id_version_and_its_binary_hash(self):
         plugins = self.scanner.w.get_all_plugins()
