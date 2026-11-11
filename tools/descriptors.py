@@ -30,6 +30,7 @@ import sys
 from _declarations import (
     DESCRIPTOR_CODE_BINARY_UNHASHED,
     DESCRIPTOR_CODE_DIR_UNWRITABLE,
+    DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
     DESCRIPTOR_CODE_SCHEMA,
     DESCRIPTOR_CODE_SCHEMA_MISSING,
     DESCRIPTOR_DIR_STATE_SUBDIR,
@@ -49,12 +50,44 @@ FEATURE_WORDS = ("audio-effect", "instrument", "note-effect", "analyzer")
 
 
 class DescriptorRefused(Exception):
-    """A descriptor that is not written, with the code it is refused by."""
+    """A descriptor that is not written, with the code it is refused by (and, for a code `schema/codes.json`
+    declares, the args its sentence names)."""
 
-    def __init__(self, code, problem):
+    def __init__(self, code, problem, args=None):
         super().__init__(f"{code}: {problem}")
         self.code = code
         self.problem = problem
+        self.code_args = dict(args or {})
+
+
+# ---- the codes' sentences -----------------------------------------------------------------------
+
+CODES_FILE = os.path.join(PKG, "schema", "codes.json")
+
+
+def code_sentence(code, args, path=CODES_FILE):
+    """The English source sentence of `code` (schema/codes.json) with `args` filled in. A code the file does not
+    declare, or no file, reads as the code and its args, so a refusal is never lost for want of its words."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            entries = {e["code"]: e for e in json.load(f)["codes"].values()}
+        return entries[code]["text"]["en"].format(**args)
+    except (OSError, ValueError, KeyError, IndexError):
+        return f"{code} " + " ".join(f"{k}={v}" for k, v in sorted(args.items()))
+
+
+def refused(code, **args):
+    """A refusal by `code`, its args and its sentence."""
+    return DescriptorRefused(code, code_sentence(code, args), args)
+
+
+def duplicate_symbol(symbols):
+    """The first (sorted) symbol `symbols` holds twice, else None: two ports with one symbol cannot be addressed
+    by it (EQ10Q's eq1qs..eq10qs name both output meters out_2_vu_ctl, plugin-qualify#27)."""
+    seen, twice = set(), set()
+    for s in symbols:
+        (twice if s in seen else seen).add(s)
+    return min(twice) if twice else None
 
 
 # ---- the directory and the name -----------------------------------------------------------------

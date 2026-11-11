@@ -1,0 +1,24 @@
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+
+<urn:plugin-qualify:fixture:lv2-eq10qm> a lv2:Plugin , lv2:EQPlugin ;
+  doap:name "eq10qm fixture" ;
+  doap:license <https://spdx.org/licenses/GPL-3.0-or-later> ;
+  lv2:minorVersion 1 ; lv2:microVersion 0 ;
+  lv2:optionalFeature lv2:hardRTCapable ;
+  lv2:port [ a lv2:InputPort , lv2:ControlPort ; lv2:index 0 ; lv2:symbol "bypass" ; lv2:name "Bypass" ;
+             lv2:portProperty lv2:toggled ; lv2:default 0 ; lv2:minimum 0 ; lv2:maximum 1 ] ,
+           [ a lv2:AudioPort , lv2:InputPort ; lv2:index 1 ; lv2:symbol "in" ; lv2:name "In" ] ,
+           [ a lv2:AudioPort , lv2:OutputPort ; lv2:index 2 ; lv2:symbol "out" ; lv2:name "Out" ] .
+
+<urn:plugin-qualify:fixture:lv2-eq10qs> a lv2:Plugin , lv2:EQPlugin ;
+  doap:name "eq10qs fixture" ;
+  doap:license <https://spdx.org/licenses/GPL-3.0-or-later> ;
+  lv2:minorVersion 1 ; lv2:microVersion 0 ;
+  lv2:optionalFeature lv2:hardRTCapable ;
+  lv2:port [ a lv2:AudioPort , lv2:InputPort ; lv2:index 0 ; lv2:symbol "in" ; lv2:name "In" ] ,
+           [ a lv2:AudioPort , lv2:OutputPort ; lv2:index 1 ; lv2:symbol "out" ; lv2:name "Out" ] ,
+           [ a lv2:OutputPort , lv2:ControlPort ; lv2:index 2 ; lv2:symbol "out_2_vu_ctl" ; lv2:name "Out 2 VU" ;
+             lv2:minimum -60 ; lv2:maximum 0 ; lv2:default -60 ] ,
+           [ a lv2:OutputPort , lv2:ControlPort ; lv2:index 3 ; lv2:symbol "out_2_vu_ctl" ; lv2:name "Out 1 VU" ;
+             lv2:minimum -60 ; lv2:maximum 0 ; lv2:default -60 ] .
