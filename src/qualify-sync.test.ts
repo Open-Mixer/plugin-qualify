@@ -10,7 +10,7 @@
  * CI their absence fails the test.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -37,7 +37,7 @@ import {
 } from "./qualify-sync.js";
 import { clapQualifyToolPath, lv2MeasureNativePath, rtInterposePath } from "./tool-paths.js";
 import type { SearchPathRun } from "./hostd-search-path.js";
-import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
+import { searchPathClause, searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(PKG, "native", "build", "fixtures");
@@ -338,7 +338,11 @@ const sweepJackName = (): string | undefined => (sweepJack ??= startPrivateJack(
 function sync(flags: readonly string[]): SyncRun {
   const started = Date.now();
   const jack = sweepJackName();
-  const r = spawnSync(process.execPath, [SYNC, ...flags], { encoding: "utf8", env: { ...process.env, ...(RUNNER === undefined ? {} : { OMX_PROBE_RUNNER: RUNNER }), ...(jack === undefined ? {} : { JACK_DEFAULT_SERVER: jack, JACK_NO_START_SERVER: "1" }) } });
+  const { argv, lv2, clap } = splitPathFlags(flags);
+  const hostd = join(mkdtempSync(join(scratch, "hostd-")), "plugin-hostd");
+  writeFileSync(hostd, `#!/bin/sh\n${searchPathClause(lv2, clap)}\n${HOSTD === undefined ? "exit 127" : `exec ${JSON.stringify(HOSTD)} "$@"`}\n`);
+  chmodSync(hostd, 0o755);
+  const r = spawnSync(process.execPath, [SYNC, ...argv], { encoding: "utf8", env: { ...process.env, PLUGIN_HOSTD: hostd, ...(RUNNER === undefined ? {} : { OMX_PROBE_RUNNER: RUNNER }), ...(jack === undefined ? {} : { JACK_DEFAULT_SERVER: jack, JACK_NO_START_SERVER: "1" }) } });
   const summary: Record<string, number> = {};
   for (const m of r.stdout.matchAll(/(qualified|skipped|refused|crashed|hung|unmeasured) (\d+)/g)) summary[m[1]!] = Number(m[2]);
   return { status: r.status, summary, stderr: r.stderr, ms: Date.now() - started };
