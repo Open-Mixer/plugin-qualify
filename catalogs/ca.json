@@ -38,6 +38,11 @@
     "qualify.compare.does-better-on": "{host} fa millor en {count}: {detail}",
     "qualify.compare.beat-description": "{id} ({on} per sobre de {over})",
     "qualify.compare.not-publishable-with-missing": "no es pot publicar: {missing}",
-    "qualify.compare.not-publishable-no-flag": "no es pot publicar (sense --publish)"
+    "qualify.compare.not-publishable-no-flag": "no es pot publicar (sense --publish)",
+    "qualify.pin.hostd-not-installed": "plugin-hostd no està instal·lat: els fitxers d'un pin són cosa de plugin-hostd",
+    "qualify.pin.hostd-no-pin-files": "aquest plugin-hostd no té --pin-files (cal plugin-hostd 0.15.0 o posterior perquè anomeni els fitxers d'un pin)",
+    "qualify.pin.hostd-exited": "plugin-hostd --pin-files ha sortit amb {status}",
+    "qualify.pin.hostd-no-root-or-file": "plugin-hostd --pin-files no ha imprès cap arrel ni cap fitxer",
+    "qualify.pin.file-unreadable": "un fitxer que plugin-hostd anomena no es pot llegir: {error}"
   }
 }

@@ -38,6 +38,11 @@
     "qualify.compare.does-better-on": "{host} lo hace mejor en {count}: {detail}",
     "qualify.compare.beat-description": "{id} ({on} por encima de {over})",
     "qualify.compare.not-publishable-with-missing": "no se puede publicar: {missing}",
-    "qualify.compare.not-publishable-no-flag": "no se puede publicar (sin --publish)"
+    "qualify.compare.not-publishable-no-flag": "no se puede publicar (sin --publish)",
+    "qualify.pin.hostd-not-installed": "plugin-hostd no está instalado: los archivos de un pin son cosa de plugin-hostd",
+    "qualify.pin.hostd-no-pin-files": "este plugin-hostd no tiene --pin-files (hace falta plugin-hostd 0.15.0 o posterior para que nombre los archivos de un pin)",
+    "qualify.pin.hostd-exited": "plugin-hostd --pin-files salió con {status}",
+    "qualify.pin.hostd-no-root-or-file": "plugin-hostd --pin-files no imprimió ninguna raíz ni ningún archivo",
+    "qualify.pin.file-unreadable": "un archivo que plugin-hostd nombra no se puede leer: {error}"
   }
 }
