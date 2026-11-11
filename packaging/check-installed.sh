@@ -110,7 +110,9 @@ if command -v jackd >/dev/null 2>&1; then
   for _ in $(seq 1 50); do ls /dev/shm 2>/dev/null | grep -q "jack_${jack}_" && break; sleep 0.2; done
 fi
 bare_jack() { if [ -n "$jack" ]; then env -i PATH=/usr/bin:/bin HOME="$HOME" JACK_DEFAULT_SERVER="$jack" JACK_NO_START_SERVER=1 "$@"; else bare "$@"; fi; }
-bare_jack plugin-qualify-sync --clap-path "$out/sync/clap" --lv2-path "$out/sync/lv2" --lv2-extra "" --pin-file "$out/sync/qualified.pins" \
+# the directories scanned are the ones the installed plugin-hostd prints for its settings file (plugin-qualify#9)
+printf 'lv2_path %s\nclap_path %s\n' "$out/sync/lv2" "$out/sync/clap" > "$out/sync/plugin-hostd.conf"
+bare_jack plugin-qualify-sync --hostd-conf "$out/sync/plugin-hostd.conf" --pin-file "$out/sync/qualified.pins" \
   --qualification-dir "$out/sync/q" --descriptor-dir "$out/sync/d" --state-file "$out/sync/state.json" --hostd-port 0 > "$out/sync.txt" 2> "$out/sync.err" ||
   fail "plugin-qualify-sync failed: $(cat "$out/sync.err")"
 cat "$out/sync.err"

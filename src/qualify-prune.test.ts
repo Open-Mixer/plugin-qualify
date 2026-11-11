@@ -27,6 +27,7 @@ import {
   type SyncState,
 } from "./qualify-sync.js";
 import { pinClearLine, pinWord } from "./pins-file.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "qualify-prune-"));
@@ -89,10 +90,11 @@ function machine(extraLv2Dir?: string) {
   writeFileSync(join(root, "state.json"), JSON.stringify(state));
   writeFileSync(join(root, "qualified.pins"), `# written by plugin-qualify-sync\n${PIN_GONE}\n`);
   const run = async (ports: { port: number; feedbackPort: number }, lv2Dirs: string) => {
-    const args = parseSyncArgs(["--lv2-path", lv2Dirs, "--lv2-extra", "", "--clap-path", join(root, "no-clap"), "--clap-extra", "", "--pin-file", join(root, "qualified.pins"),
+    const sp = splitPathFlags(["--lv2-path", lv2Dirs, "--lv2-extra", "", "--clap-path", join(root, "no-clap"), "--clap-extra", "", "--pin-file", join(root, "qualified.pins"),
       "--qualification-dir", q, "--descriptor-dir", d, "--state-file", join(root, "state.json"), "--hostd-port", String(ports.port), "--hostd-feedback-port", String(ports.feedbackPort)]);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, {}, root);
+    const r = resolveSyncSettings(new Map(), args.args, {}, root, undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const log: string[] = [];
     const summary = await runSync(r.settings, { log: (l) => log.push(l), env: { ...process.env } });
