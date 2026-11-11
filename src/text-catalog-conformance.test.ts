@@ -8,7 +8,9 @@
  */
 import { describe, expect, test } from "vitest";
 import { catalogsDir, loadMessages, OWNER } from "./text-catalog.js";
-import { TEXT_CODES } from "./text-codes.js";
+import { TEXT_CODES, type TextCode } from "./text-codes.js";
+
+const CODES: readonly TextCode[] = Object.values(TEXT_CODES.codes);
 
 const LANGS = ["ca", "es"] as const;
 
@@ -20,7 +22,7 @@ describe("every shipped language has every code, with no placeholder the code do
       const messages = loadMessages(lang, catalogsDir());
       expect(messages, `${OWNER}'s catalogs/${lang}.json does not read as a catalog`).toBeDefined();
       const problems: string[] = [];
-      for (const c of Object.values(TEXT_CODES.codes)) {
+      for (const c of CODES) {
         const sentence = messages?.[c.code];
         if (sentence === undefined) {
           problems.push(`${c.code}: no ${lang} entry`);

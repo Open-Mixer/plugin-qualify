@@ -26,6 +26,7 @@ import {
   type HostRow,
   type RtReport,
 } from "./compare.js";
+import { TEXT_CODE } from "./text-codes.js";
 
 const COND = { cycles: 3, soakS: 5 };
 const CONDITIONS: ComparisonConditions = { rate: 48000, quantum: 256, cycles: 3, soakS: 5, windowMs: 1000, timeoutMs: 5000, jack: "jackd 1.9.22", realtime: "rtprio 70" };
@@ -76,16 +77,16 @@ describe("a missing host is skipped with its reason, never left out", () => {
     const present: HostPresence[] = [ALL[0]!, { host: "mod-host", installed: false, version: null, reason: "mod-host is not installed (not on PATH)" }];
     expect(missingReferences(present)).toEqual([
       { host: "mod-host", reason: "mod-host is not installed (not on PATH)" },
-      { host: "jalv", reason: "not asked for with --hosts" },
+      { host: "jalv", reason: { code: TEXT_CODE.compareHostNotAsked } },
     ]);
     expect(missingReferences(ALL)).toEqual([]);
   });
   it("a host that is not installed gives a skipped row", () => {
     const row = hostRowOf("jalv", null, { installed: false }, COND);
-    expect(row).toEqual({ host: "jalv", version: null, status: "skipped", reason: "jalv is not installed" });
+    expect(row).toEqual({ host: "jalv", version: null, status: "skipped", reason: { code: TEXT_CODE.compareHostNotInstalled, args: { program: "jalv" } } });
   });
   it("a host that does not take the format is not applicable, not failed", () => {
-    expect(notApplicableRow("mod-host", "mod-host 0.10.6", "clap")).toMatchObject({ status: "not-applicable", reason: "mod-host takes no CLAP plugin" });
+    expect(notApplicableRow("mod-host", "mod-host 0.10.6", "clap")).toMatchObject({ status: "not-applicable", reason: { code: TEXT_CODE.compareFormatNotTaken, args: { program: "mod-host", format: "CLAP" } } });
   });
 });
 
@@ -107,26 +108,26 @@ describe("one host's row", () => {
     expect(hostRowOf("jalv", null, quiet, COND).checks?.output.result).toBe("not-observable");
     expect(hostRowOf("jalv", null, quiet, COND).runsClean).toBe(true);
     const fed = { ...clean, peak: 0 };
-    expect(hostRowOf("jalv", null, fed, COND).checks?.output).toMatchObject({ result: "fail", detail: "silent under tone" });
+    expect(hostRowOf("jalv", null, fed, COND).checks?.output).toMatchObject({ result: "fail", detail: { code: TEXT_CODE.compareSilentUnderStimulus, args: { stimulus: "tone" } } });
     expect(hostRowOf("jalv", null, fed, COND).runsClean).toBe(false);
   });
   it("NaN or infinite samples on the output fail it, whatever the finite peak", () => {
     const row = hostRowOf("jalv", null, { ...clean, nonFinite: 512 }, COND);
-    expect(row.checks?.output).toMatchObject({ result: "fail", detail: "the output is not finite (512 NaN or infinite samples)" });
+    expect(row.checks?.output).toMatchObject({ result: "fail", detail: { code: TEXT_CODE.compareOutputNotFinite, args: { count: 512 } } });
     expect(row.runsClean).toBe(false);
   });
   it("a host that dies is a crash at its step, and the checks after it did not run", () => {
     const died: HostObservation = { installed: true, started: true, load: { ok: false, died: "SIGSEGV" }, cycles: { done: 0, of: 3, failedAt: "add", died: "SIGSEGV" }, died: { step: "load", signal: "SIGSEGV" } };
     const row = hostRowOf("mod-host", null, died, COND);
     expect(row.crash).toEqual({ step: "load", signal: "SIGSEGV" });
-    expect(row.checks?.loads).toEqual({ result: "fail", detail: "the host ended (SIGSEGV)" });
+    expect(row.checks?.loads).toEqual({ result: "fail", detail: { code: TEXT_CODE.compareLoadHostEnded, args: { died: "SIGSEGV" } } });
     expect(row.checks?.output.result).toBe("not-run");
     expect(row.checks?.rtSafe.result).toBe("not-run");
     expect(row.runsClean).toBe(false);
   });
   it("a load cycle that fails fails the cycles check", () => {
     const row = hostRowOf("omx-clap-host", null, { ...clean, cycles: { done: 2, of: 3, failedAt: "remove" } }, COND);
-    expect(row.checks?.cycles).toEqual({ result: "fail", done: 2, of: 3, detail: "cycle 3 failed at remove" });
+    expect(row.checks?.cycles).toEqual({ result: "fail", done: 2, of: 3, detail: { code: TEXT_CODE.compareCycleFailedAt, args: { cycle: 3, step: "remove" } } });
     expect(row.runsClean).toBe(false);
   });
 });

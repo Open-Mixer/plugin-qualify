@@ -62,3 +62,11 @@ export function textOf(ref: TextRef, lang?: string): string {
 export function reasonText(reason: ReasonText, lang?: string): string {
   return typeof reason === "string" ? reason : textOf(reason, lang);
 }
+
+/** The language of `LC_ALL`, else `LANG` (the POSIX precedence), as the two letters before `_` or `.`; `undefined` unset, unparsed, or `C`/`POSIX` (textOf's own fallback to the source sentence is the same as leaving this undefined). */
+export function localeOf(env: Readonly<Record<string, string | undefined>> = process.env): string | undefined {
+  const raw = env["LC_ALL"] || env["LANG"];
+  if (raw === undefined || raw === "") return undefined;
+  const m = /^([a-z]{2})(?:[_.].*)?$/.exec(raw);
+  return m?.[1];
+}

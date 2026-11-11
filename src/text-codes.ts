@@ -13,7 +13,7 @@
  * `args`.
  */
 
-interface TextCode {
+export interface TextCode {
   readonly code: string;
   readonly doc: string;
   readonly text: { readonly en: string };
