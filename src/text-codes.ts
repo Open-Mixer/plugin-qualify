@@ -234,6 +234,36 @@ export const TEXT_CODES = Object.freeze({
       text: { en: "not publishable (no --publish)" },
       args: [],
     },
+    pinHostdNotInstalled: {
+      code: "qualify.pin.hostd-not-installed",
+      doc: "plugin-hostd --pin-files could not run because plugin-hostd is not installed",
+      text: { en: "plugin-hostd is not installed: the files of a pin are plugin-hostd's to name" },
+      args: [],
+    },
+    pinHostdNoPinFiles: {
+      code: "qualify.pin.hostd-no-pin-files",
+      doc: "the installed plugin-hostd predates --pin-files (0.15.0)",
+      text: { en: "this plugin-hostd has no --pin-files (plugin-hostd 0.15.0 or later names the files of a pin)" },
+      args: [],
+    },
+    pinHostdExited: {
+      code: "qualify.pin.hostd-exited",
+      doc: "plugin-hostd --pin-files exited with no stderr line to say why",
+      text: { en: "plugin-hostd --pin-files exited {status}" },
+      args: ["status"],
+    },
+    pinHostdNoRootOrFile: {
+      code: "qualify.pin.hostd-no-root-or-file",
+      doc: "plugin-hostd --pin-files exited ok, but its output named no root or no file",
+      text: { en: "plugin-hostd --pin-files printed no root or no file" },
+      args: [],
+    },
+    pinFileUnreadable: {
+      code: "qualify.pin.file-unreadable",
+      doc: "a file plugin-hostd named for the pin could not be read (and so hashed) from the bundle",
+      text: { en: "a file plugin-hostd names cannot be read: {error}" },
+      args: ["error"],
+    },
   } satisfies Readonly<Record<string, TextCode>>,
 } as const);
 
