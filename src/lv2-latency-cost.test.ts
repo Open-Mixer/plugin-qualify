@@ -30,6 +30,7 @@ const SYNTH = "urn:plugin-qualify:fixture:lv2-synth";
 const SYNTH_ATTACK = "urn:plugin-qualify:fixture:lv2-synth-attack";
 const SYNTH_DELAY = "urn:plugin-qualify:fixture:lv2-synth-delay";
 const SYNTH_LATE = "urn:plugin-qualify:fixture:lv2-synth-late";
+const SYNTH_DRUM = "urn:plugin-qualify:fixture:lv2-synth-drum";
 const BUILT = [
   MEASURE,
   INTERPOSER,
@@ -39,6 +40,7 @@ const BUILT = [
   join(LV2_FIXTURES, "synth-attack.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-delay.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-late.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-drum.lv2", "synth.so"),
 ].every((p) => existsSync(p));
 
 const scratch = mkdtempSync(join(tmpdir(), "lv2-latency-cost-"));
@@ -155,6 +157,21 @@ describe("lv2-measure, live: the cost", () => {
     const prompt = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
     expect(late).not.toHaveProperty("unmeasuredReason");
     expect(late.nsPerSampleMedian).toBeGreaterThan(prompt.nsPerSampleMedian * 0.5);
+  });
+
+  live("an instrument whose notes sounded and died away before the timed blocks is timed, not called silent", () => {
+    // the drum fixture's hits last 20 ms: struck at the first block, they are over before the warm-up ends
+    const at = measure(SYNTH_DRUM, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
+    expect(at).not.toHaveProperty("unmeasuredReason");
+    expect(at.nsPerSampleMedian).toBeGreaterThan(0);
+  });
+
+  live("an instrument whose held notes never make a sound is not timed as playing: silent-output", () => {
+    // one note held is A4, which the drum fixture maps to nothing (it plays keys 36 to 40)
+    const at = measure(SYNTH_DRUM, 48000, { OMX_PROBE_NOTES: "1" })["cost"].perRate["48000"];
+    expect(at).not.toHaveProperty("nsPerSampleMedian");
+    expect(at["unmeasuredReason"]).toBe("silent-output");
+    expect(unmeasuredTerm(at["unmeasuredReason"])).toMatchObject({ code: "silent-output" });
   });
 
   live("an instrument is timed at each count of the curve: the cost grows with the notes up to its voices, then stops", () => {

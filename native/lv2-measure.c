@@ -1125,7 +1125,7 @@ static void measure_cost(struct host *H, double rate, uint32_t block, struct cos
     m_run(r->inst, block);
     ns[b] = (double)(now_ns() - t0) / (double)block;
     rig_after(r);
-    if (instrument && !sounded && b >= COST_WARMUP_BLOCKS) {
+    if (instrument && !sounded) {
       const float *o = rig_out(r);
       for (size_t i = 0; i < (size_t)H->n_audio_out * block && !sounded; i++) sounded = fabsf(o[i]) > LATENCY_SILENCE;
     }
@@ -1143,9 +1143,10 @@ static void measure_cost(struct host *H, double rate, uint32_t block, struct cos
   C->max = timed[COST_BLOCKS - 1];
   C->blocks = COST_BLOCKS;
   free(ns);
-  /* an instrument timed while it made no sound was not timed playing: that is no cost under notes */
+  /* an instrument whose held notes never made a sound, from the strike on, was not timed playing: that is no cost under
+   * notes (one that sounded and died away, a drum or a decaying patch, was played and is timed) */
   if (instrument && H->n_audio_out > 0 && !sounded)
-    C->unmeasured = "silent-output", C->detail = "the held notes never sounded in the timed blocks";
+    C->unmeasured = "silent-output", C->detail = "the held notes never sounded";
 }
 
 /* the latency map, in the shape the CLAP prober's line has: per rate, what the plugin reports and what was measured */
