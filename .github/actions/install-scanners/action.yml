@@ -9,7 +9,7 @@ description: python3-lilv and jsonschema, omx-clap-scan with omx-clap-host's fak
 runs:
   using: composite
   steps:
-    - name: Install from the distribution and the FreeMixer channel
+    - name: Install from the distribution and the OpenMixer channel
       shell: bash
       run: |
         set -euo pipefail

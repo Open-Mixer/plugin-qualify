@@ -42,7 +42,7 @@ The GitHub release also carries the packed tarball, `openmixer-plugin-qualify-<v
 checkout instead (Node.js 20 or newer and pnpm 10, see `BUILDING.md`):
 
 ```
-git clone https://github.com/FreeMixer/plugin-qualify.git
+git clone https://github.com/Open-Mixer/plugin-qualify.git
 cd plugin-qualify
 pnpm install
 pnpm exec plugin-qualify --help
@@ -450,7 +450,7 @@ real-time safe of those observed, crashes, its median CPU, and the plugins where
 others, on running clean or on a clean audio thread). A run into a directory that holds a record made under the same
 conditions keeps it (`--force` compares again), so a long run that stopped is started again where it stopped.
 
-**`--publish`** makes a summary for the records (FreeMixer/plugin-db-qualification, and from them the site's plugin
+**`--publish`** makes a summary for the records (Open-Mixer/plugin-db-qualification, and from them the site's plugin
 pages). It needs `--host-class` and `--set`, and it is refused, before anything runs and with each missing host named,
 unless mod-host and jalv are both installed: a comparison is measured against them. Without `--publish` a run is a
 local look, and its summary says it is not publishable.

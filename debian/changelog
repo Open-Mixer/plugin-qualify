@@ -11,6 +11,8 @@ plugin-qualify (0.20.3) unstable; urgency=medium
   * Built and run against the inner layers' latest releases: plugin-hostd
     >= 0.20.3 (its --search-path), omx-clap-host, omx-clap-core and
     omx-clap-lv2 >= 0.31.2, each below the next minor.
+  * The manual page, the overview and the CLAP host the qualifier presents
+    name Open-Mixer/plugin-qualify and OpenMixer, not FreeMixer.
 
  -- Pau Aliagas <linuxnow@gmail.com>  Wed, 11 Nov 2026 00:30:00 +0000
 

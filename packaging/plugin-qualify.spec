@@ -145,6 +145,8 @@ fi
 - built and run against the inner layers' latest releases: plugin-hostd >= 0.20.3
   (its --search-path), omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.2,
   each below the next minor
+- the manual page, the overview and the CLAP host the qualifier presents name
+  Open-Mixer/plugin-qualify and OpenMixer, not FreeMixer
 
 * Tue Nov 10 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.2-1
 - built and run against the inner layers' latest releases: plugin-hostd >= 0.20.2,
