@@ -291,6 +291,18 @@ describe("qualifyTargets: a pass over the targets", () => {
     expect(curves).toEqual([PROBE_NOTES_CURVE.join(","), "1,2"]);
   });
 
+  it("a CLAP instrument is timed at the declared curve too: the prober reads it from the run's environment", () => {
+    const curves: (string | undefined)[] = [];
+    const { run } = runner((args) => fixtureText("success-msi").replace("urn:clap:org.example.plate", "org.example.plate"));
+    const capture: ProbeRun = (tool, args, env) => (curves.push(env[PROBE_NOTES_CURVE_ENV]), run(tool, args, env));
+    try {
+      probeTarget(CLAP, { rates: [48000], run: capture, env: TOOLS, exists });
+    } catch {
+      // the document may not be about this plugin; the environment the run was given is what is checked
+    }
+    expect(curves).toEqual([PROBE_NOTES_CURVE.join(",")]);
+  });
+
   it("no JACK server stops the pass by name, and the probe runner is never started", () => {
     const { run, calls } = runner(() => JSON.stringify(fixtureJson("success-msi")));
     const noJack: AdmissionRuns = { ...HOSTS_ADMIT, adapter: () => ({ installed: true, steps: [{ cmd: "add", resp: -201 }] }) };

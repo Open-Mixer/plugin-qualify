@@ -200,7 +200,7 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
         target.binaryPath,
         expectedId,
       );
-      runEnv = { ...env, LD_PRELOAD: interposer };
+      runEnv = { ...env, LD_PRELOAD: interposer, [PROBE_NOTES_CURVE_ENV]: env[PROBE_NOTES_CURVE_ENV] ?? PROBE_NOTES_CURVE.join(",") };
     } else {
       expectedId = target.uri;
       const child = locateNativeTool(LV2_MEASURE_TOOL_NAME, env, options.exists ?? existsSync).path;

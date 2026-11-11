@@ -75,6 +75,8 @@ export interface ClapQualifyOptions {
   readonly probeNotes?: number;
   /** The notes the cost arm holds whatever the instrument declares (`--hold`). */
   readonly hold?: number;
+  /** The counts the voice curve is timed at, every parameter at its default (`--curve`). */
+  readonly curve?: readonly number[];
 }
 
 /**
@@ -95,6 +97,7 @@ export function qualifyClap(binaryPath: string, id: string | undefined, options:
     ...(options.offer === undefined || options.offer.length === 0 ? [] : ["--offer", options.offer.join(",")]),
     ...(options.probeNotes === undefined ? [] : ["--probe-notes", String(options.probeNotes)]),
     ...(options.hold === undefined ? [] : ["--hold", String(options.hold)]),
+    ...(options.curve === undefined ? [] : ["--curve", options.curve.join(",")]),
     binaryPath,
     ...(id === undefined ? [] : [id]),
   ];
