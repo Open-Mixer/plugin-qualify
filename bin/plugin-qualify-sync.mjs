@@ -43,6 +43,7 @@ if (!resolved.ok) {
   log(resolved.error);
   process.exit(2);
 }
+for (const w of resolved.warnings) log(w);
 const s = resolved.settings;
 const grid = s.grid.kind === "cells" ? s.grid.cells.map((c) => `${String(c.rate)}/${String(c.quantum)}`).join(",") : s.grid.kind;
 log(
