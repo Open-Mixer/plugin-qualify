@@ -31,7 +31,7 @@ function entries(): Map<string, CodeEntry> {
   return new Map(Object.values(doc?.codes ?? {}).map((e) => [e.code, e]));
 }
 
-const placeholders = (s: string): string[] => [...s.matchAll(/\{([a-zA-Z]+)\}/g)].map((m) => m[1]).sort();
+const placeholders = (s: string): string[] => [...s.matchAll(/\{([a-zA-Z]+)\}/g)].map((m) => m[1] ?? "").sort();
 
 describe("each scan refusal code has its source sentence and its catalog entries", () => {
   for (const code of SCAN_REFUSALS) {
