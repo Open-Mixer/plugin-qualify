@@ -30,6 +30,8 @@ import type { MemoryBound } from "./memory-bound.js";
 import { mergeProbeRuns, ProbeMergeError } from "./probe-merge.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
 import {
+  MEMORY_PASS_PROBE_NOTES,
+  PROBE_NOTES_ENV,
   CLAP_QUALIFY_TIMEOUT_S,
   CLAP_SWEEP_BLOCKS,
   CLAP_SWEEP_FRAMES,
@@ -204,6 +206,9 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
         { ...at, ...wall, out, log, ...(child === undefined ? {} : { child }) },
         target.uri,
       );
+      // an instrument that declares no voice capacity is played with this many notes held, so its cost and its memory
+      // under notes are measured, not left voices-unknown; a count the caller set wins
+      runEnv = { ...runEnv, [PROBE_NOTES_ENV]: env[PROBE_NOTES_ENV] ?? String(MEMORY_PASS_PROBE_NOTES) };
     }
     // under a bound, the interposer ends the child the moment an allocation is refused, with the status that names it
     if (options.memory !== undefined) runEnv = { ...runEnv, [MEMORY_BOUND_EXIT_ENV]: "1" };

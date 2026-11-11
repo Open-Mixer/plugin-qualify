@@ -24,6 +24,8 @@ import {
   CLAP_QUALIFY_TIMEOUT_S,
   CLAP_SWEEP_BLOCKS,
   LV2_HOSTING_TIMEOUT_S,
+  MEMORY_PASS_PROBE_NOTES,
+  PROBE_NOTES_ENV,
   PROBE_RUNNER_ENV,
   RT_INTERPOSE_ENV,
 } from "./qualify-declarations.js";
@@ -257,6 +259,20 @@ describe("qualifyTargets: a pass over the targets", () => {
       [LV2.uri, "jalv", "conditional", HOSTING_CODE.rtSafetyViolations],
     ]);
     expect(pass.documents).toEqual([]);
+  });
+
+  it("an LV2 instrument is played: the run holds the declared probe count of notes, or the count the caller set", () => {
+    const doc = fixtureJson("success-msi");
+    doc.plugin = { format: "lv2", id: LV2.uri };
+    const notes: (string | undefined)[] = [];
+    const run: ProbeRun = (tool, args, env) => {
+      notes.push(env[PROBE_NOTES_ENV]);
+      writeFileSync(args[args.indexOf("--out") + 1]!, JSON.stringify(doc));
+      return { status: 0, signal: null };
+    };
+    probeTarget(LV2, { rates: [48000], run, env: {} });
+    probeTarget(LV2, { rates: [48000], run, env: { [PROBE_NOTES_ENV]: "4" } });
+    expect(notes).toEqual([String(MEMORY_PASS_PROBE_NOTES), "4"]);
   });
 
   it("no JACK server stops the pass by name, and the probe runner is never started", () => {

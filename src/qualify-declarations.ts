@@ -174,7 +174,8 @@ export const MEMORY_BOUND_EXIT_STATUS = 121;
 /**
  * The memory-only pass (`plugin-qualify-sync --memory-only`). With `PROBE_MEMORY_ONLY_ENV` set the probers take the
  * footprint and nothing else; the probe runner passes its environment on, so its limits hold unchanged.
- * `PROBE_NOTES_ENV` is the count of notes an instrument that declares no voice capacity holds, basis `probe`:
+ * `PROBE_NOTES_ENV` is the count of notes an instrument that declares no voice capacity holds, basis `probe`, in every
+ * LV2 run (probe-runner) and in the memory-only pass:
  * `MEMORY_PASS_PROBE_NOTES` unless `memory_notes` says otherwise.
  */
 export const PROBE_MEMORY_ONLY_ENV = "OMX_PROBE_MEMORY_ONLY";
