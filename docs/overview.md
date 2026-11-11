@@ -389,6 +389,10 @@ plugin states (`unversioned` when it states none) and the SHA-256 of its binary 
 bundle's `lv2:binary`), with every character other than letters, digits, `.`, `_` and `-` written `_`. The hash
 keys which file describes which binary: a changed binary is a new file, and the old one stays as history.
 
+A toggle port named `bypass` carries the meaning `bypass` in its control, whether or not the plugin also
+declares the formal `lv2:designation param:bypass`: the console's header already draws the bypass of every
+panel, so a panel reads the meaning and leaves that one control to it, undrawn a second time.
+
 ```
 tools/scan.py --out catalog.json                                     # LV2: the catalog, and the descriptors beside it
 tools/scan.py --descriptor-dir ./descriptors urn:my:plugin           # one plugin, into a directory of your own
@@ -398,10 +402,12 @@ native/build/clap-qualify --json ./my-fx.clap | tools/descriptors.py clap --desc
 `scan.py --no-descriptors` writes the catalog only. A descriptor the schema refuses is not written and is
 reported as `contract.file.invalid`, omx-contract's code; a plugin whose binary cannot be read is
 `qualify.descriptor.binary-unhashed`; a directory that cannot be written is `qualify.descriptor.dir-unwritable`;
-no schema found is `qualify.descriptor.schema-missing`. Any of them makes the run exit `2`, and the other
-plugins are still written. The schema is the omx-contract package plugin-qualify depends on, else
-`/usr/share/omx-contract/omx-contract.schema.json`; `OMX_CONTRACT_SCHEMA` names another one, for a test. The
-writer needs Python's `jsonschema` (`python3-jsonschema`).
+no schema found is `qualify.descriptor.schema-missing`; a plugin whose TTL names two ports (or two controls)
+with the same symbol is `qualify.descriptor.duplicate-symbol`, naming the symbol two ports cannot be addressed
+by. Any of them makes the run exit `2`, and the other plugins are still written. The schema is the omx-contract
+package plugin-qualify depends on, else `/usr/share/omx-contract/omx-contract.schema.json`;
+`OMX_CONTRACT_SCHEMA` names another one, for a test. The writer needs Python's `jsonschema`
+(`python3-jsonschema`).
 
 ## Comparing hosts: mod-host, jalv and ours
 

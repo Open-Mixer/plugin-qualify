@@ -250,9 +250,11 @@ def lv2_row(doc, class_label):
         if c.get("hidden") or c.get("readonly") or c["id"] in patch_symbols:
             continue
         t = c.get("travel", {})
+        # a toggle carries its 0/1 range nowhere but the port itself: no travel is in the descriptor for one
+        mn, mx, df = (0.0, 1.0, 1.0 if c.get("default") else 0.0) if c["kind"] == "toggle" else (t.get("min"), t.get("max"), t.get("default", t.get("min")))
         params.append({
             "kind": "control", "symbol": c["id"], "name": c["name"],
-            "min": t.get("min"), "max": t.get("max"), "default": t.get("default", t.get("min")),
+            "min": mn, "max": mx, "default": df,
             "isInteger": t.get("scale") == "stepped", "isToggle": c["kind"] == "toggle",
             "isEnumeration": c["kind"] == "choice", "isLogarithmic": t.get("scale") == "log",
             "isTrigger": c["kind"] == "trigger", "unit": catalog_unit(t.get("unit")),
@@ -321,8 +323,9 @@ class Lv2RoundTrip(unittest.TestCase):
         cls.scanner = scan.Scanner()
         cls.rows = {r["uri"]: r for r in cls.scanner.scan()}
         cls.out = os.path.join(cls.tmp, "descriptors")
+        described, cls.scan_refused = cls.scanner.descriptors()
         with open(os.devnull, "w") as err:
-            cls.written, cls.refused = d.write_all(cls.out, cls.scanner.descriptors(), validator(), err)
+            cls.written, cls.refused = d.write_all(cls.out, described, validator(), err)
 
     @classmethod
     def tearDownClass(cls):
@@ -348,10 +351,23 @@ class Lv2RoundTrip(unittest.TestCase):
             out[doc["plugin"]["id"]] = (os.path.basename(path), doc)
         return out
 
-    def test_every_fixture_plugin_is_written_and_none_refused(self):
+    def test_every_fixture_plugin_is_written_but_the_one_with_a_duplicate_symbol(self):
         self.assertEqual(self.refused, [])
-        self.assertEqual(sorted(self.docs()), sorted(self.rows))
-        self.assertEqual(len(self.rows), 21)  # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19
+        written_or_refused = sorted(list(self.docs()) + [u for u, _code, _problem in self.scan_refused])
+        self.assertEqual(written_or_refused, sorted(self.rows))
+        # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19,
+        # eq10qm (a bypass toggle) and eq10qs (a duplicate port symbol, refused) the 21 (#27)
+        self.assertEqual(len(self.rows), 23)
+
+    def test_a_duplicate_port_symbol_is_refused_by_its_own_code_naming_the_symbol(self):
+        self.assertEqual(self.scan_refused, [("urn:plugin-qualify:fixture:lv2-eq10qs", d.DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
+                                              "out_2_vu_ctl: two ports share one symbol")])
+        self.assertNotIn("urn:plugin-qualify:fixture:lv2-eq10qs", self.docs())
+
+    def test_a_toggle_named_bypass_means_bypass_with_no_designation(self):
+        [control] = self.docs()["urn:plugin-qualify:fixture:lv2-eq10qm"][1]["controls"]
+        self.assertEqual(control["kind"], "toggle")
+        self.assertEqual(control["meaning"], "bypass")
 
     def test_each_file_is_named_by_id_version_and_its_binary_hash(self):
         plugins = self.scanner.w.get_all_plugins()
