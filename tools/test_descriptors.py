@@ -250,9 +250,11 @@ def lv2_row(doc, class_label):
         if c.get("hidden") or c.get("readonly") or c["id"] in patch_symbols:
             continue
         t = c.get("travel", {})
+        # a toggle carries its 0/1 range nowhere but the port itself: no travel is in the descriptor for one
+        mn, mx, df = (0.0, 1.0, 1.0 if c.get("default") else 0.0) if c["kind"] == "toggle" else (t.get("min"), t.get("max"), t.get("default", t.get("min")))
         params.append({
             "kind": "control", "symbol": c["id"], "name": c["name"],
-            "min": t.get("min"), "max": t.get("max"), "default": t.get("default", t.get("min")),
+            "min": mn, "max": mx, "default": df,
             "isInteger": t.get("scale") == "stepped", "isToggle": c["kind"] == "toggle",
             "isEnumeration": c["kind"] == "choice", "isLogarithmic": t.get("scale") == "log",
             "isTrigger": c["kind"] == "trigger", "unit": catalog_unit(t.get("unit")),
@@ -351,7 +353,9 @@ class Lv2RoundTrip(unittest.TestCase):
     def test_every_fixture_plugin_is_written_and_none_refused(self):
         self.assertEqual(self.refused, [])
         self.assertEqual(sorted(self.docs()), sorted(self.rows))
-        self.assertEqual(len(self.rows), 21)  # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19
+        # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19,
+        # eq10qm and eq10qs (the EQ10Q-shaped fixtures, plugin-qualify#27) the 21
+        self.assertEqual(len(self.rows), 23)
 
     def test_each_file_is_named_by_id_version_and_its_binary_hash(self):
         plugins = self.scanner.w.get_all_plugins()
