@@ -178,6 +178,23 @@ describe("readProbeOutput: a document that is not a probe output", () => {
     expect(refused(c).code).toBe("probe.format.invalid");
   });
 
+  it("reads an instrument's cost against the notes held (voiceCurve, probe output 1.4), and refuses an entry that is no count with its figures", () => {
+    const doc = fixtureJson("success-msi");
+    const curve = [
+      { held: 1, median: 10, percentile: { p: 95, value: 12 } },
+      { held: 16, median: 90, percentile: { p: 95, value: 110 } },
+    ];
+    doc["grid"][0]["cost"]["voiceCurve"] = curve;
+    const r = readProbeOutput(JSON.stringify(doc));
+    if (!r.ok) throw new Error(r.problem);
+    expect(r.output.grid[0]?.cost?.voiceCurve).toEqual(curve);
+    for (const bad of [{ held: 0, median: 1, percentile: { p: 95, value: 1 } }, { held: 2, median: -1, percentile: { p: 95, value: 1 } }, { held: 2 }]) {
+      const d = fixtureJson("success-msi");
+      d["grid"][0]["cost"]["voiceCurve"] = [bad];
+      expect(refused(d).code).toBe("probe.format.invalid");
+    }
+  });
+
   it("accepts an outcome code of a later minor, which only adds codes", () => {
     const doc = fixtureJson("success-msi");
     doc["steps"][0]["outcome"] = "probe.something-new";

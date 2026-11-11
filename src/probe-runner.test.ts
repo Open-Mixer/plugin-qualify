@@ -25,6 +25,8 @@ import {
   CLAP_SWEEP_BLOCKS,
   LV2_HOSTING_TIMEOUT_S,
   MEMORY_PASS_PROBE_NOTES,
+  PROBE_NOTES_CURVE,
+  PROBE_NOTES_CURVE_ENV,
   PROBE_NOTES_ENV,
   PROBE_RUNNER_ENV,
   RT_INTERPOSE_ENV,
@@ -273,6 +275,20 @@ describe("qualifyTargets: a pass over the targets", () => {
     probeTarget(LV2, { rates: [48000], run, env: {} });
     probeTarget(LV2, { rates: [48000], run, env: { [PROBE_NOTES_ENV]: "4" } });
     expect(notes).toEqual([String(MEMORY_PASS_PROBE_NOTES), "4"]);
+  });
+
+  it("an LV2 instrument is timed at every count of the declared curve, or the curve the caller set", () => {
+    const doc = fixtureJson("success-msi");
+    doc.plugin = { format: "lv2", id: LV2.uri };
+    const curves: (string | undefined)[] = [];
+    const run: ProbeRun = (tool, args, env) => {
+      curves.push(env[PROBE_NOTES_CURVE_ENV]);
+      writeFileSync(args[args.indexOf("--out") + 1]!, JSON.stringify(doc));
+      return { status: 0, signal: null };
+    };
+    probeTarget(LV2, { rates: [48000], run, env: {} });
+    probeTarget(LV2, { rates: [48000], run, env: { [PROBE_NOTES_CURVE_ENV]: "1,2" } });
+    expect(curves).toEqual([PROBE_NOTES_CURVE.join(","), "1,2"]);
   });
 
   it("no JACK server stops the pass by name, and the probe runner is never started", () => {

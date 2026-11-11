@@ -183,6 +183,14 @@ export const PROBE_NOTES_ENV = "OMX_PROBE_NOTES";
 export const MEMORY_PASS_PROBE_NOTES = 16;
 
 /**
+ * The counts of notes an LV2 instrument is timed at, besides its probe count, for its cost against the notes held
+ * (the rate's `voiceCurve`, probe output 1.4): the counts the Pi measurements held Surge XT at
+ * (openmixer.org/notes/instruments-on-a-pi-5), so a voice limit shows as the count past which the cost stops growing.
+ */
+export const PROBE_NOTES_CURVE_ENV = "OMX_PROBE_NOTES_CURVE";
+export const PROBE_NOTES_CURVE = [1, 8, 16, 32, 48, 64] as const;
+
+/**
  * What `tools/mod-host-admit.mjs` is told in an adapter-only pass: how long the host has for one command, its address
  * space (`ulimit -v`, in KB) and the directory for the state files of the plugin it loads.
  */
