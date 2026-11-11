@@ -11,6 +11,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { withRunHome } from "./run-home.js";
 import type { HostProfile } from "./host-profiles.js";
 import { ADMIT_STEP_MS_ENV } from "./qualify-declarations.js";
 
@@ -232,14 +233,14 @@ export const SPAWNED_ADMISSIONS: AdmissionRuns = {
     // two commands at the limit the pass gives each, and the tool's own start and end: it kills the host itself first
     const stepMs = Number(env?.[ADMIT_STEP_MS_ENV] ?? 0);
     const timeout = stepMs > 0 ? 2 * stepMs + 15000 : MOD_HOST_ADMISSION_MS;
-    const r = spawnSync(process.execPath, [MOD_HOST_ADMIT, uri, ADAPTER_HOST], { encoding: "utf8", timeout, killSignal: "SIGKILL", ...(env === undefined ? {} : { env: { ...env } }) });
+    const r = spawnSync(process.execPath, [MOD_HOST_ADMIT, uri, ADAPTER_HOST], { encoding: "utf8", timeout, killSignal: "SIGKILL", env: withRunHome(env ?? process.env) });
     if (r.error !== undefined || r.status !== 0) {
       throw new Error(`${ADAPTER_HOST} admission of ${uri} gave no answer (${r.error?.message ?? `exit ${String(r.status)}`}): ${(r.stderr ?? "").trim()}`);
     }
     return JSON.parse(r.stdout) as ModHostRun;
   },
   modHost(uri, env) {
-    const r = spawnSync(process.execPath, [MOD_HOST_ADMIT, uri], { encoding: "utf8", timeout: MOD_HOST_ADMISSION_MS, ...(env === undefined ? {} : { env: { ...env } }) });
+    const r = spawnSync(process.execPath, [MOD_HOST_ADMIT, uri], { encoding: "utf8", timeout: MOD_HOST_ADMISSION_MS, env: withRunHome(env ?? process.env) });
     if (r.error !== undefined || r.status !== 0) {
       throw new Error(`mod-host admission of ${uri} gave no answer (${r.error?.message ?? `exit ${String(r.status)}`}): ${(r.stderr ?? "").trim()}`);
     }
@@ -249,7 +250,7 @@ export const SPAWNED_ADMISSIONS: AdmissionRuns = {
     // SIGKILL at the deadline: jalv hosting some plugins ignores SIGTERM, and one stuck in jack_client_open never reaches
     // the loop that reads the flag TERM sets, so a TERM left spawnSync waiting with it (#187). Alive at the deadline is
     // all the verdict asks, so nothing is lost by not letting it exit cleanly.
-    const r = spawnSync("jalv", ["-n", "plugin-qualify", uri], { encoding: "utf8", timeout: JALV_HOSTED_MS, killSignal: "SIGKILL", input: "", ...(env === undefined ? {} : { env: { ...env } }) });
+    const r = spawnSync("jalv", ["-n", "plugin-qualify", uri], { encoding: "utf8", timeout: JALV_HOSTED_MS, killSignal: "SIGKILL", input: "", env: withRunHome(env ?? process.env) });
     const code = (r.error as NodeJS.ErrnoException | undefined)?.code;
     if (code === "ENOENT") return { installed: false, stillRunning: false, status: null, signal: null, stderr: "" };
     return { installed: true, stillRunning: code === "ETIMEDOUT", status: r.status, signal: code === "ETIMEDOUT" ? null : r.signal, stderr: r.stderr ?? "" };

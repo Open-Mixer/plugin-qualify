@@ -30,6 +30,7 @@ import { existsSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { join } from "node:path";
 
+import { withRunHome } from "./run-home.js";
 import type { GridCell } from "./measurement-grid.js";
 import type { PinEntry, PinPool } from "./pins-file.js";
 import type { PoolFigures, QualificationRecord, RunBlock, RunStep } from "./qualification-record.js";
@@ -203,7 +204,7 @@ const POOL_STEP_SLACK_MS = 120000;
 export function asksForPool(prober: string, uri: string, env: Readonly<Record<string, string | undefined>>): boolean | undefined {
   const m = /^clap:(.*)#([^#]*)$/s.exec(uri);
   if (m === null) return undefined;
-  const r = spawnSync(prober, ["--asks-thread-pool", m[1]!, m[2]!], { encoding: "utf8", timeout: 60000, killSignal: "SIGKILL", env: { ...env } });
+  const r = spawnSync(prober, ["--asks-thread-pool", m[1]!, m[2]!], { encoding: "utf8", timeout: 60000, killSignal: "SIGKILL", env: withRunHome(env) });
   if (r.status !== 0) return undefined;
   try {
     return (JSON.parse(r.stdout) as { threadPool?: unknown }).threadPool === true;
@@ -233,7 +234,7 @@ export function watchOnHelpers(prober: string, interposer: string, uri: string, 
     encoding: "utf8",
     timeout: 120000,
     killSignal: "SIGKILL",
-    env: { ...env, LD_PRELOAD: preload },
+    env: { ...withRunHome(env), LD_PRELOAD: preload },
   });
   if (r.error !== undefined || r.status !== 0) return { problem: `${CLAP_QUALIFY_TOOL_NAME} --pool: ${r.error?.message ?? `exit ${String(r.status)}`}` };
   const line = r.stdout.split("\n").filter((l) => l.startsWith("{")).pop();
@@ -273,7 +274,7 @@ export function spawnedPoolRunner(jack: JackStarter = startPrivateJack): PoolRun
         encoding: "utf8",
         timeout: 2 * POOL_ROUNDS * POOL_WINDOW_MS + POOL_STEP_SLACK_MS,
         killSignal: "SIGKILL",
-        env: { ...env, JACK_DEFAULT_SERVER: server.name, [ISOLATED_SIGNAL_TOOL_ENV]: signal },
+        env: { ...withRunHome(env), JACK_DEFAULT_SERVER: server.name, [ISOLATED_SIGNAL_TOOL_ENV]: signal },
       });
       if (r.error !== undefined || r.status !== 0) return { started: false, problem: `pool-step: ${r.error?.message ?? `exit ${String(r.status)}`}: ${(r.stderr ?? "").trim()}` };
       return { ...(JSON.parse(r.stdout) as PoolRunFacts), asks: true, rt: watched.rt };

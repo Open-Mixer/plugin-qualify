@@ -23,6 +23,7 @@ import { createConnection } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
+import { withRunHome } from "./run-home.js";
 import { clapQualifyTools } from "./clap-qualify.js";
 import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOfBoard, hostClassOfMachine, outcomeOfVerdict, matchDistributed, readBoardModel, readMachine, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
 import { clapSearchPath, parseClapScan } from "./clap-loader.js";
@@ -861,7 +862,7 @@ function qualifyClap(ctx: SyncContext, item: SyncItem): SyncPlugin[] {
     return [{ uri: fileUri, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: (e as Error).message }];
   }
   // the scanner lists the plugins of the file in a child of its own, and says how that child ended
-  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20 });
+  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20, env: withRunHome(process.env) });
   let scanned;
   try {
     if (r.error !== undefined) throw r.error;
@@ -1095,7 +1096,7 @@ function scanClapDescriptors(ctx: SyncContext, item: SyncItem): void {
     ctx.log(`${file}: descriptors not written: ${(e as Error).message}`);
     return;
   }
-  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20 });
+  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20, env: withRunHome(process.env) });
   if (r.error !== undefined || r.status !== 0) {
     ctx.log(`${file}: descriptors not written: the scan ended ${r.error?.message ?? `with exit ${String(r.status)}`}`);
     return;

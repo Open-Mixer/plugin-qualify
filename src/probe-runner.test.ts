@@ -291,6 +291,24 @@ describe("qualifyTargets: a pass over the targets", () => {
     expect(curves).toEqual([PROBE_NOTES_CURVE.join(","), "1,2"]);
   });
 
+  it("a run starts with a HOME of its own, under its scratch directory, never the caller's (Surge XT died without one)", () => {
+    const doc = fixtureJson("success-msi");
+    doc.plugin = { format: "lv2", id: LV2.uri };
+    const homes: (string | undefined)[] = [];
+    const run: ProbeRun = (tool, args, env) => {
+      homes.push(env["HOME"]);
+      writeFileSync(args[args.indexOf("--out") + 1]!, JSON.stringify(doc));
+      return { status: 0, signal: null };
+    };
+    probeTarget(LV2, { rates: [48000], run, env: { HOME: "/home/someone" } });
+    probeTarget(LV2, { rates: [48000], run, env: {} });
+    for (const h of homes) {
+      expect(h).toBeDefined();
+      expect(h).not.toBe("/home/someone");
+      expect(h!.startsWith(tmpdir())).toBe(true);
+    }
+  });
+
   it("a CLAP instrument is timed at the declared curve too: the prober reads it from the run's environment", () => {
     const curves: (string | undefined)[] = [];
     const { run } = runner((args) => fixtureText("success-msi").replace("urn:clap:org.example.plate", "org.example.plate"));

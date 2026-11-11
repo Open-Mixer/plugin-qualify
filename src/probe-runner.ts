@@ -12,7 +12,7 @@
  * unavailable, an output that could not be written), 3 is no such plugin.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { availableParallelism, loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -186,7 +186,11 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
   const log = join(work, "child.stderr.log");
   try {
     let args: string[];
-    let runEnv: Record<string, string | undefined> = { ...env };
+    // a HOME of the run's own, under its scratch directory: a plugin that reads its user data from HOME (Surge XT) dies
+    // or stays silent without one, and a probe must never write into the caller's real home
+    const home = join(work, "home");
+    mkdirSync(home);
+    let runEnv: Record<string, string | undefined> = { ...env, HOME: home };
     let expectedId: string;
     const wall = options.wallS === undefined ? {} : { wallS: options.wallS };
     const bound = options.memory === undefined ? {} : { dataBytes: options.memory.bytes };
@@ -200,7 +204,7 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
         target.binaryPath,
         expectedId,
       );
-      runEnv = { ...env, LD_PRELOAD: interposer, [PROBE_NOTES_CURVE_ENV]: env[PROBE_NOTES_CURVE_ENV] ?? PROBE_NOTES_CURVE.join(",") };
+      runEnv = { ...runEnv, LD_PRELOAD: interposer, [PROBE_NOTES_CURVE_ENV]: env[PROBE_NOTES_CURVE_ENV] ?? PROBE_NOTES_CURVE.join(",") };
     } else {
       expectedId = target.uri;
       const child = locateNativeTool(LV2_MEASURE_TOOL_NAME, env, options.exists ?? existsSync).path;
