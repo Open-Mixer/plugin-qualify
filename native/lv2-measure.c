@@ -1089,6 +1089,9 @@ struct note_curve {
 
 /* measure_cost's count of notes when set: the curve's, in place of OMX_PROBE_NOTES */
 static long cost_held_override;
+/* set for the curve: every control stays at its default while the notes are held, so the curve is what a played
+ * instrument costs (the Pi measurements' method); the main cost keeps its parameter sweep, a cell of its own */
+static int cost_at_defaults;
 
 static void measure_cost(struct host *H, double rate, uint32_t block, struct cost_at *C) {
   memset(C, 0, sizeof *C);
@@ -1119,7 +1122,7 @@ static void measure_cost(struct host *H, double rate, uint32_t block, struct cos
   unsigned seed = 0x636f73u;
   int sounded = 0;
   for (uint32_t b = 0; b < total; b++) {
-    rig_sweep(r, (float)((b * 7u) % 101u) / 100.0f, 0);
+    if (!cost_at_defaults) rig_sweep(r, (float)((b * 7u) % 101u) / 100.0f, 0);
     /* an instrument's audio inputs get silence: it is timed playing its notes, and what it puts out is its notes,
      * never noise passed through from an input (Surge XT's LV2 has inputs) */
     if (instrument)
@@ -1851,9 +1854,9 @@ int main(int argc, char **argv) {
         const long held = strtol(p, &end, 10);
         if (end == p) break;
         if (held > 0) {
-          cost_held_override = held;
+          cost_held_override = held, cost_at_defaults = 1;
           measure_cost(H, rate, block, &curve.at[curve.n++]);
-          cost_held_override = 0;
+          cost_held_override = 0, cost_at_defaults = 0;
         }
         p = *end == ',' ? end + 1 : end;
       }

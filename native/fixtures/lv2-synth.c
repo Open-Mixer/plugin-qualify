@@ -15,6 +15,8 @@
  *                    instrument with an audio-in oscillator or a vocoder input (Surge XT) has: still lv2:InstrumentPlugin.
  *   synth-thru.lv2   built with -DFIXTURE_INPUT_THRU, an instrument with an audio input (index 4) that plays no note
  *                    and copies its input to its outputs: silent under notes, loud under noise on its input.
+ *   synth-sweep.lv2  built with -DFIXTURE_SWEEP_COST, the same, which burns a large fixed load per sample whenever its
+ *                    gain is anything but its default 1.0: costly under a parameter sweep, cheap at its defaults.
  *   synth-late.lv2   built with -DFIXTURE_LATE_MS=300, the same, which ignores every note for its first 300 ms after
  *                    activate, as an instrument that builds its sound on a thread of its own (Yoshimi) does.
  *
@@ -47,6 +49,9 @@ static void (*volatile fixture_free)(void *) = free;
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-input"
 #elif defined FIXTURE_INPUT_THRU
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-thru"
+#elif defined FIXTURE_SWEEP_COST
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-sweep"
+static volatile double fixture_sink;
 #else
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth"
 #endif
@@ -183,6 +188,13 @@ static void midi_message(struct synth *s, const uint8_t *m, uint32_t size) {
 static void render(struct synth *s, uint32_t from, uint32_t to) {
   const float k = s->gain ? *s->gain : 1.0f;
   for (uint32_t i = from; i < to; i++) {
+#ifdef FIXTURE_SWEEP_COST
+    if (fabsf(k - 1.0f) > 1e-3f) {
+      double x = 1.0;
+      for (int j = 0; j < 4000; j++) x = x * 1.0000001 + 1e-9;
+      fixture_sink = x;
+    }
+#endif
     double y = 0.0;
     for (int v = 0; v < VOICES; v++)
       if (s->voice[v].key >= 0) {

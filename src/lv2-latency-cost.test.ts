@@ -33,6 +33,7 @@ const SYNTH_LATE = "urn:plugin-qualify:fixture:lv2-synth-late";
 const SYNTH_DRUM = "urn:plugin-qualify:fixture:lv2-synth-drum";
 const SYNTH_INPUT = "urn:plugin-qualify:fixture:lv2-synth-input";
 const SYNTH_THRU = "urn:plugin-qualify:fixture:lv2-synth-thru";
+const SYNTH_SWEEP = "urn:plugin-qualify:fixture:lv2-synth-sweep";
 const BUILT = [
   MEASURE,
   INTERPOSER,
@@ -45,6 +46,7 @@ const BUILT = [
   join(LV2_FIXTURES, "synth-drum.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-input.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-thru.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-sweep.lv2", "synth.so"),
 ].every((p) => existsSync(p));
 
 const scratch = mkdtempSync(join(tmpdir(), "lv2-latency-cost-"));
@@ -194,6 +196,17 @@ describe("lv2-measure, live: the cost", () => {
     const at = measure(SYNTH_THRU, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
     expect(at).not.toHaveProperty("nsPerSampleMedian");
     expect(at["unmeasuredReason"]).toBe("silent-output");
+  });
+
+  live("the curve is timed with every parameter at its default: a cost only a sweep causes stays out of it", () => {
+    // the fixture burns a large load whenever its gain is moved off its default (1.0); at the default it costs what the plain
+    // synth does. The main cost keeps the sweep (its own cell); the curve is what a played instrument costs
+    const swept = measure(SYNTH_SWEEP, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "16" })["cost"].perRate["48000"];
+    const plain = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "16" })["cost"].perRate["48000"];
+    const curve16 = (swept["voiceCurve"] as { nsPerSampleMedian: number }[])[0]!.nsPerSampleMedian;
+    const plain16 = (plain["voiceCurve"] as { nsPerSampleMedian: number }[])[0]!.nsPerSampleMedian;
+    expect(swept.nsPerSampleMedian).toBeGreaterThan(plain.nsPerSampleMedian * 5);
+    expect(curve16).toBeLessThan(plain16 * 2);
   });
 
   live("an instrument is timed at each count of the curve: the cost grows with the notes up to its voices, then stops", () => {
