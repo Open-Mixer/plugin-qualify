@@ -74,6 +74,7 @@
     "!tools/test_*.py",
     "!**/__pycache__",
     "!**/*.pyc",
+    "catalogs",
     "fixtures",
     "README.md",
     "LICENSE"

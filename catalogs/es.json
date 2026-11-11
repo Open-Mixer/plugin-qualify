@@ -1,0 +1,13 @@
+{
+  "$schema": "../node_modules/@openmixer/omx-contract/schema/omx-contract.schema.json#/$defs/catalog",
+  "kind": "catalog",
+  "lang": "es",
+  "owner": "plugin-qualify",
+  "messages": {
+    "qualify.compare.host-not-installed": "{program} no está instalado",
+    "qualify.compare.host-did-not-start": "{program} no se inició",
+    "qualify.compare.host-not-asked": "no se ha pedido con --hosts",
+    "qualify.compare.host-did-not-run": "{program} no se ejecutó",
+    "qualify.compare.format-not-taken": "{program} no acepta ningún plugin {format}"
+  }
+}
