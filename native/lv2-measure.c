@@ -1120,13 +1120,18 @@ static void measure_cost(struct host *H, double rate, uint32_t block, struct cos
   int sounded = 0;
   for (uint32_t b = 0; b < total; b++) {
     rig_sweep(r, (float)((b * 7u) % 101u) / 100.0f, 0);
-    for (uint32_t k = 0; k < H->n_audio_in; k++) {
-      float *in = rig_in(r, k);
-      for (uint32_t i = 0; i < block; i++) {
-        seed = seed * 1664525u + 1013904223u;
-        in[i] = ((float)(seed >> 8) / 16777216.0f - 0.5f) * 0.5f;
+    /* an instrument's audio inputs get silence: it is timed playing its notes, and what it puts out is its notes,
+     * never noise passed through from an input (Surge XT's LV2 has inputs) */
+    if (instrument)
+      zero_inputs(r);
+    else
+      for (uint32_t k = 0; k < H->n_audio_in; k++) {
+        float *in = rig_in(r, k);
+        for (uint32_t i = 0; i < block; i++) {
+          seed = seed * 1664525u + 1013904223u;
+          in[i] = ((float)(seed >> 8) / 16777216.0f - 0.5f) * 0.5f;
+        }
       }
-    }
     r->probe_note = instrument && b == 0 ? 3 : 0;
     r->held = C->held;
     rig_prepare(r);

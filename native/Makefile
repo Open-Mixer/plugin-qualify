@@ -12,7 +12,7 @@
 #                            build/fixtures/{requires-voice-info,requires-timer,requires-thread-pool}.clap,
 #                            build/fixtures/fail-alloc.so, build/fixtures-faulty/hogs-memory.clap (apart, as the faulty ones),
 #                            build/fixtures-faulty/synth-voice-memory.clap (apart, its memory fails any budget),
-#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-input,latency,activate-reads,needs-display,abi-breaker}.lv2,
+#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-input,synth-thru,latency,activate-reads,needs-display,abi-breaker}.lv2,
 #                            build/fixtures-faulty/lv2/{leaks,large-activate}.lv2 (apart, as the faulty ones)
 #   build/lv2_measure_options_test    the measurer's feature options oracle
 #   build/lv2_measure_path_test       the oracle of the LV2 search path made absolute before lilv reads it
@@ -113,7 +113,7 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
 	$(BUILD)/fixtures/lv2/host-faithfulness.lv2/host-faithfulness.so \
 	$(BUILD)/fixtures/lv2/synth.lv2/synth.so $(BUILD)/fixtures/lv2/synth-alloc.lv2/synth.so $(BUILD)/fixtures/lv2/synth-drum.lv2/synth.so \
-	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so \
+	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/latency.lv2/latency.so $(BUILD)/fixtures/lv2/spaced.lv2/manifest.ttl \
 	$(BUILD)/fixtures-faulty/synth-voice-memory.clap \
 	$(BUILD)/fixtures-faulty/lv2/leaks.lv2/gain.so $(BUILD)/fixtures-faulty/lv2/large-activate.lv2/gain.so
@@ -337,6 +337,13 @@ $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so: fixtures/lv2-synth.c fixtures/sy
 	sed 's/fixture:lv2-synth>/fixture:lv2-synth-input>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
 	sed 's/fixture:lv2-synth>/fixture:lv2-synth-input>/; s/lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 \] \./lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 ] ,\n           [ a lv2:AudioPort , lv2:InputPort ; lv2:index 4 ; lv2:symbol "in" ; lv2:name "In" ] ./' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_INPUT -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# the instrument that plays no note and copies its audio input (index 4) to its outputs
+$(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
+	mkdir -p $(@D)
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-thru>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-thru>/; s/lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 \] \./lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 ] ,\n           [ a lv2:AudioPort , lv2:InputPort ; lv2:index 4 ; lv2:symbol "in" ; lv2:name "In" ] ./' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_INPUT_THRU -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
 
 # the instrument that ignores notes for its first 300 ms after activate, as one that builds its sound on a thread does
 $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl

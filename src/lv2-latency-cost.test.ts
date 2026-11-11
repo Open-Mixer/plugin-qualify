@@ -32,6 +32,7 @@ const SYNTH_DELAY = "urn:plugin-qualify:fixture:lv2-synth-delay";
 const SYNTH_LATE = "urn:plugin-qualify:fixture:lv2-synth-late";
 const SYNTH_DRUM = "urn:plugin-qualify:fixture:lv2-synth-drum";
 const SYNTH_INPUT = "urn:plugin-qualify:fixture:lv2-synth-input";
+const SYNTH_THRU = "urn:plugin-qualify:fixture:lv2-synth-thru";
 const BUILT = [
   MEASURE,
   INTERPOSER,
@@ -43,6 +44,7 @@ const BUILT = [
   join(LV2_FIXTURES, "synth-late.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-drum.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-input.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-thru.lv2", "synth.so"),
 ].every((p) => existsSync(p));
 
 const scratch = mkdtempSync(join(tmpdir(), "lv2-latency-cost-"));
@@ -185,6 +187,13 @@ describe("lv2-measure, live: the cost", () => {
     expect(line["cost"]["stimulus"]).toBe("notes-held");
     expect(at["voices"]).toEqual({ held: 16, basis: "probe" });
     expect((at["voiceCurve"] as { held: number }[]).map((e) => e.held)).toEqual([1, 8]);
+  });
+
+  live("noise on an instrument's audio input never counts as its notes sounding (Surge XT on the Pi read idle as played)", () => {
+    // the fixture plays no note and copies its input to its outputs: whatever the cost pass puts on that input comes out
+    const at = measure(SYNTH_THRU, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
+    expect(at).not.toHaveProperty("nsPerSampleMedian");
+    expect(at["unmeasuredReason"]).toBe("silent-output");
   });
 
   live("an instrument is timed at each count of the curve: the cost grows with the notes up to its voices, then stops", () => {

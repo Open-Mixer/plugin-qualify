@@ -13,6 +13,8 @@
  *   synth-attack.lv2 built with -DFIXTURE_ATTACK_MS=50, and synth-delay.lv2 with -DFIXTURE_DELAY_FRAMES=64: see voice_sample.
  *   synth-input.lv2  built with -DFIXTURE_INPUT, the same with an audio input it never reads (index 4), as an
  *                    instrument with an audio-in oscillator or a vocoder input (Surge XT) has: still lv2:InstrumentPlugin.
+ *   synth-thru.lv2   built with -DFIXTURE_INPUT_THRU, an instrument with an audio input (index 4) that plays no note
+ *                    and copies its input to its outputs: silent under notes, loud under noise on its input.
  *   synth-late.lv2   built with -DFIXTURE_LATE_MS=300, the same, which ignores every note for its first 300 ms after
  *                    activate, as an instrument that builds its sound on a thread of its own (Yoshimi) does.
  *
@@ -43,6 +45,8 @@ static void (*volatile fixture_free)(void *) = free;
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-late"
 #elif defined FIXTURE_INPUT
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-input"
+#elif defined FIXTURE_INPUT_THRU
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-thru"
 #else
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth"
 #endif
@@ -97,6 +101,7 @@ struct synth {
   const LV2_Atom_Sequence *midi;
   float *out[2];
   const float *gain;
+  const float *in; /* FIXTURE_INPUT_THRU's audio input */
   LV2_URID midi_event;
   double rate;
   long since_activate; /* frames run since activate */
@@ -124,6 +129,7 @@ static void connect_port(LV2_Handle h, uint32_t port, void *data) {
   case PORT_OUT_L: s->out[0] = data; break;
   case PORT_OUT_R: s->out[1] = data; break;
   case PORT_GAIN: s->gain = data; break;
+  case 4: s->in = data; break;
   default: break;
   }
 }
@@ -135,6 +141,10 @@ static void activate(LV2_Handle h) {
 }
 
 static void note_on(struct synth *s, int key) {
+#ifdef FIXTURE_INPUT_THRU
+  (void)s; (void)key;
+  return;
+#endif
 #ifdef FIXTURE_LATE_MS
   if (s->since_activate < (long)(s->rate * FIXTURE_LATE_MS / 1000.0)) return;
 #endif
@@ -182,6 +192,9 @@ static void render(struct synth *s, uint32_t from, uint32_t to) {
 #endif
       }
     s->out[0][i] = s->out[1][i] = (float)y * k;
+#ifdef FIXTURE_INPUT_THRU
+    if (s->in) s->out[0][i] = s->out[1][i] = s->in[i];
+#endif
   }
 }
 
