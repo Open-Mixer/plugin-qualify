@@ -239,6 +239,7 @@ export const DESCRIPTOR_CODE_SCHEMA_MISSING = "qualify.descriptor.schema-missing
 export const DESCRIPTOR_CODE_SCHEMA_FLOOR = "qualify.descriptor.schema-floor";
 export const DESCRIPTOR_CODE_BINARY_UNHASHED = "qualify.descriptor.binary-unhashed";
 export const DESCRIPTOR_CODE_DIR_UNWRITABLE = "qualify.descriptor.dir-unwritable";
+export const DESCRIPTOR_CODE_DUPLICATE_SYMBOL = "qualify.descriptor.duplicate-symbol";
 
 
 
