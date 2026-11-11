@@ -165,6 +165,9 @@ struct host {
   int n_params;
   int patch_port; /* the atom input that takes patch:Set, or -1 */
   int midi_port;  /* the atom input that takes midi:MidiEvent, or -1 */
+  /* played with notes, not an impulse: a MIDI input and no audio input, or a MIDI input and the class
+   * lv2:InstrumentPlugin (an instrument with an audio input, Surge XT's), as the CLAP prober reads its instrument feature */
+  int instrument;
   int latency_port; /* the control output that reports the plugin's latency (lv2:designation lv2:latency, or the older lv2:reportsLatency), or -1 */
   LV2_URID_Map map; /* the provider's one URI table, for the forge */
   LV2_URID u_float, u_int, u_bool, u_long, u_double;
@@ -366,6 +369,12 @@ static int host_open(struct host *h, LilvWorld *world, const LilvPlugin *plugin)
   lilv_node_free(output_class);
   lilv_node_free(input_class);
   lilv_node_free(control_class);
+  LilvNode *instrument_class = lilv_new_uri(world, LV2_CORE__InstrumentPlugin);
+  LilvNode *rdf_type = lilv_new_uri(world, LILV_NS_RDF "type");
+  h->instrument = h->midi_port >= 0 &&
+                  (h->n_audio_in == 0 || lilv_world_ask(world, lilv_plugin_get_uri(plugin), rdf_type, instrument_class));
+  lilv_node_free(rdf_type);
+  lilv_node_free(instrument_class);
   lilv_node_free(audio_class);
   return 0;
 }
@@ -983,7 +992,7 @@ static void settle_blocks(struct rig *r, double rate, uint32_t block) {
 static void measure_latency(struct host *H, double rate, uint32_t block, struct latency_at *L) {
   memset(L, 0, sizeof *L);
   L->declared_from_port = H->latency_port >= 0;
-  L->by_note = H->n_audio_in == 0 && H->midi_port >= 0;
+  L->by_note = H->instrument;
   if (H->n_audio_out == 0) {
     L->unmeasured = "no-audio-out", L->detail = "the plugin has no audio output to read a response from";
     return;
@@ -1011,7 +1020,7 @@ static void measure_latency(struct host *H, double rate, uint32_t block, struct 
   int nonfinite = 0;
   for (uint32_t base = 0; base < horizon && !L->unmeasured; base += block) {
     zero_inputs(r);
-    if (base == 0)
+    if (base == 0 && !L->by_note)
       for (uint32_t k = 0; k < H->n_audio_in; k++) rig_in(r, k)[0] = 1.0f;
     r->probe_note = L->by_note ? (base == 0 ? 1 : (base + block >= horizon ? 2 : 0)) : 0;
     rig_prepare(r);
@@ -1083,7 +1092,7 @@ static long cost_held_override;
 
 static void measure_cost(struct host *H, double rate, uint32_t block, struct cost_at *C) {
   memset(C, 0, sizeof *C);
-  const int instrument = H->n_audio_in == 0 && H->midi_port >= 0;
+  const int instrument = H->instrument;
   if (instrument) {
     const char *n = getenv("OMX_PROBE_NOTES");
     const long held = cost_held_override > 0 ? cost_held_override : n ? atol(n) : 0;
@@ -1218,7 +1227,7 @@ static void footprint_measure(struct host *H, double rate, uint32_t block, struc
   fp->activate = grew(base), fp->got |= FP_ACTIVATE;
   footprint_blocks(r, block, &seed, 0, 0);
   fp->rest = grew(base), fp->got |= FP_REST;
-  if (H->n_audio_in == 0 && H->midi_port >= 0) {
+  if (H->instrument) {
     const char *n = getenv("OMX_PROBE_NOTES");
     const long held = n ? atol(n) : 0;
     if (held > 0) {
@@ -1568,7 +1577,7 @@ int main(int argc, char **argv) {
     fprintf(jout, "{\"uri\":");
     json_str(jout, uri);
     fprintf(jout, ",\"found\":true,\"instantiated\":%s", refused ? "false" : "true");
-    if (!refused) emit_cost(rate, &none, block, n_audio_in == 0 && H->midi_port >= 0, &footprint, NULL);
+    if (!refused) emit_cost(rate, &none, block, H->instrument, &footprint, NULL);
     emit_feature_options();
     fprintf(jout, "}\n");
     fflush(jout);
@@ -1831,7 +1840,7 @@ int main(int argc, char **argv) {
     static struct note_curve curve;
     curve.n = 0;
     const char *list = getenv("OMX_PROBE_NOTES_CURVE");
-    if (list && n_audio_in == 0 && H->midi_port >= 0) {
+    if (list && H->instrument) {
       for (const char *p = list; *p && curve.n < NOTE_CURVE_MAX;) {
         char *end;
         const long held = strtol(p, &end, 10);
@@ -1845,7 +1854,7 @@ int main(int argc, char **argv) {
       }
     }
     emit_latency(rate, &lat);
-    emit_cost(rate, &cost, block, n_audio_in == 0 && H->midi_port >= 0, &footprint, &curve);
+    emit_cost(rate, &cost, block, H->instrument, &footprint, &curve);
   }
   emit_host_facts(H);
   emit_feature_options();

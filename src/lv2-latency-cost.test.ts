@@ -31,6 +31,7 @@ const SYNTH_ATTACK = "urn:plugin-qualify:fixture:lv2-synth-attack";
 const SYNTH_DELAY = "urn:plugin-qualify:fixture:lv2-synth-delay";
 const SYNTH_LATE = "urn:plugin-qualify:fixture:lv2-synth-late";
 const SYNTH_DRUM = "urn:plugin-qualify:fixture:lv2-synth-drum";
+const SYNTH_INPUT = "urn:plugin-qualify:fixture:lv2-synth-input";
 const BUILT = [
   MEASURE,
   INTERPOSER,
@@ -41,6 +42,7 @@ const BUILT = [
   join(LV2_FIXTURES, "synth-delay.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-late.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-drum.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-input.lv2", "synth.so"),
 ].every((p) => existsSync(p));
 
 const scratch = mkdtempSync(join(tmpdir(), "lv2-latency-cost-"));
@@ -172,6 +174,17 @@ describe("lv2-measure, live: the cost", () => {
     expect(at).not.toHaveProperty("nsPerSampleMedian");
     expect(at["unmeasuredReason"]).toBe("silent-output");
     expect(unmeasuredTerm(at["unmeasuredReason"])).toMatchObject({ code: "silent-output" });
+  });
+
+  live("an instrument with an audio input is still played: its class says it is an instrument (Surge XT on the Pi)", () => {
+    // the fixture is lv2:InstrumentPlugin with an audio input it never reads; taken for an effect it would get an
+    // impulse (silent-output), hold no note and have no curve
+    const line = measure(SYNTH_INPUT, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "1,8" });
+    expect(latencyAt(line, 48000)).toMatchObject({ measuredFrames: 1, from: "note" });
+    const at = line["cost"].perRate["48000"];
+    expect(line["cost"]["stimulus"]).toBe("notes-held");
+    expect(at["voices"]).toEqual({ held: 16, basis: "probe" });
+    expect((at["voiceCurve"] as { held: number }[]).map((e) => e.held)).toEqual([1, 8]);
   });
 
   live("an instrument is timed at each count of the curve: the cost grows with the notes up to its voices, then stops", () => {

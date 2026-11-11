@@ -11,6 +11,8 @@
  *                    scratch buffer on every note on: quiet and clean until it is played, the known
  *                    RT-unsafe instrument.
  *   synth-attack.lv2 built with -DFIXTURE_ATTACK_MS=50, and synth-delay.lv2 with -DFIXTURE_DELAY_FRAMES=64: see voice_sample.
+ *   synth-input.lv2  built with -DFIXTURE_INPUT, the same with an audio input it never reads (index 4), as an
+ *                    instrument with an audio-in oscillator or a vocoder input (Surge XT) has: still lv2:InstrumentPlugin.
  *   synth-late.lv2   built with -DFIXTURE_LATE_MS=300, the same, which ignores every note for its first 300 ms after
  *                    activate, as an instrument that builds its sound on a thread of its own (Yoshimi) does.
  *
@@ -39,6 +41,8 @@ static void (*volatile fixture_free)(void *) = free;
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-delay"
 #elif defined FIXTURE_LATE_MS
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-late"
+#elif defined FIXTURE_INPUT
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-input"
 #else
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth"
 #endif
