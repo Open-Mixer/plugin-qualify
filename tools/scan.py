@@ -420,6 +420,10 @@ class Scanner:
         if group:
             c["group"] = group
         meaning = self.designation_meaning(port)
+        # a toggle a TTL names "bypass" means bypass whether or not it also declares the formal
+        # lv2:designation param:bypass: the console's header already draws one per panel (#27)
+        if c["kind"] == "toggle" and sym == "bypass":
+            meaning = "bypass"
         if meaning is not None:
             c["meaning"] = meaning
         if self.has(port, PP + "notOnGUI"):
@@ -496,6 +500,17 @@ class Scanner:
                 controls.append({"id": desc.link_symbol(prm["symbol"]), "name": prm["name"], "kind": "travel",
                                  "travel": travel, "meaning": "unknown",
                                  "source": {"from": f"{link}#{desc.link_symbol(prm['symbol'])}"}})
+
+        # a TTL that names two ports (or two controls) the same symbol leaves nothing a host can address
+        # by it (plugin-qualify#27): refused by its own code, the symbol named, rather than carried twice
+        counts = {}
+        for sym_ in [c["id"] for c in controls] + [q["id"] for q in ports]:
+            counts[sym_] = counts.get(sym_, 0) + 1
+        dupes = sorted(sym_ for sym_, n in counts.items() if n > 1)
+        if dupes:
+            raise desc.DescriptorRefused(desc.DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
+                                         f"{dupes[0]}: two ports share one symbol")
+
         d["controls"] = controls
         d["ports"] = ports
 
@@ -526,21 +541,23 @@ class Scanner:
         return d, sha256
 
     def descriptors(self, uris=None):
-        """`(doc, sha256)` for every plugin `scan` would describe."""
+        """`(doc, sha256)` for every plugin `scan` would describe; `(uri, code, problem)` for one it refuses
+        (plugin-qualify#27): reported here and kept, never silently dropped."""
         plugins = self.w.get_all_plugins()
         chosen = [plugins.get_by_uri(self.w.new_uri(u)) for u in uris] if uris else list(plugins)
-        out = []
+        out, refused = [], []
         for p in chosen:
             if p is None:
                 continue
             try:
                 out.append(self.descriptor(p))
             except desc.DescriptorRefused as e:
+                refused.append((str(p.get_uri()), e.code, e.problem))
                 sys.stderr.write(f"descriptor refused: {p.get_uri()}: {e.code}: {e.problem}\n")
             except Exception as e:  # noqa: BLE001 - one plugin's bad data never stops the scan
                 line = e.__traceback__.tb_next.tb_lineno if e.__traceback__ and e.__traceback__.tb_next else "?"
                 sys.stderr.write(f"not described: {p.get_uri()}: {type(e).__name__}: {e} (scan.py:{line})\n")
-        return out
+        return out, refused
 
     def plugin_version(self, plugin):
         """(minor, micro) from lv2:minorVersion / lv2:microVersion, or None.
@@ -658,8 +675,9 @@ def main():
         except desc.DescriptorRefused as e:
             sys.exit(f"{e.code}: {e.problem}")
         directory = desc.descriptor_dir(args.descriptor_dir, args.system)
-        written, bad = desc.write_all(directory, scanner.descriptors(args.uris or None), validator)
-        refused = len(bad)
+        described, scan_refused = scanner.descriptors(args.uris or None)
+        written, bad = desc.write_all(directory, described, validator)
+        refused = len(bad) + len(scan_refused)
         sys.stderr.write(f"wrote {len(written)} descriptors -> {directory}\n")
     text = json.dumps(catalog, indent=2, ensure_ascii=False)
     if args.out:
