@@ -32,8 +32,12 @@ import {
   summaryHelpText,
   summaryTable,
   writeFileWhole,
+  localeOf,
+  reasonText,
+  TEXT_CODE,
 } from "../dist/index.js";
 
+const LANG = localeOf();
 const DRIVER = fileURLToPath(new URL("./compare-host.mjs", import.meta.url));
 const log = (line) => process.stderr.write(`plugin-qualify compare: ${line}\n`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -62,7 +66,7 @@ function presence(hosts) {
     const program = HOST_TRAITS[host].program;
     const w = sh("sh", ["-c", `command -v "$1"`, "sh", program]);
     const path = w.status === 0 ? w.stdout.trim() : "";
-    if (!path) return { host, installed: false, version: null, reason: `${program} is not installed (not on PATH)` };
+    if (!path) return { host, installed: false, version: null, reason: { code: TEXT_CODE.compareHostNotInstalled, args: { program } } };
     return { host, installed: true, version: versionOf(program, path) };
   });
 }
@@ -187,7 +191,7 @@ function writeSummary(dir, records, present, meta, format) {
     writeFileWhole(join(dir, COMPARISON_SUMMARY_FILE), `${JSON.stringify(summary, null, 2)}\n`);
     log(`summary ${join(dir, COMPARISON_SUMMARY_FILE)}`);
   }
-  process.stdout.write(format === "json" ? `${JSON.stringify(summary, null, 2)}\n` : summaryTable(summary));
+  process.stdout.write(format === "json" ? `${JSON.stringify(summary, null, 2)}\n` : summaryTable(summary, LANG));
   return summary;
 }
 
@@ -209,7 +213,7 @@ export async function compareSummaryMain(argv) {
   const present = presenceFromRecords(records);
   const missing = missingReferences(present);
   if (parsed.args.publish && missing.length) {
-    for (const m of missing) log(`not publishable: ${m.host}: ${m.reason}`);
+    for (const m of missing) log(`not publishable: ${m.host}: ${reasonText(m.reason, LANG)}`);
     return 1;
   }
   writeSummary(parsed.args.dir, records, present, { hostClass: parsed.args.hostClass, set: parsed.args.set, publish: parsed.args.publish }, "text");
@@ -229,11 +233,11 @@ export async function compareMain(argv) {
     return 0;
   }
   const present = presence(a.hosts);
-  for (const p of present) log(p.installed ? `host ${p.host}: ${p.version ?? "version unknown"}` : `host ${p.host}: skipped, ${p.reason}`);
+  for (const p of present) log(p.installed ? `host ${p.host}: ${p.version ?? "version unknown"}` : `host ${p.host}: skipped, ${reasonText(p.reason, LANG)}`);
   const missing = missingReferences(present);
   if (a.publish && missing.length) {
     // a publishable comparison is against both references: refused before anything runs, each missing one named
-    for (const m of missing) log(`--publish refused: ${m.host}: ${m.reason}`);
+    for (const m of missing) log(`--publish refused: ${m.host}: ${reasonText(m.reason, LANG)}`);
     log(`install them (see the README, "Compare with mod-host and jalv"), or run without --publish for a local look`);
     return 1;
   }
@@ -337,7 +341,7 @@ export async function compareMain(argv) {
         rows.push(row);
         const c = row.checks;
         log(
-          `[${String(i + 1)}/${String(targets.length)}] ${t.uri} ${p.host}: ${row.status === "ran" ? `${row.runsClean ? "clean" : "not clean"}; load ${c.loads.result}, output ${c.output.result}, cycles ${c.cycles.result}, soak ${c.soak.result}, rt ${c.rtSafe.result}${row.crash ? `, crashed at ${row.crash.step} (${row.crash.signal})` : ""}` : `${row.status}: ${row.reason}`}`,
+          `[${String(i + 1)}/${String(targets.length)}] ${t.uri} ${p.host}: ${row.status === "ran" ? `${row.runsClean ? "clean" : "not clean"}; load ${c.loads.result}, output ${c.output.result}, cycles ${c.cycles.result}, soak ${c.soak.result}, rt ${c.rtSafe.result}${row.crash ? `, crashed at ${row.crash.step} (${row.crash.signal})` : ""}` : `${row.status}: ${reasonText(row.reason, LANG)}`}`,
         );
       }
       const rec = comparisonRecordOf({ format: t.format, id: t.uri, ...(t.binary ? { binary: t.binary } : {}) }, stimulus, conditions, new Date().toISOString(), rows);

@@ -15,6 +15,9 @@
  */
 import { createHash } from "node:crypto";
 
+import { TEXT_CODE, type ReasonText } from "./text-codes.js";
+import { reasonText } from "./text-catalog.js";
+
 export const COMPARISON_RECORD_SCHEMA = "plugin-qualify.comparison-record/1";
 export const COMPARISON_SUMMARY_SCHEMA = "plugin-qualify.comparison-summary/1";
 export const COMPARISON_RECORD_SUFFIX = ".comparison.json";
@@ -33,7 +36,7 @@ export interface HostTraits {
   readonly drive: "protocol" | "process";
   readonly formats: readonly ("lv2" | "clap")[];
   /** Why the plugin latency it reports is or is not observable. */
-  readonly latency: { readonly observable: boolean; readonly how: string };
+  readonly latency: { readonly observable: boolean; readonly how: ReasonText };
   readonly rt: string;
 }
 
@@ -42,28 +45,28 @@ export const HOST_TRAITS: Readonly<Record<CompareHost, HostTraits>> = {
     program: "omx-clap-host",
     drive: "protocol",
     formats: ["lv2", "clap"],
-    latency: { observable: true, how: "the host sets a JACK latency callback: the plugin's latency is on its output port's capture range" },
+    latency: { observable: true, how: { code: TEXT_CODE.compareLatencyPortObservable } },
     rt: "its JACK process callback, counted by rt_watch.so",
   },
   "plugin-hostd": {
     program: "plugin-hostd",
     drive: "protocol",
     formats: ["lv2", "clap"],
-    latency: { observable: true, how: "its worker (omx-clap-host) sets a JACK latency callback" },
+    latency: { observable: true, how: { code: TEXT_CODE.compareLatencyHostdPortObservable } },
     rt: "the JACK process callback of every process it starts, counted by rt_watch.so",
   },
   "mod-host": {
     program: "mod-host",
     drive: "protocol",
     formats: ["lv2"],
-    latency: { observable: false, how: "mod-host sets no JACK latency callback, so a plugin's latency is not on its ports" },
+    latency: { observable: false, how: { code: TEXT_CODE.compareLatencyNotObservableModHost } },
     rt: "its JACK process callback, counted by rt_watch.so",
   },
   jalv: {
     program: "jalv",
     drive: "process",
     formats: ["lv2"],
-    latency: { observable: true, how: "jalv sets a JACK latency callback: the plugin's latency is on its output port's capture range" },
+    latency: { observable: true, how: { code: TEXT_CODE.compareLatencyPortObservable } },
     rt: "its JACK process callback, counted by rt_watch.so",
   },
 };
@@ -234,15 +237,15 @@ export interface HostPresence {
   readonly installed: boolean;
   readonly version: string | null;
   /** Why it is skipped, when it is. */
-  readonly reason?: string;
+  readonly reason?: ReasonText;
 }
 
 /** The reference hosts a publishable summary lacks, by name, with the reason each is missing. */
-export function missingReferences(present: readonly HostPresence[]): readonly { host: CompareHost; reason: string }[] {
+export function missingReferences(present: readonly HostPresence[]): readonly { host: CompareHost; reason: ReasonText }[] {
   return REFERENCE_HOSTS.flatMap((h) => {
     const p = present.find((x) => x.host === h);
-    if (p === undefined) return [{ host: h, reason: "not asked for with --hosts" }];
-    if (!p.installed) return [{ host: h, reason: p.reason ?? `${HOST_TRAITS[h].program} is not installed` }];
+    if (p === undefined) return [{ host: h, reason: { code: TEXT_CODE.compareHostNotAsked } }];
+    if (!p.installed) return [{ host: h, reason: p.reason ?? { code: TEXT_CODE.compareHostNotInstalled, args: { program: HOST_TRAITS[h].program } } }];
     return [];
   });
 }
@@ -256,7 +259,7 @@ export function presenceFromRecords(records: readonly ComparisonRecord[]): HostP
     if (ran !== undefined) return [{ host: h, installed: true, version: ran.version }];
     if (rows.every((x) => x.status === "not-applicable")) return [{ host: h, installed: true, version: rows[0]?.version ?? null }];
     const skipped = rows.find((x) => x.status === "skipped");
-    return [{ host: h, installed: false, version: null, reason: skipped?.reason ?? `${HOST_TRAITS[h].program} did not run` }];
+    return [{ host: h, installed: false, version: null, reason: skipped?.reason ?? { code: TEXT_CODE.compareHostDidNotRun, args: { program: HOST_TRAITS[h].program } } }];
   });
 }
 
@@ -308,7 +311,7 @@ export type FigureResult = "measured" | "not-observable" | "not-run";
 
 export interface Check {
   readonly result: CheckResult;
-  readonly detail?: string;
+  readonly detail?: ReasonText;
 }
 export interface OutputCheck extends Check {
   readonly peak?: number;
@@ -335,12 +338,12 @@ export interface CpuFigure {
   readonly result: FigureResult;
   /** utime + stime of the host's processes over the soak, in percent of one core. */
   readonly percent?: number;
-  readonly detail?: string;
+  readonly detail?: ReasonText;
 }
 export interface LatencyFigure {
   readonly result: FigureResult;
   readonly frames?: number;
-  readonly detail?: string;
+  readonly detail?: ReasonText;
 }
 
 export interface HostChecks {
@@ -358,7 +361,7 @@ export interface HostRow {
   readonly host: CompareHost;
   readonly version: string | null;
   readonly status: "ran" | "skipped" | "not-applicable";
-  readonly reason?: string;
+  readonly reason?: ReasonText;
   readonly checks?: HostChecks;
   /** The step the host died at and how, when it did. */
   readonly crash?: { readonly step: string; readonly signal: string };
@@ -410,11 +413,11 @@ const audible = (p: number | null | undefined): boolean => typeof p === "number"
 
 /** The real-time verdict from the reports of the host's processes. */
 export function rtCheckOf(reports: readonly RtReport[] | undefined): RtCheck {
-  if (reports === undefined || reports.length === 0) return { result: "not-observable", detail: "no process of the host reported (rt_watch.so was not loaded, or the host was gone)" };
+  if (reports === undefined || reports.length === 0) return { result: "not-observable", detail: { code: TEXT_CODE.compareRtNotReported } };
   const watched = reports.filter((r) => r.callbacks > 0);
   const armed = watched.reduce((s, r) => s + r.armedCycles, 0);
-  if (watched.length === 0) return { result: "not-observable", detail: "no process of the host set a JACK process callback that rt_watch.so could wrap" };
-  if (armed === 0) return { result: "not-observable", detail: "the process callback never ran past its warm-up" };
+  if (watched.length === 0) return { result: "not-observable", detail: { code: TEXT_CODE.compareRtNoCallback } };
+  if (armed === 0) return { result: "not-observable", detail: { code: TEXT_CODE.compareRtNoWarmUp } };
   const allocations = watched.reduce((s, r) => s + r.allocations, 0);
   const locks = watched.reduce((s, r) => s + r.locks, 0);
   const syscalls = watched.reduce((s, r) => s + r.syscalls, 0);
@@ -429,65 +432,92 @@ export function rtCheckOf(reports: readonly RtReport[] | undefined): RtCheck {
     syscalls,
     cycles: armed,
     ...(kinds.length ? { kinds } : {}),
-    ...(clean ? (trylocks > 0 ? { detail: `${String(trylocks)} try-locks on the audio thread over ${String(armed)} cycles; a try-lock never waits` } : {}) : { detail: `on the audio thread over ${String(armed)} cycles: ${String(allocations)} allocations, ${String(locks)} locks, ${String(syscalls)} system calls` }),
+    ...(clean
+      ? trylocks > 0
+        ? { detail: { code: TEXT_CODE.compareRtTrylocksOnly, args: { trylocks, cycles: armed } } }
+        : {}
+      : { detail: { code: TEXT_CODE.compareRtUnsafe, args: { cycles: armed, allocations, locks, syscalls } } }),
   };
 }
 
-const NOT_RUN = (why: string): Check => ({ result: "not-run", detail: why });
+const NOT_RUNNING: ReasonText = { code: TEXT_CODE.compareNotRunning };
+const NOT_RUN = (why: ReasonText): Check => ({ result: "not-run", detail: why });
 
 /** One host's observation of one plugin as its row. */
 export function hostRowOf(host: CompareHost, version: string | null, obs: HostObservation, conditions: { cycles: number; soakS: number }): HostRow {
   const base = { host, version };
-  if (!obs.installed) return { ...base, status: "skipped", reason: obs.problem ?? `${HOST_TRAITS[host].program} is not installed` };
-  if (obs.started === false) return { ...base, status: "skipped", reason: obs.problem ?? `${HOST_TRAITS[host].program} did not start` };
+  if (!obs.installed) return { ...base, status: "skipped", reason: obs.problem ?? { code: TEXT_CODE.compareHostNotInstalled, args: { program: HOST_TRAITS[host].program } } };
+  if (obs.started === false) return { ...base, status: "skipped", reason: obs.problem ?? { code: TEXT_CODE.compareHostDidNotStart, args: { program: HOST_TRAITS[host].program } } };
   const load = obs.load;
   const loaded = load?.ok === true;
   const loads: Check = loaded
     ? { result: "pass" }
-    : { result: "fail", detail: load?.died ? `the host ended (${load.died})` : load?.resp !== undefined ? `resp ${String(load.resp)}` : load?.detail ?? "no answer in time" };
+    : {
+        result: "fail",
+        detail: load?.died
+          ? { code: TEXT_CODE.compareLoadHostEnded, args: { died: load.died } }
+          : load?.resp !== undefined
+            ? { code: TEXT_CODE.compareLoadResp, args: { resp: load.resp } }
+            : (load?.detail ?? { code: TEXT_CODE.compareLoadTimeout }),
+      };
   const ports = obs.ports;
   const anyPort = ports !== undefined && ports.audioIn + ports.audioOut + ports.midiIn > 0;
-  const instantiates: Check = !loaded ? NOT_RUN("it did not load") : anyPort ? { result: "pass" } : { result: "fail", detail: "no port of the plugin appeared on the graph" };
+  const instantiates: Check = !loaded
+    ? NOT_RUN({ code: TEXT_CODE.compareNotLoaded })
+    : anyPort
+      ? { result: "pass" }
+      : { result: "fail", detail: { code: TEXT_CODE.compareNoPort } };
   const running = loaded && anyPort;
 
   let output: OutputCheck;
-  if (!running) output = { ...NOT_RUN("it is not running") };
-  else if (ports.audioOut === 0) output = { result: "not-observable", detail: "the plugin has no audio output" };
+  if (!running) output = { ...NOT_RUN(NOT_RUNNING) };
+  else if (ports.audioOut === 0) output = { result: "not-observable", detail: { code: TEXT_CODE.compareNoAudioOutput } };
   else if (obs.peakProblem !== undefined) output = { result: "not-observable", detail: obs.peakProblem };
-  else if ((obs.nonFinite ?? 0) > 0) output = { result: "fail", detail: `the output is not finite (${String(obs.nonFinite)} NaN or infinite samples)`, peak: obs.peak ?? 0, stimulus: obs.stimulus ?? "none" };
+  else if ((obs.nonFinite ?? 0) > 0)
+    output = { result: "fail", detail: { code: TEXT_CODE.compareOutputNotFinite, args: { count: obs.nonFinite ?? 0 } }, peak: obs.peak ?? 0, stimulus: obs.stimulus ?? "none" };
   else if (audible(obs.peak)) output = { result: "pass", peak: obs.peak as number, stimulus: obs.stimulus ?? "none" };
-  else if (obs.stimulus === "none" || obs.stimulus === undefined) output = { result: "not-observable", detail: "no stimulus this plugin takes (no audio or MIDI input), and its output was silent", peak: obs.peak ?? 0, stimulus: "none" };
-  else output = { result: "fail", detail: `silent under ${obs.stimulus}`, peak: obs.peak ?? 0, stimulus: obs.stimulus };
+  else if (obs.stimulus === "none" || obs.stimulus === undefined)
+    output = { result: "not-observable", detail: { code: TEXT_CODE.compareNoStimulusSilent }, peak: obs.peak ?? 0, stimulus: "none" };
+  else output = { result: "fail", detail: { code: TEXT_CODE.compareSilentUnderStimulus, args: { stimulus: obs.stimulus } }, peak: obs.peak ?? 0, stimulus: obs.stimulus };
 
   const c = obs.cycles;
   const cycles: CyclesCheck =
     c === undefined
-      ? { result: "not-run", done: 0, of: conditions.cycles, detail: "the cycles did not run" }
+      ? { result: "not-run", done: 0, of: conditions.cycles, detail: { code: TEXT_CODE.compareCyclesNotRun } }
       : c.done === c.of
         ? { result: "pass", done: c.done, of: c.of }
-        : { result: "fail", done: c.done, of: c.of, detail: c.died ? `the host ended at cycle ${String(c.done + 1)} (${c.died})` : `cycle ${String(c.done + 1)} failed${c.failedAt ? ` at ${c.failedAt}` : ""}` };
+        : {
+            result: "fail",
+            done: c.done,
+            of: c.of,
+            detail: c.died
+              ? { code: TEXT_CODE.compareCycleHostEnded, args: { cycle: c.done + 1, died: c.died } }
+              : c.failedAt
+                ? { code: TEXT_CODE.compareCycleFailedAt, args: { cycle: c.done + 1, step: c.failedAt } }
+                : { code: TEXT_CODE.compareCycleFailed, args: { cycle: c.done + 1 } },
+          };
 
   const s = obs.soak;
   const soak: SoakCheck = !running || s === undefined
-    ? { result: "not-run", seconds: 0, detail: "it is not running" }
+    ? { result: "not-run", seconds: 0, detail: NOT_RUNNING }
     : s.alive
       ? { result: "pass", seconds: s.seconds, ...(typeof s.peakAtEnd === "number" ? { peakAtEnd: s.peakAtEnd } : {}) }
-      : { result: "fail", seconds: s.seconds, detail: `the host ended during the soak${s.died ? ` (${s.died})` : ""}` };
+      : { result: "fail", seconds: s.seconds, detail: s.died ? { code: TEXT_CODE.compareSoakHostEnded, args: { died: s.died } } : { code: TEXT_CODE.compareSoakEnded } };
 
-  const rtSafe: RtCheck = !running ? { result: "not-run", detail: "it is not running" } : rtCheckOf(obs.rt);
+  const rtSafe: RtCheck = !running ? { result: "not-run", detail: NOT_RUNNING } : rtCheckOf(obs.rt);
   const cpu: CpuFigure = !running || obs.cpu === undefined
-    ? { result: "not-run", detail: "it is not running" }
+    ? { result: "not-run", detail: NOT_RUNNING }
     : "percent" in obs.cpu
       ? { result: "measured", percent: Math.round(obs.cpu.percent * 100) / 100 }
       : { result: "not-observable", detail: obs.cpu.problem };
   const traits = HOST_TRAITS[host];
   const latency: LatencyFigure = !running
-    ? { result: "not-run", detail: "it is not running" }
+    ? { result: "not-run", detail: NOT_RUNNING }
     : !traits.latency.observable
       ? { result: "not-observable", detail: traits.latency.how }
       : typeof obs.latencyFrames === "number"
         ? { result: "measured", frames: obs.latencyFrames }
-        : { result: "not-observable", detail: "the output port's latency could not be read" };
+        : { result: "not-observable", detail: { code: TEXT_CODE.compareLatencyUnreadable } };
 
   const crashed = obs.died !== undefined;
   const runsClean = !crashed && loaded && running && cycles.result === "pass" && soak.result === "pass" && output.result !== "fail";
@@ -542,7 +572,7 @@ export function comparisonRecordOf(
 
 /** The row of a host that does not take this plugin's format. */
 export function notApplicableRow(host: CompareHost, version: string | null, format: string): HostRow {
-  return { host, version, status: "not-applicable", reason: `${HOST_TRAITS[host].program} takes no ${format.toUpperCase()} plugin` };
+  return { host, version, status: "not-applicable", reason: { code: TEXT_CODE.compareFormatNotTaken, args: { program: HOST_TRAITS[host].program, format: format.toUpperCase() } } };
 }
 
 /** Problems with a record's shape, empty when it is one: the records repository's check holds the same rules. */
@@ -567,7 +597,7 @@ export interface HostTotals {
   readonly host: CompareHost;
   readonly version: string | null;
   readonly status: "ran" | "skipped";
-  readonly reason?: string;
+  readonly reason?: ReasonText;
   /** Plugins of a format the host takes. */
   readonly plugins: number;
   readonly loads: number;
@@ -597,7 +627,7 @@ export interface ComparisonSummary {
   readonly set: string | null;
   readonly measured: string | null;
   readonly publishable: boolean;
-  readonly missing: readonly { host: CompareHost; reason: string }[];
+  readonly missing: readonly { host: CompareHost; reason: ReasonText }[];
   readonly conditions: ComparisonConditions | null;
   readonly records: number;
   /** Plugins every host that ran takes and ran: the like-for-like set the headline counts. */
@@ -636,7 +666,7 @@ export function summarise(
       host: h,
       version,
       status: skipped ? "skipped" : "ran",
-      ...(skipped ? { reason: p?.reason ?? `${HOST_TRAITS[h].program} is not installed` } : {}),
+      ...(skipped ? { reason: p?.reason ?? { code: TEXT_CODE.compareHostNotInstalled, args: { program: HOST_TRAITS[h].program } } } : {}),
       plugins: rows.length,
       loads: count((r) => r.checks?.loads.result === "pass"),
       instantiates: count((r) => r.checks?.instantiates.result === "pass"),
@@ -681,19 +711,29 @@ export function summarise(
   };
 }
 
-/** The text table of a summary, for the terminal. */
-export function summaryTable(s: ComparisonSummary): string {
+/** The text table of a summary, for the terminal, in `lang` (the catalog's sentence, else the English source). */
+export function summaryTable(s: ComparisonSummary, lang?: string): string {
   const lines = [`host            version                     plugins loads clean rt-safe/observed crashes cpu%`];
   for (const t of s.hosts) {
     if (t.status === "skipped") {
-      lines.push(`${t.host.padEnd(15)} skipped: ${t.reason ?? ""}`);
+      lines.push(`${t.host.padEnd(15)} ${reasonText({ code: TEXT_CODE.compareSkippedReason, args: { reason: t.reason === undefined ? "" : reasonText(t.reason, lang) } }, lang)}`);
       continue;
     }
     lines.push(
       `${t.host.padEnd(15)} ${(t.version ?? "?").padEnd(27)} ${String(t.plugins).padStart(7)} ${String(t.loads).padStart(5)} ${String(t.runsClean).padStart(5)} ${`${String(t.rtSafe)}/${String(t.rtObserved)}`.padStart(16)} ${String(t.crashes).padStart(7)} ${t.cpuMedianPercent === null ? "-" : String(t.cpuMedianPercent)}`,
     );
   }
-  for (const [h, list] of Object.entries(s.beats)) if (list.length) lines.push(`${h} does better on ${String(list.length)}: ${list.map((b) => `${b.id} (${b.on} over ${b.over.join(",")})`).join("; ")}`);
-  if (!s.publishable) lines.push(`not publishable${s.missing.length ? `: ${s.missing.map((m) => `${m.host}: ${m.reason}`).join("; ")}` : " (no --publish)"}`);
+  for (const [h, list] of Object.entries(s.beats)) {
+    if (!list.length) continue;
+    const detail = list.map((b) => reasonText({ code: TEXT_CODE.compareBeatDescription, args: { id: b.id, on: b.on, over: b.over.join(",") } }, lang)).join("; ");
+    lines.push(reasonText({ code: TEXT_CODE.compareDoesBetterOn, args: { host: h, count: list.length, detail } }, lang));
+  }
+  if (!s.publishable) {
+    lines.push(
+      s.missing.length
+        ? reasonText({ code: TEXT_CODE.compareNotPublishableWithMissing, args: { missing: s.missing.map((m) => `${m.host}: ${reasonText(m.reason, lang)}`).join("; ") } }, lang)
+        : reasonText({ code: TEXT_CODE.compareNotPublishableNoFlag }, lang),
+    );
+  }
   return `${lines.join("\n")}\n`;
 }
