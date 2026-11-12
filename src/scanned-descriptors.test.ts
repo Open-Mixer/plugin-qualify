@@ -20,6 +20,7 @@ import { type ClapDescriptorParam, type ClapDescriptorRow, clapScanDescriptors, 
 import {
   DESCRIPTOR_CODE_BINARY_UNHASHED,
   DESCRIPTOR_CODE_DIR_UNWRITABLE,
+  DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
   DESCRIPTOR_CODE_SCHEMA,
   DESCRIPTOR_CODE_SCHEMA_MISSING,
   DESCRIPTOR_DIR_KEY,
@@ -179,7 +180,7 @@ describe("the CLAP fixture set through clap-qualify and descriptors.py", () => {
     const doc = parseClapScan(text);
     const rows = clapScanDescriptors(doc);
     const written = readDir(dir);
-    expect(rows.length).toBe(26);
+    expect(rows.length).toBe(27);
     expect([...written.keys()].sort()).toEqual(rows.map((r) => r.uri.replace(/^urn:clap:/, "")).sort());
     for (const row of rows) {
       const id = row.uri.replace(/^urn:clap:/, "");
@@ -250,7 +251,13 @@ describe("the guide (docs/overview.md) states the directory, its key and the nam
     expect(readme).toContain(`\`$XDG_STATE_HOME/${DESCRIPTOR_DIR_STATE_SUBDIR}\`, else \`~/.local/state/${DESCRIPTOR_DIR_STATE_SUBDIR}\``);
     expect(readme).toContain(`\`${DESCRIPTOR_DIR_SYSTEM}\``);
     expect(readme).toContain(`\`<id>@<version>-<sha256 first ${DESCRIPTOR_HASH_PREFIX}>.json\``);
-    for (const code of [DESCRIPTOR_CODE_SCHEMA, DESCRIPTOR_CODE_BINARY_UNHASHED, DESCRIPTOR_CODE_DIR_UNWRITABLE, DESCRIPTOR_CODE_SCHEMA_MISSING]) {
+    for (const code of [
+      DESCRIPTOR_CODE_SCHEMA,
+      DESCRIPTOR_CODE_BINARY_UNHASHED,
+      DESCRIPTOR_CODE_DIR_UNWRITABLE,
+      DESCRIPTOR_CODE_SCHEMA_MISSING,
+      DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
+    ]) {
       expect(readme).toContain(`\`${code}\``);
     }
     expect(readme).toContain(`\`${DESCRIPTOR_SCHEMA_INSTALLED}\``);

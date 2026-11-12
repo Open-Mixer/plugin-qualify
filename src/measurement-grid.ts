@@ -7,7 +7,7 @@
  *
  * Pure: no file, no process. `probe-runner.ts` runs what `runnerInvocations` plans.
  */
-import { GRID_CONTINUITY_QUANTUM } from "./qualify-declarations.js";
+import { COST_REFERENCE_RATE, GRID_CONTINUITY_QUANTUM, LONG_QUANTUM_FRAMES } from "./qualify-declarations.js";
 
 /** One cell of the grid. */
 export interface GridCell {
@@ -55,7 +55,7 @@ const byRateThenQuantum = (a: GridCell, b: GridCell): number => a.rate - b.rate 
 
 /**
  * The cells of a grid, in the order they are taken: for `hosts`, each host's own cell in the order the hosts are given,
- * then `GRID_CONTINUITY_QUANTUM` at every rate; for `full`, those cells first as well, then the rest of the product by
+ * then `GRID_CONTINUITY_QUANTUM` at every rate, then the long quantum at the reference rate when the run measures that rate; for `full`, those cells first as well, then the rest of the product by
  * rate and quantum; for named cells, as named. A cell is listed once.
  */
 export function gridCells(
@@ -64,7 +64,9 @@ export function gridCells(
 ): GridCell[] {
   if (spec.kind === "cells") return unique(spec.cells);
   const continuity = [...context.rates].sort((a, b) => a - b).map((rate) => ({ rate, quantum: GRID_CONTINUITY_QUANTUM }));
-  const lead = unique([...context.hosts, ...continuity]);
+  // the console was judged at the long quantum until its basis moved to the reference one: that cell stays measured
+  const long = context.rates.includes(COST_REFERENCE_RATE) ? [{ rate: COST_REFERENCE_RATE, quantum: LONG_QUANTUM_FRAMES }] : [];
+  const lead = unique([...context.hosts, ...continuity, ...long]);
   if (spec.kind === "hosts") return lead;
   const product = context.rates.flatMap((rate) => context.quanta.map((quantum) => ({ rate, quantum }))).sort(byRateThenQuantum);
   const inProduct = new Set(product.map(cellKey));

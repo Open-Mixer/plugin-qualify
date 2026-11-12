@@ -14,9 +14,16 @@ import { ORACLE_FLOOR_RATES, RT_HARD_TARGET } from "@openmixer/omx-contract";
 export const COST_REFERENCE_RATE = 96000;
 
 /**
- * The reference quantum in frames: the rig's buffer, and the block `benchmark.py` runs.
+ * The reference quantum in frames: the buffer the console aims at (96000/256), the quantum its budget is judged at,
+ * and the block `benchmark.py` runs.
  */
-export const QUANTUM_FRAMES = 1024;
+export const QUANTUM_FRAMES = 256;
+
+/**
+ * The long quantum, in frames: the console's basis until 0.20.2, kept as a measured cell so a plugin's cost at a large
+ * buffer stays on record beside its cost at the console's.
+ */
+export const LONG_QUANTUM_FRAMES = 1024;
 
 /** The rate the offline capture window is sized at; other rates scale from it. */
 export const MEASURE_BASE_RATE = 48000;
@@ -31,8 +38,8 @@ export const OPERATIONAL_RATE_FLOOR = 48000;
 /** The rates a run measures when `--rates` is not given — recorded in `run.rates`: omx-contract's ORACLE_FLOOR_RATES. */
 export const QUALIFY_RATES: readonly number[] = ORACLE_FLOOR_RATES;
 
-/** The quanta (frames) a run rates cost at when `--quanta` is not given: the contract's hard-target quantum, then 256, 512 and the reference. */
-export const QUALIFY_QUANTA: readonly number[] = [RT_HARD_TARGET.quantum, 256, 512, QUANTUM_FRAMES];
+/** The quanta (frames) a run rates cost at when `--quanta` is not given: the contract's hard-target quantum, the reference, 512 and the long quantum. */
+export const QUALIFY_QUANTA: readonly number[] = [RT_HARD_TARGET.quantum, QUANTUM_FRAMES, 512, LONG_QUANTUM_FRAMES];
 
 /** Seconds one plugin's offline pass may take before its worker is killed and it reads as a timeout. */
 export const PLUGIN_TIMEOUT_S = 15;
@@ -174,12 +181,21 @@ export const MEMORY_BOUND_EXIT_STATUS = 121;
 /**
  * The memory-only pass (`plugin-qualify-sync --memory-only`). With `PROBE_MEMORY_ONLY_ENV` set the probers take the
  * footprint and nothing else; the probe runner passes its environment on, so its limits hold unchanged.
- * `PROBE_NOTES_ENV` is the count of notes an instrument that declares no voice capacity holds, basis `probe`:
+ * `PROBE_NOTES_ENV` is the count of notes an instrument that declares no voice capacity holds, basis `probe`, in every
+ * LV2 run (probe-runner) and in the memory-only pass:
  * `MEMORY_PASS_PROBE_NOTES` unless `memory_notes` says otherwise.
  */
 export const PROBE_MEMORY_ONLY_ENV = "OMX_PROBE_MEMORY_ONLY";
 export const PROBE_NOTES_ENV = "OMX_PROBE_NOTES";
 export const MEMORY_PASS_PROBE_NOTES = 16;
+
+/**
+ * The counts of notes an LV2 instrument is timed at, besides its probe count, for its cost against the notes held
+ * (the rate's `voiceCurve`, probe output 1.4): the counts the Pi measurements held Surge XT at
+ * (openmixer.org/notes/instruments-on-a-pi-5), so a voice limit shows as the count past which the cost stops growing.
+ */
+export const PROBE_NOTES_CURVE_ENV = "OMX_PROBE_NOTES_CURVE";
+export const PROBE_NOTES_CURVE = [1, 8, 16, 32, 48, 64] as const;
 
 /**
  * What `tools/mod-host-admit.mjs` is told in an adapter-only pass: how long the host has for one command, its address
@@ -239,6 +255,8 @@ export const DESCRIPTOR_CODE_SCHEMA_MISSING = "qualify.descriptor.schema-missing
 export const DESCRIPTOR_CODE_SCHEMA_FLOOR = "qualify.descriptor.schema-floor";
 export const DESCRIPTOR_CODE_BINARY_UNHASHED = "qualify.descriptor.binary-unhashed";
 export const DESCRIPTOR_CODE_DIR_UNWRITABLE = "qualify.descriptor.dir-unwritable";
+/** Two ports of one plugin carry the same symbol: neither can be addressed by it, so the plugin is not described. Args: `symbol`. */
+export const DESCRIPTOR_CODE_DUPLICATE_SYMBOL = "qualify.descriptor.duplicate-symbol";
 
 
 

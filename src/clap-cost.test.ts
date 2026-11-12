@@ -38,8 +38,9 @@ const SYNTH_NO_VOICES = join(FIXTURES, "synth-no-voices.clap");
 const SYNTH_MIDI = join(FIXTURES, "synth-midi.clap");
 const SYNTH_INPUT = join(FIXTURES, "synth-input.clap");
 const SYNTH_ALLOC = join(FIXTURES, "synth-alloc.clap");
+const SYNTH_SWEEP = join(FIXTURES, "synth-sweep.clap");
 const SAFE = join(FIXTURES, "rt-safe.clap");
-const BUILT = [clapQualifyToolPath(), rtInterposePath(), SYNTH, SYNTH_VOICES, SYNTH_NO_VOICES, SYNTH_MIDI, SYNTH_INPUT, SYNTH_ALLOC, SAFE].every((p) => existsSync(p));
+const BUILT = [clapQualifyToolPath(), rtInterposePath(), SYNTH, SYNTH_VOICES, SYNTH_NO_VOICES, SYNTH_MIDI, SYNTH_INPUT, SYNTH_ALLOC, SYNTH_SWEEP, SAFE].every((p) => existsSync(p));
 
 function live(name: string, body: () => void): void {
   it(name, (ctx) => {
@@ -102,6 +103,21 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
     expect(l!.clap.mainInputChannels).toBe(2);
     expect(l!.cost?.stimulus).toBe("notes-held");
     expect(figure(l!.cost?.perRate[String(RATE)]).voices).toEqual({ held: 16, basis: "probe" });
+  });
+
+  live("the voice curve is timed at each count with every parameter at its default; the main cost keeps the sweep", () => {
+    // the fixture burns a large load whenever its gain leaves its default (1.0): the sweep makes the main cost explode,
+    // and the curve, what a played instrument costs, reads the plain synth's figures and grows with the notes
+    const [swept] = qualifyClap(SYNTH_SWEEP, undefined, { rates: [RATE], probeNotes: 16, curve: [1, 16] });
+    const [plain] = qualifyClap(SYNTH, undefined, { rates: [RATE], probeNotes: 16, curve: [1, 16] });
+    const s = figure(swept!.cost?.perRate[String(RATE)]);
+    const p = figure(plain!.cost?.perRate[String(RATE)]);
+    expect(s.nsPerSampleMedian).toBeGreaterThan(5 * p.nsPerSampleMedian);
+    expect(s.voiceCurve?.map((e) => e.held)).toEqual([1, 16]);
+    const [s1, s16] = s.voiceCurve!.map((e) => e.nsPerSampleMedian!);
+    const p16 = p.voiceCurve![1]!.nsPerSampleMedian!;
+    expect(s16!).toBeLessThan(2 * p16);
+    expect(s16!).toBeGreaterThan(3 * s1!);
   });
 
   live("an effect is timed under the sweep's noise and holds no note", () => {
