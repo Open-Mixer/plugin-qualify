@@ -86,6 +86,30 @@ jobs:
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           node packaging/check-tarball.mjs "$RUNNER_TEMP"/pack/openmixer-plugin-qualify-*.tgz
 
+  # one pack per listed language from the spec and debian/control, and the catalogs through omx-contract's release
+  # gate (translate --check, tools/catalogs-gate.sh): a listed language with no catalog, a missing key or a stale entry
+  # is red; omx-contract 3.16 from the staging channel, above the real one, until it is served
+  catalogs:
+    name: language packs and catalogs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: fedora:44
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs
+      - uses: actions/checkout@v4
+      - name: Add the OpenMixer channel
+        uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          staging: 'true'
+      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.16.0' 'omx-contract < 4' 'omx-contract-data >= 3.16.0'
+      - uses: Open-Mixer/.github/.github/actions/langpacks@openmixer-v1
+        with:
+          name: plugin-qualify
+          owner: plugin-qualify
+          spec: packaging/plugin-qualify.spec
+          gate: tools/catalogs-gate.sh
+
   # the RPM and the DEB are built, linted and assembled into unsigned trees; nothing is published
   packages:
     name: packages, dry run
