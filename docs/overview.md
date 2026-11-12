@@ -390,6 +390,10 @@ plugin states (`unversioned` when it states none) and the SHA-256 of its binary 
 bundle's `lv2:binary`), with every character other than letters, digits, `.`, `_` and `-` written `_`. The hash
 keys which file describes which binary: a changed binary is a new file, and the old one stays as history.
 
+A toggle port with the symbol `bypass` and no `lv2:designation` of its own carries the meaning `bypass` (EQ10Q's
+`eq*qm` plugins declare theirs so): the console's header draws one bypass per panel, so a panel leaves that
+control to it and does not draw it a second time.
+
 ```
 tools/scan.py --out catalog.json                                     # LV2: the catalog, and the descriptors beside it
 tools/scan.py --descriptor-dir ./descriptors urn:my:plugin           # one plugin, into a directory of your own
@@ -399,8 +403,12 @@ native/build/clap-qualify --json ./my-fx.clap | tools/descriptors.py clap --desc
 `scan.py --no-descriptors` writes the catalog only. A descriptor the schema refuses is not written and is
 reported as `contract.file.invalid`, omx-contract's code; a plugin whose binary cannot be read is
 `qualify.descriptor.binary-unhashed`; a directory that cannot be written is `qualify.descriptor.dir-unwritable`;
-no schema found is `qualify.descriptor.schema-missing`. Any of them makes the run exit `2`, and the other
-plugins are still written. The schema is the omx-contract package plugin-qualify depends on, else
+no schema found is `qualify.descriptor.schema-missing`; a plugin with two ports of one symbol (EQ10Q's `eq*qs`
+plugins name both output meters `out_2_vu_ctl`) is `qualify.descriptor.duplicate-symbol`, with the symbol as its
+arg: no port can be addressed by it, so the plugin is not described, and it is not repaired either. Its catalog
+row stays, carrying `refused`: the code, its args and the sentence. The codes' English sentences and their args are
+in `schema/codes.json`, each other language's in `catalogs/<lang>.json`. Any of them makes the run exit `2`, and
+the other plugins are still written. The schema is the omx-contract package plugin-qualify depends on, else
 `/usr/share/omx-contract/omx-contract.schema.json`; `OMX_CONTRACT_SCHEMA` names another one, for a test. The
 writer needs Python's `jsonschema` (`python3-jsonschema`).
 
