@@ -9,6 +9,8 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { HOSTD_ENV, hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
+import { reasonText } from "./text-catalog.js";
+import { TEXT_CODE } from "./text-codes.js";
 
 const sha = (s: string): string => createHash("sha256").update(s).digest("hex");
 
@@ -48,7 +50,8 @@ describe("hostdPinFiles", () => {
   it("an older plugin-hostd without --pin-files is said so, never worked around", () => {
     const r = hostdPinFiles("urn:x", [], {}, () => ({ status: 1, stdout: "Usage: plugin-hostd [-n] ...\n", stderr: "plugin-hostd: unrecognized option '--pin-files'\n" }));
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.detail).toMatch(/no --pin-files .*0\.15\.0/);
+    expect(!r.ok && r.detail).toEqual({ code: TEXT_CODE.pinHostdNoPinFiles });
+    expect(!r.ok && reasonText(r.detail)).toMatch(/no --pin-files .*0\.15\.0/);
   });
 
   it("no plugin-hostd installed is no pin", () => {
