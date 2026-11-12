@@ -84,9 +84,10 @@ plugin-qualify --grid 48000/128,96000/1024 urn:my:fx    # exactly these cells
 
 - `--grid hosts` (the fast option; `--grid-hosts` says the same): the rate and quantum of every host the run judges
   (each `--host-profile`, and the console's two tiers, `openmixer-console` and the format's isolated host), then
-  quantum 512 at every `--rates` rate, so that a record stays comparable with the ones written before the grid.
-  With the four shipped hosts that is seven cells: 96000/1024 (`openmixer-console`), 48000/256 (`jalv`),
-  48000/128 (`mod-host`, `omx-clap-host`), and 512 at 44100, 48000, 96000 and 192000.
+  quantum 512 at every `--rates` rate, so that a record stays comparable with the ones written before the grid, then
+  1024 at 96000 when that rate is measured: the console was judged there before its basis moved to 256.
+  With the four shipped hosts that is eight cells: 96000/256 (`openmixer-console`), 48000/256 (`jalv`),
+  48000/128 (`mod-host`, `omx-clap-host`), 512 at 44100, 48000, 96000 and 192000, and 96000/1024.
 - `--grid full` (the default; every plugin is measured under the same conditions, so any host's verdict can be read at any cell and the figures compare): every `--rates` rate at every `--quanta` quantum, 16 cells with the defaults
   (44100, 48000, 96000, 192000 by 128, 256, 512, 1024).
 - `--grid <rate>/<quantum>,...`: exactly the cells named.
@@ -552,7 +553,7 @@ plugin-qualify --host-profile ./my-host.json <uri>                 # your own ho
 
 | profile | isolation | verdict | instruments | LV2 features read from | cost budget (P95 of a core, rate / quantum) |
 |---|---|---|---|---|---|
-| `openmixer-console` (default) | in-process (the console's RT thread) | judged from a declaration | no | the console's in-process table | 0.05 at 96000 / 1024 |
+| `openmixer-console` (default) | in-process (the console's RT thread) | judged from a declaration | no | the console's in-process table | 0.05 at 96000 / 256 |
 | `jalv` | per-process | **measured by a run** (`jalv -n <name> <uri>`, headless) | yes | jalv 1.6.8 `src/jalv.c` (zynthian's fork passes the same list) | 0.25 at 48000 / 256 |
 | `mod-host` | shared-process | **measured by a run** (`add`, `activate`, `remove` on mod-host's socket) | yes | mod-host f14a230 `src/effects.c` | 0.05 at 48000 / 128 |
 | `omx-clap-host` | shared-process | judged from a declaration | yes | the console's in-process table (the same LV2 feature provider) | 0.05 at 48000 / 128 |

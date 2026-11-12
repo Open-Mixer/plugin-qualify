@@ -16,15 +16,16 @@ const context = { rates: QUALIFY_RATES, quanta: QUALIFY_QUANTA, hosts: HOSTS };
 const keys = (cells: readonly { rate: number; quantum: number }[]) => cells.map(cellKey);
 
 describe("the cells of a grid", () => {
-  it("hosts: each shipped host's own cell first, in the order named, then 512 at every rate, each once", () => {
+  it("hosts: each shipped host's own cell first, in the order named, then 512 at every rate, then the long quantum at the console rate, each once", () => {
     expect(keys(gridCells(GRID_HOSTS, context))).toEqual([
-      "96000/1024", // openmixer-console
+      "96000/256", // openmixer-console
       "48000/256", // jalv
       "48000/128", // mod-host, and omx-clap-host's is the same cell
       "44100/512",
       "48000/512",
       "96000/512",
       "192000/512",
+      "96000/1024", // the cell the console was judged at before its basis moved to 256
     ]);
     expect(GRID_CONTINUITY_QUANTUM).toBe(512);
   });
@@ -35,7 +36,13 @@ describe("the cells of a grid", () => {
     expect(full).toHaveLength(16);
     expect(new Set(keys(full)).size).toBe(16);
     for (const rate of QUALIFY_RATES) for (const quantum of QUALIFY_QUANTA) expect(keys(full)).toContain(`${rate}/${quantum}`);
-    expect(keys(full).slice(0, 3)).toEqual(["96000/1024", "48000/256", "48000/128"]);
+    expect(keys(full).slice(0, 3)).toEqual(["96000/256", "48000/256", "48000/128"]);
+  });
+
+  it("the long quantum stays measured at the console rate, and only when the run measures that rate", () => {
+    expect(keys(gridCells(GRID_HOSTS, context))).toContain("96000/1024");
+    expect(keys(gridCells(GRID_HOSTS, { ...context, rates: [48000] }))).not.toContain("96000/1024");
+    expect(QUALIFY_QUANTA).toEqual([128, 256, 512, 1024]);
   });
 
   it("every declared host's cell is in the hosts' grid and in the full one", () => {
@@ -55,7 +62,7 @@ describe("the cells of a grid", () => {
 
   it("a budget keeps the first cells of the order; 0 keeps them all", () => {
     const hosts = gridCells(GRID_HOSTS, context);
-    expect(keys(budgetCells(hosts, 3))).toEqual(["96000/1024", "48000/256", "48000/128"]);
+    expect(keys(budgetCells(hosts, 3))).toEqual(["96000/256", "48000/256", "48000/128"]);
     expect(budgetCells(hosts, 0)).toEqual(hosts);
     expect(budgetCells(hosts, undefined)).toEqual(hosts);
   });
