@@ -171,6 +171,8 @@ def owning_rpm(path, run=subprocess.run):
 
 
 class Scanner:
+    refusals = ()  # (uri, code, problem, args) of each plugin the last `descriptors` refused
+
     def __init__(self):
         # lilv is imported here, not at module load: the owner mapping and the pure helpers
         # (test_scan.py) run on a host without the bindings, the way benchmark.py's worker does.
@@ -340,6 +342,10 @@ class Scanner:
         # a DECLARED fact like the comment above, read off the bundle and judged against the params
         # just read. Always present on a scanned plugin — `[]` is "ships none", never "not read".
         out["presets"] = read_presets(self.w, plugin, params)
+        # a plugin the scan refuses to describe stays listed, with its code, args and sentence (plugin-qualify#27)
+        refusal = self.port_refusal(plugin)
+        if refusal is not None:
+            out["refused"] = {"code": refusal.code, "args": refusal.code_args, "text": refusal.problem}
         # Record the latency port symbol if the plugin reports one. The actual frame
         # value is filled later by the on-rig benchmark (benchmark.py); a plugin with
         # no latency port carries no `latency` key → host treats it as unknown, not 0.
@@ -420,6 +426,10 @@ class Scanner:
         if group:
             c["group"] = group
         meaning = self.designation_meaning(port)
+        # a toggle named bypass with no designation of its own is the plugin's bypass (EQ10Q's eq1qm..eq10qm): a
+        # panel leaves it to the header, which draws one bypass per panel (plugin-qualify#27)
+        if c["kind"] == "toggle" and sym.lower() == "bypass" and meaning in ("unknown", None):
+            meaning = "bypass"
         if meaning is not None:
             c["meaning"] = meaning
         if self.has(port, PP + "notOnGUI"):
@@ -429,9 +439,18 @@ class Scanner:
         c["source"] = {"from": f"{link}#{desc.link_symbol(sym)}"}
         return c
 
+    def port_refusal(self, plugin):
+        """The refusal a plugin's ports earn before any descriptor is drawn, else None: two ports with one symbol."""
+        dup = desc.duplicate_symbol(str(plugin.get_port_by_index(i).get_symbol()) for i in range(plugin.get_num_ports()))
+        return desc.refused(desc.DESCRIPTOR_CODE_DUPLICATE_SYMBOL, symbol=dup) if dup is not None else None
+
     def descriptor(self, plugin):
-        """The plugin as a scanned descriptor, and the SHA-256 of its binary: `(doc, sha256)`."""
+        """The plugin as a scanned descriptor, and the SHA-256 of its binary: `(doc, sha256)`. A plugin whose ports
+        cannot be addressed raises its refusal (`port_refusal`): it is not repaired."""
         uri = str(plugin.get_uri())
+        refusal = self.port_refusal(plugin)
+        if refusal is not None:
+            raise refusal
         bundle = bundle_path(plugin) or ""
         lib = plugin.get_library_uri()
         lib_path = lib.get_path() if lib is not None else None
@@ -526,16 +545,19 @@ class Scanner:
         return d, sha256
 
     def descriptors(self, uris=None):
-        """`(doc, sha256)` for every plugin `scan` would describe."""
+        """`(doc, sha256)` for every plugin `scan` would describe. A plugin refused here is kept in `self.refusals`,
+        `(uri, code, problem, args)`, and reported, never silently dropped (its catalog row says why, `describe`)."""
         plugins = self.w.get_all_plugins()
         chosen = [plugins.get_by_uri(self.w.new_uri(u)) for u in uris] if uris else list(plugins)
         out = []
+        self.refusals = []
         for p in chosen:
             if p is None:
                 continue
             try:
                 out.append(self.descriptor(p))
             except desc.DescriptorRefused as e:
+                self.refusals.append((str(p.get_uri()), e.code, e.problem, e.code_args))
                 sys.stderr.write(f"descriptor refused: {p.get_uri()}: {e.code}: {e.problem}\n")
             except Exception as e:  # noqa: BLE001 - one plugin's bad data never stops the scan
                 line = e.__traceback__.tb_next.tb_lineno if e.__traceback__ and e.__traceback__.tb_next else "?"
@@ -659,7 +681,7 @@ def main():
             sys.exit(f"{e.code}: {e.problem}")
         directory = desc.descriptor_dir(args.descriptor_dir, args.system)
         written, bad = desc.write_all(directory, scanner.descriptors(args.uris or None), validator)
-        refused = len(bad)
+        refused = len(bad) + len(scanner.refusals)
         sys.stderr.write(f"wrote {len(written)} descriptors -> {directory}\n")
     text = json.dumps(catalog, indent=2, ensure_ascii=False)
     if args.out:
