@@ -7,6 +7,12 @@ name: release
 # and checks the tarball, and publishes nothing. The RPM and DEB builds are in Open-Mixer/.github; the
 # secrets are the organisation's. The npm registry has its own workflow, publish.yml.
 
+# A manual run with staged on (never a tag) builds fc44 x86_64 and trixie amd64 only, against the staging channel, and
+# publishes them, signed, to the staging channel (staging/rpm and staging/deb of the channel repository), where the
+# next layer of the release chain finds them by adding the staging channel beside the real one. Nothing reaches the
+# real channel, and the real release still publishes once from the v<version> tag (Open-Mixer/.github build-rpm.yml
+# and build-deb.yml).
+
 on:
   push:
     tags: ['v*']
@@ -24,6 +30,10 @@ on:
         description: 'Let the release go out over a version the channel already serves (finish a partial publish)'
         type: boolean
         default: false
+      staged:
+        description: 'Build fc44 x86_64 and trixie amd64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       publish:
@@ -33,6 +43,9 @@ on:
         type: boolean
         default: true
         description: 'Build the aarch64/arm64 packages too; the pull-request dry run passes false (arm builds run at release only)'
+      staged:
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -43,6 +56,7 @@ jobs:
   rpm:
     uses: Open-Mixer/.github/.github/workflows/build-rpm.yml@openmixer-v1
     with:
+      staged: ${{ inputs.staged == true }}
       package-name: plugin-qualify
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
@@ -59,6 +73,7 @@ jobs:
     # only after the RPM passed: a DEB never ships beside a failed RPM (the shared release-order check)
     uses: Open-Mixer/.github/.github/workflows/build-deb.yml@openmixer-v1
     with:
+      staged: ${{ inputs.staged == true }}
       package-name: plugin-qualify
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
@@ -78,7 +93,8 @@ jobs:
   installed:
     name: Install and qualify (${{ matrix.image }})
     needs: [rpm, deb]
-    if: ${{ !cancelled() }}
+    # not on a staged run: it reads packages a staged run does not build
+    if: ${{ !cancelled() && inputs.staged != true }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
