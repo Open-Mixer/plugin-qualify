@@ -19,6 +19,7 @@ import {
   LILV_RESOLVE, SYNC_STATE_SCHEMA, digestFiles, discoverSyncItems, parseSyncArgs, resolveSyncSettings, runSync, sameBinaryElsewhere,
   type Lv2Resolve, type SyncState,
 } from "./qualify-sync.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-lv2-resolve-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -80,11 +81,12 @@ describe("the LV2 bundle the sync keys a plugin by is the one lilv loads (#199)"
       entries: { [`lv2:${URI}`]: { format: "lv2", root: old!.root, files: digestFiles(old!.root, old!.files)!, qualifiedAt: "2026-10-30T00:00:00.000Z", seconds: 1, plugins: [{ uri: URI, outcome: "qualified" }] } },
     };
     writeFileSync(join(m.root, "state.json"), JSON.stringify(state));
-    const args = parseSyncArgs(["--lv2-path", `${m.a}:${m.b}`, "--lv2-extra", "", "--clap-path", join(m.root, "no-clap"), "--clap-extra", "",
+    const sp = splitPathFlags(["--lv2-path", `${m.a}:${m.b}`, "--lv2-extra", "", "--clap-path", join(m.root, "no-clap"), "--clap-extra", "",
       "--pin-file", join(m.root, "qualified.pins"), "--qualification-dir", join(m.root, "q"), "--descriptor-dir", join(m.root, "d"),
       "--state-file", join(m.root, "state.json"), "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed"]);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, {}, m.root);
+    const r = resolveSyncSettings(new Map(), args.args, {}, m.root, undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const lines: string[] = [];
     const summary = await runSync(r.settings, { env: {}, lv2Resolve: takesComplement(m), log: (l) => lines.push(l) });

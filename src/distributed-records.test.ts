@@ -15,6 +15,7 @@ import { DISTRIBUTED_DIR_SYSTEM, hostClassOfBoard, hostClassOfMachine } from "./
 import { FIXTURE_CLAP_ID, fixtureProvenance, writeFakeClap, writeFixtureSet } from "./distributed-records.support.js";
 import { parsePinLine } from "./pins-file.js";
 import { parseSyncArgs, resolveSyncSettings, runSync, summaryLine, type SyncSettings } from "./qualify-sync.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "distributed-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -29,7 +30,7 @@ function machine(name: string, flags: readonly string[] = []): { root: string; c
   writeFakeClap(clap);
   mkdirSync(join(root, "lv2"), { recursive: true });
   const share = join(root, "share");
-  const args = parseSyncArgs([
+  const sp = splitPathFlags([
     "--clap-path", join(root, "clap"),
     "--lv2-path", join(root, "lv2"),
     "--lv2-extra", "",
@@ -43,8 +44,9 @@ function machine(name: string, flags: readonly string[] = []): { root: string; c
     "--distributed-dir", share,
     ...flags,
   ]);
+  const args = parseSyncArgs(sp.argv);
   if (!args.ok) throw new Error(args.error);
-  const r = resolveSyncSettings(new Map(), args.args, {}, root);
+  const r = resolveSyncSettings(new Map(), args.args, {}, root, undefined, undefined, sp.run);
   if (!r.ok) throw new Error(r.error);
   return { root, clap, settings: r.settings, share };
 }
@@ -88,14 +90,14 @@ describe("the host class", () => {
     expect(hostClassOfMachine("")).toBeUndefined();
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error("args");
-    const noBoard = (machine: string) => resolveSyncSettings(new Map(), args.args, {}, "/home/u", () => undefined, () => machine);
+    const noBoard = (machine: string) => resolveSyncSettings(new Map(), args.args, {}, "/home/u", () => undefined, () => machine, searchPathOf([], []));
     const x86 = noBoard("x86_64");
     const arm = noBoard("aarch64");
     if (!x86.ok || !arm.ok) throw new Error("settings");
     expect(x86.settings.hostClass).toBe("x86-64");
     expect(arm.settings.hostClass).toBeUndefined();
     // a board names itself first: a Pi is rpi5, whatever uname -m says
-    const pi = resolveSyncSettings(new Map(), args.args, {}, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0", () => "aarch64");
+    const pi = resolveSyncSettings(new Map(), args.args, {}, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0", () => "aarch64", searchPathOf([], []));
     if (!pi.ok) throw new Error("settings");
     expect(pi.settings.hostClass).toBe("rpi5");
   });
@@ -104,14 +106,14 @@ describe("the host class", () => {
     const sys = parseSyncArgs(["--system"]);
     const user = parseSyncArgs(["--host-class", "x86-desk"]);
     if (!sys.ok || !user.ok) throw new Error("args");
-    const s = resolveSyncSettings(new Map(), sys.args, {}, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0");
-    const u = resolveSyncSettings(new Map(), user.args, { XDG_DATA_HOME: "/d", XDG_DATA_DIRS: "/a:/b" }, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0");
+    const s = resolveSyncSettings(new Map(), sys.args, {}, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0", undefined, searchPathOf([], []));
+    const u = resolveSyncSettings(new Map(), user.args, { XDG_DATA_HOME: "/d", XDG_DATA_DIRS: "/a:/b" }, "/home/u", () => "Raspberry Pi 5 Model B Rev 1.0", undefined, searchPathOf([], []));
     if (!s.ok || !u.ok) throw new Error("settings");
     expect([s.settings.hostClass, s.settings.distributedDirs, s.settings.distributed]).toEqual(["rpi5", [DISTRIBUTED_DIR_SYSTEM], true]);
     expect([u.settings.hostClass, u.settings.distributedDirs]).toEqual(["x86-desk", ["/d/omx/qualification", "/a/omx/qualification", "/b/omx/qualification"]]);
     const plain = parseSyncArgs([]);
     if (!plain.ok) throw new Error("args");
-    const p = resolveSyncSettings(new Map(), plain.args, {}, "/home/u", () => undefined, () => "riscv64");
+    const p = resolveSyncSettings(new Map(), plain.args, {}, "/home/u", () => undefined, () => "riscv64", searchPathOf([], []));
     if (!p.ok) throw new Error("settings");
     expect([p.settings.hostClass, p.settings.distributedDirs]).toEqual([undefined, ["/home/u/.local/share/omx/qualification", "/usr/local/share/omx/qualification", "/usr/share/omx/qualification"]]);
     const off = parseSyncArgs(["--no-distributed"]);

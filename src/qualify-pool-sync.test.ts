@@ -17,9 +17,11 @@ import { parsePinLine } from "./pins-file.js";
 
 import type { QualificationRecord } from "./qualification-record.js";
 import { POOL_CODE, POOL_RESULT, POOL_STEP, type PoolRunFacts } from "./qualify-pool.js";
+import { PROBE_NOTES_CURVE_ENV } from "./qualify-declarations.js";
 import { parseSyncArgs, resolveSyncSettings, runSync, summaryLine } from "./qualify-sync.js";
 import { clapQualifyToolPath, rtInterposePath } from "./tool-paths.js";
 import { CLAP_NOTES, CLAP_RT, LV2_CLEAN, device, rejudge, removeDevices } from "./qualify-rejudge.support.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 afterAll(removeDevices);
 
@@ -144,16 +146,17 @@ describe("a sweep over CLAP plugins that ask for the pool and one that does not"
         "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
         "--grid-hosts", "--budget-s", "20", "--hostd-port", "0", "--hostd-feedback-port", "0",
       ];
-      const args = parseSyncArgs(flags);
+      const sp = splitPathFlags(flags);
+      const args = parseSyncArgs(sp.argv);
       if (!args.ok) throw new Error(args.error);
-      const r = resolveSyncSettings(new Map(), args.args, {}, root);
+      const r = resolveSyncSettings(new Map(), args.args, {}, root, undefined, undefined, sp.run);
       if (!r.ok) throw new Error(r.error);
       const asked: string[] = [];
       const poolRunner = (uri: string): PoolRunFacts => {
         asked.push(uri);
         return uri.includes("pool-synth.clap") ? FASTER : NOT_ASKED;
       };
-      const summary = await runSync(r.settings, { poolRunner, isolatedRunner: () => ALONE, env: { ...process.env, OMX_PROBE_RUNNER: RUNNER }, log: () => {} });
+      const summary = await runSync(r.settings, { poolRunner, isolatedRunner: () => ALONE, env: { ...process.env, OMX_PROBE_RUNNER: RUNNER, [PROBE_NOTES_CURVE_ENV]: "1" }, log: () => {} });
       expect(summary?.qualified).toBe(2);
       const pins = readFileSync(join(out, "qualified.pins"), "utf8").split("\n").map(parsePinLine).filter((p) => p !== undefined);
       expect(asked.length, JSON.stringify(asked)).toBe(2);

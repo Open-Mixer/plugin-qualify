@@ -16,6 +16,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 
+import { withRunHome } from "./run-home.js";
 import { ADAPTER_PASS_CELLS, startPrivateJack, type JackStarter } from "./qualify-adapter-pass.js";
 import type { GridCell } from "./measurement-grid.js";
 import { clapPinUri, type PinEntry } from "./pins-file.js";
@@ -197,7 +198,7 @@ export function spawnedIsolatedRunner(jack: JackStarter = startPrivateJack): Iso
         encoding: "utf8",
         timeout: ISOLATED_WINDOW_MS + ISOLATED_STEP_SLACK_MS,
         killSignal: "SIGKILL",
-        env: { ...env, JACK_DEFAULT_SERVER: server.name, [ISOLATED_SIGNAL_TOOL_ENV]: signal },
+        env: { ...withRunHome(env), JACK_DEFAULT_SERVER: server.name, [ISOLATED_SIGNAL_TOOL_ENV]: signal },
       });
       if (r.error !== undefined || r.status !== 0) return { started: false, problem: `isolated-step: ${r.error?.message ?? `exit ${String(r.status)}`}: ${(r.stderr ?? "").trim()}` };
       return JSON.parse(r.stdout) as IsolatedRunFacts;

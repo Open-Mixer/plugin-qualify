@@ -11,7 +11,7 @@
 # Verify:     node tools/gen-python-declarations.mjs --check
 
 COST_REFERENCE_RATE = 96000
-QUANTUM_FRAMES = 1024
+QUANTUM_FRAMES = 256
 MEASURE_BASE_RATE = 48000
 OPERATIONAL_RATE_FLOOR = 48000
 QUALIFY_RATES = (44100, 48000, 96000, 192000)
@@ -33,3 +33,4 @@ DESCRIPTOR_CODE_SCHEMA_MISSING = "qualify.descriptor.schema-missing"
 DESCRIPTOR_CODE_SCHEMA_FLOOR = "qualify.descriptor.schema-floor"
 DESCRIPTOR_CODE_BINARY_UNHASHED = "qualify.descriptor.binary-unhashed"
 DESCRIPTOR_CODE_DIR_UNWRITABLE = "qualify.descriptor.dir-unwritable"
+DESCRIPTOR_CODE_DUPLICATE_SYMBOL = "qualify.descriptor.duplicate-symbol"

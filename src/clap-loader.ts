@@ -17,6 +17,7 @@ import { type Dirent, existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { withRunHome } from "./run-home.js";
 import type { PluginLoader, PluginTarget } from "./loader.js";
 import { lv2BundlesOnPath, lv2Loader } from "./lv2-loader.js";
 import {
@@ -345,7 +346,7 @@ export interface ClapScanRunResult {
 export type ClapScanRun = (tool: string, args: readonly string[], timeoutMs: number) => ClapScanRunResult;
 
 const spawnScan: ClapScanRun = (tool, args, timeoutMs) => {
-  const r = spawnSync(tool, [...args], { encoding: "utf8", timeout: timeoutMs, maxBuffer: MAX_SCAN_BYTES });
+  const r = spawnSync(tool, [...args], { encoding: "utf8", timeout: timeoutMs, maxBuffer: MAX_SCAN_BYTES, env: withRunHome(process.env) });
   return { status: r.status, stdout: r.stdout ?? "", ...(r.error === undefined ? {} : { error: r.error }) };
 };
 

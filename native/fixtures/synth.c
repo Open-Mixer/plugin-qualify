@@ -24,6 +24,9 @@
  *                          It also has a stepped parameter (a mode, 0 to 3) and aborts on a value between two
  *                          steps, which no host sends.
  *
+ *   synth-sweep.clap       built with -DFIXTURE_SWEEP_COST, the safe one, which burns a large fixed load per sample
+ *                          whenever its gain is anything but its default 1.0: costly under the parameter sweep, cheap
+ *                          at its defaults.
  *   synth-attack.clap      built with -DFIXTURE_ATTACK_MS=50, and synth-delay.clap with -DFIXTURE_DELAY_FRAMES=64: see
  *                          voice_sample.
  *   synth-voice-memory.clap  built with -DFIXTURE_VOICE_MB=4, the safe one taking that many MiB for each note struck,
@@ -62,6 +65,10 @@ static void (*volatile fixture_free)(void *) = free;
 #elif defined FIXTURE_DRUM
 #define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.synth-drum"
 #define FIXTURE_NAME "synth answering only some keys"
+#elif defined FIXTURE_SWEEP_COST
+#define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.synth-sweep"
+#define FIXTURE_NAME "synth costly off its default gain"
+static volatile double fixture_sink;
 #elif defined FIXTURE_VOICE_CAPACITY
 #define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.synth-voices"
 #define FIXTURE_NAME "synth declaring its voices"
@@ -262,6 +269,13 @@ static clap_process_status synth_process(const clap_plugin_t *p, const clap_proc
         if (--s->voice[v].left <= 0) s->voice[v].key = -1;
 #endif
       }
+#ifdef FIXTURE_SWEEP_COST
+    if (fabs(s->gain - 1.0) > 1e-3) {
+      double x = 1.0;
+      for (int j = 0; j < 4000; j++) x = x * 1.0000001 + 1e-9;
+      fixture_sink = x;
+    }
+#endif
     for (uint32_t c = 0; c < out->channel_count; c++) {
       double in = 0.0;
       if (proc->audio_inputs_count > 0 && c < proc->audio_inputs[0].channel_count) in = proc->audio_inputs[0].data32[c][i];

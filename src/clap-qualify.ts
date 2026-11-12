@@ -79,6 +79,18 @@ export interface ClapCostFigure {
   readonly voices?: VoicesHeld;
   /** What these blocks were timed under. */
   readonly scheduling?: TimingScheduling;
+  /**
+   * For an instrument: its cost at each count of notes held with every parameter at its default (`--curve`), the
+   * rate's voiceCurve that plugin-hostd's runner carries into probe output 1.4; an entry it could not time has a reason.
+   */
+  readonly voiceCurve?: readonly ClapVoiceCurveEntry[];
+}
+
+export interface ClapVoiceCurveEntry {
+  readonly held: number;
+  readonly nsPerSampleMedian?: number;
+  readonly nsPerSampleP95?: number;
+  readonly unmeasuredReason?: string;
 }
 
 /** One rate the cost arm did not time, and why; an instrument's declared capacity is kept when it has one. */
@@ -281,7 +293,20 @@ function readCostAtRate(v: unknown, where: string, notes: boolean): ClapCostAtRa
       ? {}
       : { voices: { held: voices.held, basis: voices.basis, ...(voices.capacity === undefined ? {} : { capacity: voices.capacity }) } }),
     ...(scheduling === undefined ? {} : { scheduling }),
+    ...(v["voiceCurve"] === undefined ? {} : { voiceCurve: readVoiceCurve(v["voiceCurve"], `${where} voiceCurve`) }),
   };
+}
+
+function readVoiceCurve(v: unknown, where: string): ClapVoiceCurveEntry[] {
+  if (!Array.isArray(v)) return bad(`${where} is not a list`);
+  return v.map((e: unknown, i: number) => {
+    const at = `${where} entry ${i}`;
+    if (!isRecord(e)) return bad(`${at} is not an object`);
+    const held = count(e, "held", at);
+    if (held === 0) return bad(`${at} holds no note`);
+    if (e["unmeasuredReason"] !== undefined) return { held, unmeasuredReason: str(e, "unmeasuredReason", at) };
+    return { held, nsPerSampleMedian: figure(e, "nsPerSampleMedian", at), nsPerSampleP95: figure(e, "nsPerSampleP95", at) };
+  });
 }
 
 function readCost(v: unknown): ClapCostReading {

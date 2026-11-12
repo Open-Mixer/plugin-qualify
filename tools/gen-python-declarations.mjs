@@ -49,6 +49,7 @@ const PY_NAMES = [
   'DESCRIPTOR_CODE_SCHEMA_FLOOR',
   'DESCRIPTOR_CODE_BINARY_UNHASHED',
   'DESCRIPTOR_CODE_DIR_UNWRITABLE',
+  'DESCRIPTOR_CODE_DUPLICATE_SYMBOL',
 ];
 
 /** A Python literal: a tuple, a string (JSON's quoting is Python's for these ASCII words) or a number. */

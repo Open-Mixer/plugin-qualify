@@ -23,9 +23,11 @@ import { createConnection } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
+import { withRunHome } from "./run-home.js";
 import { clapQualifyTools } from "./clap-qualify.js";
 import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOfBoard, hostClassOfMachine, outcomeOfVerdict, matchDistributed, readBoardModel, readMachine, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
-import { clapSearchPath, parseClapScan } from "./clap-loader.js";
+import { parseClapScan } from "./clap-loader.js";
+import { SPAWNED_SEARCH_PATH, hostdSearchPath, searchPathWarnings, type SearchPathRun } from "./hostd-search-path.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
 import { NO_JACK_SERVER } from "./host-admission.js";
@@ -50,12 +52,6 @@ import { writeFileWhole } from "./whole-file.js";
 /** The settings file a system service reads, `key value` per line. */
 export const SYNC_CONF = "/etc/omx/qualify.conf";
 
-/** The LV2 directories plugin-hostd searches when `LV2_PATH` is unset (its `lv2_path` default). */
-export const HOSTD_LV2_PATH = ["/usr/lib64/lv2", "/usr/lib/lv2", "/usr/local/lib/lv2"];
-
-/** Zynthian's own LV2 directories: the image's plugins and the ones its user installs. */
-export const ZYNTHIAN_LV2_DIRS = ["/zynthian/zynthian-plugins/lv2", "/zynthian/zynthian-my-data/plugins/lv2"];
-
 export interface SyncSetting {
   readonly key: string;
   readonly meaning: string;
@@ -65,10 +61,7 @@ export interface SyncSetting {
 
 /** Every setting, declared once: the settings file, the flags (`--pin-file` for `pin_file`) and `--help` read this. */
 export const SYNC_SETTINGS: readonly SyncSetting[] = [
-  { key: "lv2_path", meaning: "the LV2 directories, colon-separated, in the order plugin-hostd searches them", default: "$LV2_PATH, else " + HOSTD_LV2_PATH.join(":") },
-  { key: "lv2_extra", meaning: "more LV2 directories, searched after lv2_path", default: ZYNTHIAN_LV2_DIRS.join(":") },
-  { key: "clap_path", meaning: "the CLAP directories, colon-separated", default: "$CLAP_PATH, then ~/.clap, then /usr/lib/clap" },
-  { key: "clap_extra", meaning: "more CLAP directories, searched after clap_path", default: "" },
+  { key: "hostd_conf", meaning: "plugin-hostd's settings file: the LV2 and CLAP directories scanned are the ones plugin-hostd --search-path -c <file> prints", default: "plugin-hostd's own (its XDG_CONFIG_HOME/plugin-hostd.conf, else ~/.config/plugin-hostd.conf)" },
   { key: "pin_file", meaning: "the pin file plugin-hostd loads as pin_file", default: "/var/lib/omx/qualified.pins (system), else $XDG_STATE_HOME/omx/qualified.pins" },
   { key: "qualification_dir", meaning: "where the qualification records go", default: "/var/lib/omx/qualification (system), else $XDG_STATE_HOME/omx/qualification" },
   { key: "descriptor_dir", meaning: "where the scanned descriptors go", default: `${DESCRIPTOR_DIR_SYSTEM} (system), else $XDG_STATE_HOME/${DESCRIPTOR_DIR_STATE_SUBDIR}` },
@@ -86,8 +79,16 @@ export const SYNC_SETTINGS: readonly SyncSetting[] = [
   { key: "distributed_dir", meaning: "the directories of distributed records, colon-separated, each holding <host class>/<set>/", default: `${DISTRIBUTED_DIR_SYSTEM} (system), else $XDG_DATA_HOME/omx/qualification and each $XDG_DATA_DIRS/omx/qualification` },
 ];
 
+/** The search path settings that moved to plugin-hostd's settings file (plugin-qualify#9): refused here, with where they went. */
+export const MOVED_TO_HOSTD = ["lv2_path", "lv2_extra", "clap_path", "clap_extra"] as const;
+
+const movedText = (key: string): string =>
+  `${key} is plugin-hostd's setting now: write it in plugin-hostd's settings file (plugin-hostd.conf, named here by hostd_conf); the directories scanned are the ones plugin-hostd --search-path prints${key === "clap_extra" ? " (plugin-hostd has no clap_extra: add the directories to clap_path)" : ""}`;
+
 export interface SyncSettings {
+  /** The LV2 directories, as plugin-hostd searches them with hostd_conf (plugin-hostd --search-path). */
   readonly lv2Dirs: readonly string[];
+  /** The CLAP directories, as plugin-hostd searches them with hostd_conf. */
   readonly clapDirs: readonly string[];
   readonly pinFile: string;
   readonly qualificationDir: string;
@@ -122,6 +123,7 @@ export function parseSyncConf(text: string, source = SYNC_CONF): { ok: true; val
     if (line === "") continue;
     const m = /^(\S+)(?:\s+(.*))?$/.exec(line)!;
     const key = m[1]!;
+    if ((MOVED_TO_HOSTD as readonly string[]).includes(key)) return { ok: false, error: `${source}:${String(n + 1)}: ${movedText(key)}` };
     if (!known.has(key)) return { ok: false, error: `${source}:${String(n + 1)}: ${key} is not a setting` };
     values.set(key, (m[2] ?? "").trim());
   }
@@ -187,7 +189,8 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
       if (v === undefined) return { ok: false, error: `${a} needs a value` };
       if (a === "--config") config = v;
       else values.set(byFlag.get(a)!, v);
-    } else return { ok: false, error: `unknown argument ${a}` };
+    } else if (MOVED_TO_HOSTD.some((k) => flagOf(k) === a)) return { ok: false, error: `${a}: ${movedText(a.slice(2).replace(/-/g, "_"))}` };
+    else return { ok: false, error: `unknown argument ${a}` };
   }
   if (rejudge && (memoryOnly || adapterOnly || isolatedOnly || poolOnly || force || refreshPinsOnly)) return { ok: false, error: "--rejudge measures nothing: it goes with none of --memory-only, --adapter-only, --isolated-only, --pool-only, --force and --refresh-pins" };
   if ([memoryOnly, adapterOnly, isolatedOnly, poolOnly, refreshPinsOnly].filter(Boolean).length > 1) return { ok: false, error: "--memory-only, --adapter-only, --isolated-only, --pool-only and --refresh-pins are different runs: one at a time" };
@@ -230,17 +233,18 @@ export function resolveSyncSettings(
   home: string = homedir(),
   boardModel: () => string | undefined = readBoardModel,
   machineArch: () => string | undefined = readMachine,
-): { ok: true; settings: SyncSettings } | { ok: false; error: string } {
+  searchPathRun: SearchPathRun = SPAWNED_SEARCH_PATH,
+): { ok: true; settings: SyncSettings; warnings: string[] } | { ok: false; error: string } {
   const get = (key: string): string | undefined => args.values.get(key) ?? file.get(key);
   const state = env["XDG_STATE_HOME"] !== undefined && env["XDG_STATE_HOME"] !== "" ? env["XDG_STATE_HOME"] : join(home, ".local", "state");
   const place = (key: string, system: string, user: string): string => {
     const v = get(key);
     return v !== undefined && v !== "" ? v : args.system ? system : join(state, user);
   };
-  const lv2Named = get("lv2_path");
-  const lv2Base = lv2Named !== undefined && lv2Named !== "" ? dirList(lv2Named) : dirList(env["LV2_PATH"] ?? "").length > 0 ? dirList(env["LV2_PATH"]!) : HOSTD_LV2_PATH;
-  const clapNamed = get("clap_path");
-  const clapBase = clapNamed !== undefined && clapNamed !== "" ? dirList(clapNamed) : clapSearchPath(env, home);
+  const hostdConfNamed = get("hostd_conf");
+  const hostdConf = hostdConfNamed !== undefined && hostdConfNamed !== "" ? hostdConfNamed : undefined;
+  const search = hostdSearchPath(hostdConf, env, searchPathRun);
+  if (!search.ok) return { ok: false, error: `the directories to scan: ${search.error}` };
   const number = (key: string, min: number): number | undefined => {
     const v = Number(get(key) ?? SYNC_SETTINGS.find((s) => s.key === key)!.default);
     return Number.isFinite(v) && v >= min ? v : undefined;
@@ -282,9 +286,10 @@ export function resolveSyncSettings(
   if (hostClass !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(hostClass)) return { ok: false, error: `host_class ${hostClass} is not a directory name` };
   return {
     ok: true,
+    warnings: searchPathWarnings(search.path, hostdConf),
     settings: {
-      lv2Dirs: once([...lv2Base, ...dirList(get("lv2_extra") ?? ZYNTHIAN_LV2_DIRS.join(":"))]),
-      clapDirs: once([...clapBase, ...dirList(get("clap_extra") ?? "")]),
+      lv2Dirs: once(search.path.lv2),
+      clapDirs: once(search.path.clap),
       pinFile: place("pin_file", "/var/lib/omx/qualified.pins", join("omx", "qualified.pins")),
       qualificationDir: place("qualification_dir", "/var/lib/omx/qualification", join("omx", "qualification")),
       descriptorDir: place("descriptor_dir", DESCRIPTOR_DIR_SYSTEM, DESCRIPTOR_DIR_STATE_SUBDIR),
@@ -861,7 +866,7 @@ function qualifyClap(ctx: SyncContext, item: SyncItem): SyncPlugin[] {
     return [{ uri: fileUri, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: (e as Error).message }];
   }
   // the scanner lists the plugins of the file in a child of its own, and says how that child ended
-  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20 });
+  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20, env: withRunHome(process.env) });
   let scanned;
   try {
     if (r.error !== undefined) throw r.error;
@@ -1095,7 +1100,7 @@ function scanClapDescriptors(ctx: SyncContext, item: SyncItem): void {
     ctx.log(`${file}: descriptors not written: ${(e as Error).message}`);
     return;
   }
-  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20 });
+  const r = spawnSync(tool, ["--json", file], { encoding: "utf8", timeout: Math.max(ctx.settings.budgetS, 35) * 1000, killSignal: "SIGKILL", maxBuffer: 64 << 20, env: withRunHome(process.env) });
   if (r.error !== undefined || r.status !== 0) {
     ctx.log(`${file}: descriptors not written: the scan ended ${r.error?.message ?? `with exit ${String(r.status)}`}`);
     return;

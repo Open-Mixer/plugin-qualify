@@ -13,6 +13,7 @@ import { parsePinLine } from "./pins-file.js";
 import { sha256Hex } from "./probe-output.js";
 import type { QualificationRecord } from "./qualification-record.js";
 import { SYNC_STATE_SCHEMA, parseSyncArgs, resolveSyncSettings, runSync, type SyncEntry, type SyncPlugin, type SyncSettings, type SyncState } from "./qualify-sync.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 export const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "records-0.16.1");
 export const CLAP_RT = "in.lsp-plug.impulse_responses_mono@unversioned-d5235d2f5f53.custom";
@@ -78,15 +79,12 @@ export function device(stems: readonly string[], options: { patch?: (r: Qualific
     ["state_file", stateFile],
     ["pin_file", join(root, "qualified.pins")],
     ["descriptor_dir", join(root, "descriptors")],
-    ["lv2_path", join(root, "none")],
-    ["lv2_extra", ""],
-    ["clap_path", join(root, "none")],
     ["hostd_port", "0"],
     ["budget_s", "17"],
     ["memory_limit", "2G"],
     ...(options.host === undefined ? [] : [["host_profile", options.host] as [string, string]]),
   ]);
-  const r = resolveSyncSettings(conf, args.args, {}, scratch);
+  const r = resolveSyncSettings(conf, args.args, {}, scratch, undefined, undefined, searchPathOf([join(root, "none")], [join(root, "none")]));
   if (!r.ok) throw new Error(r.error);
   return {
     settings: r.settings,
