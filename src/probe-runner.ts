@@ -12,7 +12,7 @@
  * unavailable, an output that could not be written), 3 is no such plugin.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { availableParallelism, loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -30,6 +30,10 @@ import type { MemoryBound } from "./memory-bound.js";
 import { mergeProbeRuns, ProbeMergeError } from "./probe-merge.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
 import {
+  MEMORY_PASS_PROBE_NOTES,
+  PROBE_NOTES_CURVE,
+  PROBE_NOTES_CURVE_ENV,
+  PROBE_NOTES_ENV,
   CLAP_QUALIFY_TIMEOUT_S,
   CLAP_SWEEP_BLOCKS,
   CLAP_SWEEP_FRAMES,
@@ -182,7 +186,11 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
   const log = join(work, "child.stderr.log");
   try {
     let args: string[];
-    let runEnv: Record<string, string | undefined> = { ...env };
+    // a HOME of the run's own, under its scratch directory: a plugin that reads its user data from HOME (Surge XT) dies
+    // or stays silent without one, and a probe must never write into the caller's real home
+    const home = join(work, "home");
+    mkdirSync(home);
+    let runEnv: Record<string, string | undefined> = { ...env, HOME: home };
     let expectedId: string;
     const wall = options.wallS === undefined ? {} : { wallS: options.wallS };
     const bound = options.memory === undefined ? {} : { dataBytes: options.memory.bytes };
@@ -196,7 +204,7 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
         target.binaryPath,
         expectedId,
       );
-      runEnv = { ...env, LD_PRELOAD: interposer };
+      runEnv = { ...runEnv, LD_PRELOAD: interposer, [PROBE_NOTES_CURVE_ENV]: env[PROBE_NOTES_CURVE_ENV] ?? PROBE_NOTES_CURVE.join(",") };
     } else {
       expectedId = target.uri;
       const child = locateNativeTool(LV2_MEASURE_TOOL_NAME, env, options.exists ?? existsSync).path;
@@ -204,6 +212,14 @@ function runOne(target: PluginTarget, options: ProbeTargetOptions, invocation: R
         { ...at, ...wall, out, log, ...(child === undefined ? {} : { child }) },
         target.uri,
       );
+      // an instrument that declares no voice capacity is played with this many notes held, so its cost and its memory
+      // under notes are measured, not left voices-unknown; a count the caller set wins
+      runEnv = {
+        ...runEnv,
+        [PROBE_NOTES_ENV]: env[PROBE_NOTES_ENV] ?? String(MEMORY_PASS_PROBE_NOTES),
+        // and timed at each count of the curve, the cost against the notes held
+        [PROBE_NOTES_CURVE_ENV]: env[PROBE_NOTES_CURVE_ENV] ?? PROBE_NOTES_CURVE.join(","),
+      };
     }
     // under a bound, the interposer ends the child the moment an allocation is refused, with the status that names it
     if (options.memory !== undefined) runEnv = { ...runEnv, [MEMORY_BOUND_EXIT_ENV]: "1" };

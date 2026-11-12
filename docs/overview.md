@@ -266,8 +266,17 @@ way the CLAP prober does: the declared figure is what the plugin reports on its 
 (`lv2:designation lv2:latency`, or the older `lv2:reportsLatency`; 0 when it has none), the measured one is where an
 impulse at frame 0 lands (the first frame at or above 1e-3 of the response's own peak), or, for an instrument, where a
 struck A4 sounds. A plugin that has no latency port is measured, never read as 0. An instrument's cost holds
-`OMX_PROBE_NOTES` keys down (the LV2 counterpart of `--probe-notes`). A figure the run could not take (a response that
-stays silent, an instrument with no count to hold) is left out of the grid point and named in
+`OMX_PROBE_NOTES` keys down (the LV2 counterpart of `--probe-notes`), `MEMORY_PASS_PROBE_NOTES` (16) unless the caller
+set a count: the reference count of the instrument packs and of the Pi measurements. It is also timed at each count of
+`PROBE_NOTES_CURVE` (1, 8, 16, 32, 48 and 64 notes, `OMX_PROBE_NOTES_CURVE`), the counts the Pi measurements held Surge
+XT at (openmixer.org/notes/instruments-on-a-pi-5): the rate's `cost.voiceCurve`, one `{ held, median, percentile }` per
+count, shows the cost against the notes held, and a voice limit as the count past which it stops growing.
+
+An instrument gets 1 s of silence after `activate` before its first note, in the latency and the cost passes: one that
+builds its sound on a thread of its own (Yoshimi) ignores a note sent sooner. Its note is read for 0.5 s, or 8192 frames
+when that is longer. An instrument whose held notes never make a sound is not timed as playing: its cost reads
+`silent-output`, as a sampler or a sound-font player with nothing loaded does. A figure the run could not take (a
+response that stays silent, an instrument with no count to hold) is left out of the grid point and named in
 `measurements.unmeasured` with its hosting code (`hosting.latency.unmeasured`,
 `hosting.cost.unmeasured-at-rate-and-quantum`).
 

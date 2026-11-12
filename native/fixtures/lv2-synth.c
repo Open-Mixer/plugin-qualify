@@ -11,6 +11,14 @@
  *                    scratch buffer on every note on: quiet and clean until it is played, the known
  *                    RT-unsafe instrument.
  *   synth-attack.lv2 built with -DFIXTURE_ATTACK_MS=50, and synth-delay.lv2 with -DFIXTURE_DELAY_FRAMES=64: see voice_sample.
+ *   synth-input.lv2  built with -DFIXTURE_INPUT, the same with an audio input it never reads (index 4), as an
+ *                    instrument with an audio-in oscillator or a vocoder input (Surge XT) has: still lv2:InstrumentPlugin.
+ *   synth-thru.lv2   built with -DFIXTURE_INPUT_THRU, an instrument with an audio input (index 4) that plays no note
+ *                    and copies its input to its outputs: silent under notes, loud under noise on its input.
+ *   synth-sweep.lv2  built with -DFIXTURE_SWEEP_COST, the same, which burns a large fixed load per sample whenever its
+ *                    gain is anything but its default 1.0: costly under a parameter sweep, cheap at its defaults.
+ *   synth-late.lv2   built with -DFIXTURE_LATE_MS=300, the same, which ignores every note for its first 300 ms after
+ *                    activate, as an instrument that builds its sound on a thread of its own (Yoshimi) does.
  *
  * Nothing else differs but the URI, so a verdict that tells them apart is what the note sweep counted.
  */
@@ -35,6 +43,15 @@ static void (*volatile fixture_free)(void *) = free;
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-attack"
 #elif defined FIXTURE_DELAY_FRAMES
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-delay"
+#elif defined FIXTURE_LATE_MS
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-late"
+#elif defined FIXTURE_INPUT
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-input"
+#elif defined FIXTURE_INPUT_THRU
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-thru"
+#elif defined FIXTURE_SWEEP_COST
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-sweep"
+static volatile double fixture_sink;
 #else
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth"
 #endif
@@ -89,8 +106,10 @@ struct synth {
   const LV2_Atom_Sequence *midi;
   float *out[2];
   const float *gain;
+  const float *in; /* FIXTURE_INPUT_THRU's audio input */
   LV2_URID midi_event;
   double rate;
+  long since_activate; /* frames run since activate */
   struct voice voice[VOICES];
 };
 
@@ -115,6 +134,7 @@ static void connect_port(LV2_Handle h, uint32_t port, void *data) {
   case PORT_OUT_L: s->out[0] = data; break;
   case PORT_OUT_R: s->out[1] = data; break;
   case PORT_GAIN: s->gain = data; break;
+  case 4: s->in = data; break;
   default: break;
   }
 }
@@ -122,9 +142,17 @@ static void connect_port(LV2_Handle h, uint32_t port, void *data) {
 static void activate(LV2_Handle h) {
   struct synth *s = h;
   for (int v = 0; v < VOICES; v++) s->voice[v].key = -1;
+  s->since_activate = 0;
 }
 
 static void note_on(struct synth *s, int key) {
+#ifdef FIXTURE_INPUT_THRU
+  (void)s; (void)key;
+  return;
+#endif
+#ifdef FIXTURE_LATE_MS
+  if (s->since_activate < (long)(s->rate * FIXTURE_LATE_MS / 1000.0)) return;
+#endif
 #ifdef FIXTURE_DRUM
   if (key < FIXTURE_DRUM_LOW || key > FIXTURE_DRUM_HIGH) return;
 #endif
@@ -160,6 +188,13 @@ static void midi_message(struct synth *s, const uint8_t *m, uint32_t size) {
 static void render(struct synth *s, uint32_t from, uint32_t to) {
   const float k = s->gain ? *s->gain : 1.0f;
   for (uint32_t i = from; i < to; i++) {
+#ifdef FIXTURE_SWEEP_COST
+    if (fabsf(k - 1.0f) > 1e-3f) {
+      double x = 1.0;
+      for (int j = 0; j < 4000; j++) x = x * 1.0000001 + 1e-9;
+      fixture_sink = x;
+    }
+#endif
     double y = 0.0;
     for (int v = 0; v < VOICES; v++)
       if (s->voice[v].key >= 0) {
@@ -169,6 +204,9 @@ static void render(struct synth *s, uint32_t from, uint32_t to) {
 #endif
       }
     s->out[0][i] = s->out[1][i] = (float)y * k;
+#ifdef FIXTURE_INPUT_THRU
+    if (s->in) s->out[0][i] = s->out[1][i] = s->in[i];
+#endif
   }
 }
 
@@ -186,6 +224,7 @@ static void run(LV2_Handle h, uint32_t frames) {
     }
   }
   render(s, done, frames);
+  s->since_activate += frames;
 }
 
 static void deactivate(LV2_Handle h) { (void)h; }

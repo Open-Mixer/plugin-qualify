@@ -63,6 +63,14 @@ export interface ProbeCost {
   readonly warmupBlocks: number;
   /** For an instrument: the notes it held while it was timed, how many and why that many. */
   readonly voices?: VoicesHeld;
+  /** For an instrument: its cost at each count of notes held (probe output 1.4), in the cost's own unit. */
+  readonly voiceCurve?: readonly VoiceCurvePoint[];
+}
+
+export interface VoiceCurvePoint {
+  readonly held: number;
+  readonly median: number;
+  readonly percentile: { readonly p: number; readonly value: number };
 }
 
 export interface ProbeRtSafety {
@@ -255,13 +263,28 @@ function readCost(v: unknown, where: string): ProbeCost {
   if (median < 0 || value < 0) invalid(`${where} holds a negative cost`);
   const voices = o["voices"] === undefined ? undefined : readVoicesHeld(o["voices"]);
   if (o["voices"] !== undefined && voices === undefined) invalid(`${where} voices is not a count of held notes with its basis`);
+  const voiceCurve = o["voiceCurve"] === undefined ? undefined : readVoiceCurve(o["voiceCurve"], `${where} voiceCurve`);
   return {
     median,
     percentile: { p, value },
     blocks: posInt(o, "blocks", where),
     warmupBlocks: count(o, "warmupBlocks", where),
     ...(voices === undefined ? {} : { voices }),
+    ...(voiceCurve === undefined ? {} : { voiceCurve }),
   };
+}
+
+function readVoiceCurve(v: unknown, where: string): VoiceCurvePoint[] {
+  if (!Array.isArray(v)) invalid(`${where} is not a list`);
+  return (v as unknown[]).map((e, i) => {
+    const at = `${where} entry ${i}`;
+    const o = record(e, at);
+    const pct = record(o["percentile"], `${at} percentile`);
+    const median = num(o, "median", at);
+    const value = num(pct, "value", `${at} percentile`);
+    if (median < 0 || value < 0) invalid(`${at} holds a negative cost`);
+    return { held: posInt(o, "held", at), median, percentile: { p: num(pct, "p", `${at} percentile`), value } };
+  });
 }
 
 function readRtSafety(v: unknown, where: string): ProbeRtSafety {

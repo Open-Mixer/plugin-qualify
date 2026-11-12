@@ -181,12 +181,21 @@ export const MEMORY_BOUND_EXIT_STATUS = 121;
 /**
  * The memory-only pass (`plugin-qualify-sync --memory-only`). With `PROBE_MEMORY_ONLY_ENV` set the probers take the
  * footprint and nothing else; the probe runner passes its environment on, so its limits hold unchanged.
- * `PROBE_NOTES_ENV` is the count of notes an instrument that declares no voice capacity holds, basis `probe`:
+ * `PROBE_NOTES_ENV` is the count of notes an instrument that declares no voice capacity holds, basis `probe`, in every
+ * LV2 run (probe-runner) and in the memory-only pass:
  * `MEMORY_PASS_PROBE_NOTES` unless `memory_notes` says otherwise.
  */
 export const PROBE_MEMORY_ONLY_ENV = "OMX_PROBE_MEMORY_ONLY";
 export const PROBE_NOTES_ENV = "OMX_PROBE_NOTES";
 export const MEMORY_PASS_PROBE_NOTES = 16;
+
+/**
+ * The counts of notes an LV2 instrument is timed at, besides its probe count, for its cost against the notes held
+ * (the rate's `voiceCurve`, probe output 1.4): the counts the Pi measurements held Surge XT at
+ * (openmixer.org/notes/instruments-on-a-pi-5), so a voice limit shows as the count past which the cost stops growing.
+ */
+export const PROBE_NOTES_CURVE_ENV = "OMX_PROBE_NOTES_CURVE";
+export const PROBE_NOTES_CURVE = [1, 8, 16, 32, 48, 64] as const;
 
 /**
  * What `tools/mod-host-admit.mjs` is told in an adapter-only pass: how long the host has for one command, its address
