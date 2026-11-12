@@ -35,6 +35,7 @@ import { iriPath, lv2BundlesOnPath, manifestPlugins } from "./lv2-loader.js";
 import { judgmentPinEntries, pinClearLine, pinLineUri, pinsFile, type PinEntry } from "./pins-file.js";
 import { POOL_RESULT, completePool, judgePoolRun, pinAfterPool, pinFromRecordWithPool, poolEnv, spawnedPoolRunner, type PoolRunner } from "./qualify-pool.js";
 import { hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
+import { localeOf, reasonText } from "./text-catalog.js";
 import type { Judgment } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
 import { GRID_FULL, hostCells, parseGridSpec, type GridCell, type GridSpec } from "./measurement-grid.js";
@@ -670,7 +671,7 @@ function withHostdFiles(ctx: SyncContext, pin: PinEntry | undefined): PinEntry |
   if (pin === undefined || pin.integrity.files === undefined) return pin;
   const r = hostdPinFiles(pin.uri, ctx.settings.lv2Dirs, ctx.env, ...(ctx.pinFilesRun === undefined ? [] : [ctx.pinFilesRun]));
   if (!r.ok) {
-    ctx.log(`${pin.uri}: not pinned: ${r.detail}`);
+    ctx.log(`${pin.uri}: not pinned: ${reasonText(r.detail, localeOf(ctx.env))}`);
     return undefined;
   }
   return { ...pin, integrity: { ...pin.integrity, files: r.files } };
@@ -693,7 +694,7 @@ export function refreshPins(ctx: SyncContext, state: SyncState): { state: SyncSt
       if (pin === undefined || pin.integrity.files === undefined) return plugin;
       const r = hostdPinFiles(pin.uri, ctx.settings.lv2Dirs, ctx.env, ...(ctx.pinFilesRun === undefined ? [] : [ctx.pinFilesRun]));
       if (!r.ok) {
-        ctx.log(`${pin.uri}: pin files not refreshed: ${r.detail}`);
+        ctx.log(`${pin.uri}: pin files not refreshed: ${reasonText(r.detail, localeOf(ctx.env))}`);
         return plugin;
       }
       const old = new Map(pin.integrity.files.map((f) => [f.path, f.sha256]));
