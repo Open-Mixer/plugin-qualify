@@ -20,6 +20,7 @@ import { type ClapDescriptorParam, type ClapDescriptorRow, clapScanDescriptors, 
 import {
   DESCRIPTOR_CODE_BINARY_UNHASHED,
   DESCRIPTOR_CODE_DIR_UNWRITABLE,
+  DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
   DESCRIPTOR_CODE_SCHEMA,
   DESCRIPTOR_CODE_SCHEMA_MISSING,
   DESCRIPTOR_DIR_KEY,
@@ -250,7 +251,13 @@ describe("the guide (docs/overview.md) states the directory, its key and the nam
     expect(readme).toContain(`\`$XDG_STATE_HOME/${DESCRIPTOR_DIR_STATE_SUBDIR}\`, else \`~/.local/state/${DESCRIPTOR_DIR_STATE_SUBDIR}\``);
     expect(readme).toContain(`\`${DESCRIPTOR_DIR_SYSTEM}\``);
     expect(readme).toContain(`\`<id>@<version>-<sha256 first ${DESCRIPTOR_HASH_PREFIX}>.json\``);
-    for (const code of [DESCRIPTOR_CODE_SCHEMA, DESCRIPTOR_CODE_BINARY_UNHASHED, DESCRIPTOR_CODE_DIR_UNWRITABLE, DESCRIPTOR_CODE_SCHEMA_MISSING]) {
+    for (const code of [
+      DESCRIPTOR_CODE_SCHEMA,
+      DESCRIPTOR_CODE_BINARY_UNHASHED,
+      DESCRIPTOR_CODE_DIR_UNWRITABLE,
+      DESCRIPTOR_CODE_SCHEMA_MISSING,
+      DESCRIPTOR_CODE_DUPLICATE_SYMBOL,
+    ]) {
       expect(readme).toContain(`\`${code}\``);
     }
     expect(readme).toContain(`\`${DESCRIPTOR_SCHEMA_INSTALLED}\``);

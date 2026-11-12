@@ -12,7 +12,7 @@
 #                            build/fixtures/{requires-voice-info,requires-timer,requires-thread-pool}.clap,
 #                            build/fixtures/fail-alloc.so, build/fixtures-faulty/hogs-memory.clap (apart, as the faulty ones),
 #                            build/fixtures-faulty/synth-voice-memory.clap (apart, its memory fails any budget),
-#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-input,synth-thru,synth-sweep,latency,activate-reads,needs-display,abi-breaker}.lv2,
+#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-input,synth-thru,synth-sweep,latency,activate-reads,needs-display,abi-breaker,eq10q}.lv2,
 #                            build/fixtures-faulty/lv2/{leaks,large-activate}.lv2 (apart, as the faulty ones)
 #   build/lv2_measure_options_test    the measurer's feature options oracle
 #   build/lv2_measure_path_test       the oracle of the LV2 search path made absolute before lilv reads it
@@ -115,6 +115,7 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures/lv2/synth.lv2/synth.so $(BUILD)/fixtures/lv2/synth-alloc.lv2/synth.so $(BUILD)/fixtures/lv2/synth-drum.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/latency.lv2/latency.so $(BUILD)/fixtures/lv2/spaced.lv2/manifest.ttl \
+	$(BUILD)/fixtures/lv2/eq10q.lv2/eq10q.so \
 	$(BUILD)/fixtures-faulty/synth-voice-memory.clap \
 	$(BUILD)/fixtures-faulty/lv2/leaks.lv2/gain.so $(BUILD)/fixtures-faulty/lv2/large-activate.lv2/gain.so
 
@@ -378,6 +379,13 @@ $(BUILD)/fixtures/lv2/latency.lv2/latency.so: fixtures/lv2-latency.c fixtures/la
 	mkdir -p $(@D)
 	cp fixtures/latency.lv2/manifest.ttl fixtures/latency.lv2/latency.ttl $(@D)/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# two EQ10Q-shaped fixtures (plugin-qualify#27): a toggle named "bypass" with no formal designation, and two
+# output control ports a TTL names the same symbol
+$(BUILD)/fixtures/lv2/eq10q.lv2/eq10q.so: fixtures/lv2-eq10q.c fixtures/eq10q.lv2/manifest.ttl fixtures/eq10q.lv2/eq10q.ttl
+	mkdir -p $(@D)
+	cp fixtures/eq10q.lv2/manifest.ttl fixtures/eq10q.lv2/eq10q.ttl $(@D)/
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
 
 # five plugins, each demanding one thing of the measuring host: options, a worker, patch:Set, a
 # bounded sweep, a stdout of its own
