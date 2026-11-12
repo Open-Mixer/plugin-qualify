@@ -17,7 +17,7 @@ BuildRequires: npm
 BuildRequires: gcc
 BuildRequires: make
 BuildRequires: pkgconfig
-BuildRequires: (pkgconfig(clap) >= 1.2.7 with pkgconfig(clap) < 2)
+BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
 BuildRequires: (pkgconfig(plugin-db) >= 0.3.1 with pkgconfig(plugin-db) < 0.4)
