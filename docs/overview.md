@@ -42,7 +42,7 @@ The GitHub release also carries the packed tarball, `openmixer-plugin-qualify-<v
 checkout instead (Node.js 20 or newer and pnpm 10, see `BUILDING.md`):
 
 ```
-git clone https://github.com/FreeMixer/plugin-qualify.git
+git clone https://github.com/Open-Mixer/plugin-qualify.git
 cd plugin-qualify
 pnpm install
 pnpm exec plugin-qualify --help
@@ -84,9 +84,10 @@ plugin-qualify --grid 48000/128,96000/1024 urn:my:fx    # exactly these cells
 
 - `--grid hosts` (the fast option; `--grid-hosts` says the same): the rate and quantum of every host the run judges
   (each `--host-profile`, and the console's two tiers, `openmixer-console` and the format's isolated host), then
-  quantum 512 at every `--rates` rate, so that a record stays comparable with the ones written before the grid.
-  With the four shipped hosts that is seven cells: 96000/1024 (`openmixer-console`), 48000/256 (`jalv`),
-  48000/128 (`mod-host`, `omx-clap-host`), and 512 at 44100, 48000, 96000 and 192000.
+  quantum 512 at every `--rates` rate, so that a record stays comparable with the ones written before the grid, then
+  1024 at 96000 when that rate is measured: the console was judged there before its basis moved to 256.
+  With the four shipped hosts that is eight cells: 96000/256 (`openmixer-console`), 48000/256 (`jalv`),
+  48000/128 (`mod-host`, `omx-clap-host`), 512 at 44100, 48000, 96000 and 192000, and 96000/1024.
 - `--grid full` (the default; every plugin is measured under the same conditions, so any host's verdict can be read at any cell and the figures compare): every `--rates` rate at every `--quanta` quantum, 16 cells with the defaults
   (44100, 48000, 96000, 192000 by 128, 256, 512, 1024).
 - `--grid <rate>/<quantum>,...`: exactly the cells named.
@@ -265,8 +266,17 @@ way the CLAP prober does: the declared figure is what the plugin reports on its 
 (`lv2:designation lv2:latency`, or the older `lv2:reportsLatency`; 0 when it has none), the measured one is where an
 impulse at frame 0 lands (the first frame at or above 1e-3 of the response's own peak), or, for an instrument, where a
 struck A4 sounds. A plugin that has no latency port is measured, never read as 0. An instrument's cost holds
-`OMX_PROBE_NOTES` keys down (the LV2 counterpart of `--probe-notes`). A figure the run could not take (a response that
-stays silent, an instrument with no count to hold) is left out of the grid point and named in
+`OMX_PROBE_NOTES` keys down (the LV2 counterpart of `--probe-notes`), `MEMORY_PASS_PROBE_NOTES` (16) unless the caller
+set a count: the reference count of the instrument packs and of the Pi measurements. It is also timed at each count of
+`PROBE_NOTES_CURVE` (1, 8, 16, 32, 48 and 64 notes, `OMX_PROBE_NOTES_CURVE`), the counts the Pi measurements held Surge
+XT at (openmixer.org/notes/instruments-on-a-pi-5): the rate's `cost.voiceCurve`, one `{ held, median, percentile }` per
+count, shows the cost against the notes held, and a voice limit as the count past which it stops growing.
+
+An instrument gets 1 s of silence after `activate` before its first note, in the latency and the cost passes: one that
+builds its sound on a thread of its own (Yoshimi) ignores a note sent sooner. Its note is read for 0.5 s, or 8192 frames
+when that is longer. An instrument whose held notes never make a sound is not timed as playing: its cost reads
+`silent-output`, as a sampler or a sound-font player with nothing loaded does. A figure the run could not take (a
+response that stays silent, an instrument with no count to hold) is left out of the grid point and named in
 `measurements.unmeasured` with its hosting code (`hosting.latency.unmeasured`,
 `hosting.cost.unmeasured-at-rate-and-quantum`).
 
@@ -389,6 +399,10 @@ plugin states (`unversioned` when it states none) and the SHA-256 of its binary 
 bundle's `lv2:binary`), with every character other than letters, digits, `.`, `_` and `-` written `_`. The hash
 keys which file describes which binary: a changed binary is a new file, and the old one stays as history.
 
+A toggle port with the symbol `bypass` and no `lv2:designation` of its own carries the meaning `bypass` (EQ10Q's
+`eq*qm` plugins declare theirs so): the console's header draws one bypass per panel, so a panel leaves that
+control to it and does not draw it a second time.
+
 ```
 tools/scan.py --out catalog.json                                     # LV2: the catalog, and the descriptors beside it
 tools/scan.py --descriptor-dir ./descriptors urn:my:plugin           # one plugin, into a directory of your own
@@ -398,8 +412,12 @@ native/build/clap-qualify --json ./my-fx.clap | tools/descriptors.py clap --desc
 `scan.py --no-descriptors` writes the catalog only. A descriptor the schema refuses is not written and is
 reported as `contract.file.invalid`, omx-contract's code; a plugin whose binary cannot be read is
 `qualify.descriptor.binary-unhashed`; a directory that cannot be written is `qualify.descriptor.dir-unwritable`;
-no schema found is `qualify.descriptor.schema-missing`. Any of them makes the run exit `2`, and the other
-plugins are still written. The schema is the omx-contract package plugin-qualify depends on, else
+no schema found is `qualify.descriptor.schema-missing`; a plugin with two ports of one symbol (EQ10Q's `eq*qs`
+plugins name both output meters `out_2_vu_ctl`) is `qualify.descriptor.duplicate-symbol`, with the symbol as its
+arg: no port can be addressed by it, so the plugin is not described, and it is not repaired either. Its catalog
+row stays, carrying `refused`: the code, its args and the sentence. The codes' English sentences and their args are
+in `schema/codes.json`, each other language's in `catalogs/<lang>.json`. Any of them makes the run exit `2`, and
+the other plugins are still written. The schema is the omx-contract package plugin-qualify depends on, else
 `/usr/share/omx-contract/omx-contract.schema.json`; `OMX_CONTRACT_SCHEMA` names another one, for a test. The
 writer needs Python's `jsonschema` (`python3-jsonschema`).
 
@@ -450,7 +468,7 @@ real-time safe of those observed, crashes, its median CPU, and the plugins where
 others, on running clean or on a clean audio thread). A run into a directory that holds a record made under the same
 conditions keeps it (`--force` compares again), so a long run that stopped is started again where it stopped.
 
-**`--publish`** makes a summary for the records (FreeMixer/plugin-db-qualification, and from them the site's plugin
+**`--publish`** makes a summary for the records (Open-Mixer/plugin-db-qualification, and from them the site's plugin
 pages). It needs `--host-class` and `--set`, and it is refused, before anything runs and with each missing host named,
 unless mod-host and jalv are both installed: a comparison is measured against them. Without `--publish` a run is a
 local look, and its summary says it is not publishable.
@@ -535,7 +553,7 @@ plugin-qualify --host-profile ./my-host.json <uri>                 # your own ho
 
 | profile | isolation | verdict | instruments | LV2 features read from | cost budget (P95 of a core, rate / quantum) |
 |---|---|---|---|---|---|
-| `openmixer-console` (default) | in-process (the console's RT thread) | judged from a declaration | no | the console's in-process table | 0.05 at 96000 / 1024 |
+| `openmixer-console` (default) | in-process (the console's RT thread) | judged from a declaration | no | the console's in-process table | 0.05 at 96000 / 256 |
 | `jalv` | per-process | **measured by a run** (`jalv -n <name> <uri>`, headless) | yes | jalv 1.6.8 `src/jalv.c` (zynthian's fork passes the same list) | 0.25 at 48000 / 256 |
 | `mod-host` | shared-process | **measured by a run** (`add`, `activate`, `remove` on mod-host's socket) | yes | mod-host f14a230 `src/effects.c` | 0.05 at 48000 / 128 |
 | `omx-clap-host` | shared-process | judged from a declaration | yes | the console's in-process table (the same LV2 feature provider) | 0.05 at 48000 / 128 |
@@ -682,9 +700,7 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 
 | key | default |
 | --- | --- |
-| `lv2_path` | `$LV2_PATH`, else plugin-hostd's: `/usr/lib64/lv2:/usr/lib/lv2:/usr/local/lib/lv2` |
-| `lv2_extra` | `/zynthian/zynthian-plugins/lv2:/zynthian/zynthian-my-data/plugins/lv2` |
-| `clap_path`, `clap_extra` | `$CLAP_PATH`, then `~/.clap`, then `/usr/lib/clap`; none |
+| `hostd_conf` | plugin-hostd's own settings file: `$XDG_CONFIG_HOME/plugin-hostd.conf`, else `~/.config/plugin-hostd.conf` |
 | `pin_file` | `/var/lib/omx/qualified.pins` |
 | `qualification_dir`, `descriptor_dir` | `/var/lib/omx/qualification`, `/var/lib/omx/descriptors` |
 | `state_file` | `/var/lib/omx/qualify-sync.json` |
@@ -698,9 +714,15 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 | `host_class` | the board's own, from the device tree (`rpi5`); none elsewhere |
 | `distributed_dir` | `/usr/share/omx/qualification` |
 
-Those are the service's (`--system`); run by a user, the files go under `$XDG_STATE_HOME/omx`. An LV2
-directory added here belongs in plugin-hostd's `lv2_path` too, or the daemon cannot find the bundle it
-pinned. `--force` qualifies everything again, and `--no-distributed` reads no distributed record. A second `plugin-qualify-sync` waits for the run in progress (a lock on `<state_file>.lock`); `--no-wait` exits 0 at once and leaves a marker, and the holder runs once more at its end over what changed meanwhile.
+Those are the service's (`--system`); run by a user, the files go under `$XDG_STATE_HOME/omx`.
+
+The directories scanned are plugin-hostd's, never this file's: the run asks `plugin-hostd --search-path -c
+<hostd_conf>` (plugin-hostd 0.20.3 and later) and scans the LV2 list (`lv2_path`, then `lv2_extra`) and the CLAP list it
+prints, so a plugin the sync pins is one the daemon finds. `lv2_path`, `lv2_extra`, `clap_path` and `clap_extra` in this
+file, or as flags, are refused with a pointer to plugin-hostd's settings file. When plugin-hostd takes `lv2_path` or
+`clap_path` from its environment (`LV2_PATH`, `CLAP_PATH`) or its default rather than the file, the run says so: the
+running daemon, started with another environment, may search other directories. Writing both lists in plugin-hostd's
+settings file makes them agree exactly, since the file is over the environment. `--force` qualifies everything again, and `--no-distributed` reads no distributed record. A second `plugin-qualify-sync` waits for the run in progress (a lock on `<state_file>.lock`); `--no-wait` exits 0 at once and leaves a marker, and the holder runs once more at its end over what changed meanwhile.
 
 Every run starts by bringing each pin's files up to the ones `plugin-hostd --pin-files` names, measuring nothing: a pin
 written before 0.17.3 lacks the preset files an LV2's manifest names, which plugin-hostd 0.15.0 also checks, and its add
@@ -709,9 +731,9 @@ stands; a changed file is measured again by the run. `--refresh-pins` does only 
 changed pins to a running plugin-hostd; the package's upgrade runs it (plugin-qualify#239).
 
 The path unit names the standard folders (`/usr/lib/lv2`, `/usr/lib64/lv2`, `/usr/local/lib/lv2`,
-`/usr/lib/clap`, `/usr/lib64/clap`). The folders the settings file adds (`lv2_path`, `lv2_extra`, `clap_path`,
-`clap_extra`) are written into a drop-in of the unit by a systemd generator at boot and at every
-`systemctl daemon-reload`, so the file is the one place a machine's extra folders are written.
+`/usr/lib/clap`, `/usr/lib64/clap`). The other folders plugin-hostd searches (`plugin-hostd --search-path -c
+<hostd_conf>`) are written into a drop-in of the unit by a systemd generator at boot and at every
+`systemctl daemon-reload`, so plugin-hostd's settings file is the one place a machine's extra folders are written.
 
 The path unit watches a folder, not the bundles inside it: a new bundle appearing in a watched folder is
 seen at once, but a package's own files being replaced in place (an upgrade) is not a change of the folder

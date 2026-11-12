@@ -29,6 +29,11 @@ const GAIN = "urn:plugin-qualify:fixture:lv2-rt-safe";
 const SYNTH = "urn:plugin-qualify:fixture:lv2-synth";
 const SYNTH_ATTACK = "urn:plugin-qualify:fixture:lv2-synth-attack";
 const SYNTH_DELAY = "urn:plugin-qualify:fixture:lv2-synth-delay";
+const SYNTH_LATE = "urn:plugin-qualify:fixture:lv2-synth-late";
+const SYNTH_DRUM = "urn:plugin-qualify:fixture:lv2-synth-drum";
+const SYNTH_INPUT = "urn:plugin-qualify:fixture:lv2-synth-input";
+const SYNTH_THRU = "urn:plugin-qualify:fixture:lv2-synth-thru";
+const SYNTH_SWEEP = "urn:plugin-qualify:fixture:lv2-synth-sweep";
 const BUILT = [
   MEASURE,
   INTERPOSER,
@@ -37,6 +42,11 @@ const BUILT = [
   join(LV2_FIXTURES, "synth.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-attack.lv2", "synth.so"),
   join(LV2_FIXTURES, "synth-delay.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-late.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-drum.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-input.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-thru.lv2", "synth.so"),
+  join(LV2_FIXTURES, "synth-sweep.lv2", "synth.so"),
 ].every((p) => existsSync(p));
 
 const scratch = mkdtempSync(join(tmpdir(), "lv2-latency-cost-"));
@@ -110,6 +120,13 @@ describe("lv2-measure, live: the latency of fixtures whose delay is known", () =
     }
   });
 
+  live("an instrument that ignores notes until it has built its sound is given the time: its note is heard, at every rate", () => {
+    // the fixture drops every note for 300 ms after activate; the probe waits NOTE_SETTLE_S before it plays
+    for (const rate of [48000, 192000]) {
+      expect(latencyAt(measure(SYNTH_LATE, rate), rate)).toEqual({ declaredFrames: 0, declaredFrom: "none", measuredFrames: 1, from: "note" });
+    }
+  });
+
   live("a plugin whose output stays silent has no measured figure, and says why by a code of the unmeasured vocabulary", () => {
     const at = latencyAt(measure(LATENCY("mute"), 48000), 48000);
     expect(at).not.toHaveProperty("measuredFrames");
@@ -137,6 +154,76 @@ describe("lv2-measure, live: the cost", () => {
     expect(at).not.toHaveProperty("nsPerSampleMedian");
     expect(at["unmeasuredReason"]).toBe("voices-unknown");
     expect(unmeasuredTerm(at["unmeasuredReason"])).toMatchObject({ code: "voices-unknown" });
+  });
+
+  live("an instrument that ignores notes until it has built its sound is timed playing them, not silent", () => {
+    // the fixture drops notes for 300 ms after activate: held from the first block, they would never sound and the
+    // block would be timed idle; after the settle it costs what the same instrument costs from the start
+    const late = measure(SYNTH_LATE, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
+    const prompt = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
+    expect(late).not.toHaveProperty("unmeasuredReason");
+    expect(late.nsPerSampleMedian).toBeGreaterThan(prompt.nsPerSampleMedian * 0.5);
+  });
+
+  live("an instrument whose notes sounded and died away before the timed blocks is timed, not called silent", () => {
+    // the drum fixture's hits last 20 ms: struck at the first block, they are over before the warm-up ends
+    const at = measure(SYNTH_DRUM, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
+    expect(at).not.toHaveProperty("unmeasuredReason");
+    expect(at.nsPerSampleMedian).toBeGreaterThan(0);
+  });
+
+  live("an instrument whose held notes never make a sound is not timed as playing: silent-output", () => {
+    // one note held is A4, which the drum fixture maps to nothing (it plays keys 36 to 40)
+    const at = measure(SYNTH_DRUM, 48000, { OMX_PROBE_NOTES: "1" })["cost"].perRate["48000"];
+    expect(at).not.toHaveProperty("nsPerSampleMedian");
+    expect(at["unmeasuredReason"]).toBe("silent-output");
+    expect(unmeasuredTerm(at["unmeasuredReason"])).toMatchObject({ code: "silent-output" });
+  });
+
+  live("an instrument with an audio input is still played: its class says it is an instrument (Surge XT on the Pi)", () => {
+    // the fixture is lv2:InstrumentPlugin with an audio input it never reads; taken for an effect it would get an
+    // impulse (silent-output), hold no note and have no curve
+    const line = measure(SYNTH_INPUT, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "1,8" });
+    expect(latencyAt(line, 48000)).toMatchObject({ measuredFrames: 1, from: "note" });
+    const at = line["cost"].perRate["48000"];
+    expect(line["cost"]["stimulus"]).toBe("notes-held");
+    expect(at["voices"]).toEqual({ held: 16, basis: "probe" });
+    expect((at["voiceCurve"] as { held: number }[]).map((e) => e.held)).toEqual([1, 8]);
+  });
+
+  live("noise on an instrument's audio input never counts as its notes sounding (Surge XT on the Pi read idle as played)", () => {
+    // the fixture plays no note and copies its input to its outputs: whatever the cost pass puts on that input comes out
+    const at = measure(SYNTH_THRU, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
+    expect(at).not.toHaveProperty("nsPerSampleMedian");
+    expect(at["unmeasuredReason"]).toBe("silent-output");
+  });
+
+  live("the curve is timed with every parameter at its default: a cost only a sweep causes stays out of it", () => {
+    // the fixture burns a large load whenever its gain is moved off its default (1.0); at the default it costs what the plain
+    // synth does. The main cost keeps the sweep (its own cell); the curve is what a played instrument costs
+    const swept = measure(SYNTH_SWEEP, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "16" })["cost"].perRate["48000"];
+    const plain = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "16" })["cost"].perRate["48000"];
+    const curve16 = (swept["voiceCurve"] as { nsPerSampleMedian: number }[])[0]!.nsPerSampleMedian;
+    const plain16 = (plain["voiceCurve"] as { nsPerSampleMedian: number }[])[0]!.nsPerSampleMedian;
+    expect(swept.nsPerSampleMedian).toBeGreaterThan(plain.nsPerSampleMedian * 5);
+    expect(curve16).toBeLessThan(plain16 * 2);
+  });
+
+  live("an instrument is timed at each count of the curve: the cost grows with the notes up to its voices, then stops", () => {
+    // the fixture has 32 voices and drops a note it has no voice for, as Surge XT at its limit of 16 does on the Pi
+    // (openmixer.org/notes/instruments-on-a-pi-5: 32 notes cost what 16 do)
+    const at = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "1,8,32,48" })["cost"].perRate["48000"];
+    const curve = at["voiceCurve"] as { held: number; nsPerSampleMedian: number; nsPerSampleP95: number }[];
+    expect(curve.map((e) => e.held)).toEqual([1, 8, 32, 48]);
+    const [one, eight, thirtyTwo, fortyEight] = curve.map((e) => e.nsPerSampleMedian) as [number, number, number, number];
+    expect(eight).toBeGreaterThan(one);
+    expect(thirtyTwo).toBeGreaterThan(eight);
+    expect(Math.abs(fortyEight - thirtyTwo) / thirtyTwo).toBeLessThan(0.25);
+    for (const e of curve) expect(e.nsPerSampleP95).toBeGreaterThanOrEqual(e.nsPerSampleMedian);
+  });
+
+  live("an effect has no curve: only an instrument holds notes", () => {
+    expect(measure(GAIN, 48000, { OMX_PROBE_NOTES_CURVE: "1,8" })["cost"].perRate["48000"]).not.toHaveProperty("voiceCurve");
   });
 
   live("an instrument is timed holding the notes it is given, and the cost follows them", () => {

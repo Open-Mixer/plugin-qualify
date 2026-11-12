@@ -1,9 +1,12 @@
 {
-  "$schema": "../node_modules/@openmixer/omx-contract/schema/omx-contract.schema.json#/$defs/catalog",
   "kind": "catalog",
   "lang": "ca",
   "owner": "plugin-qualify",
   "messages": {
+    "qualify.descriptor.duplicate-symbol": {
+      "text": "Dos ports d'aquest connector comparteixen el símbol {symbol}, de manera que no es pot adreçar cap dels dos per aquest símbol; el connector no es descriu.",
+      "by": "human"
+    },
     "qualify.compare.host-not-installed": "{program} no està instal·lat",
     "qualify.compare.host-did-not-start": "{program} no s'ha iniciat",
     "qualify.compare.host-not-asked": "no s'ha demanat amb --hosts",

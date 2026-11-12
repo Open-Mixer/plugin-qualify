@@ -1,0 +1,15 @@
+{
+  "kind": "codes",
+  "doc": "The codes plugin-qualify's scan refuses a plugin by, each with its source sentence in English and the args it names (omx-contract's codes shape; translations are not here). Each language's sentences are in catalogs/<lang>.json, keyed by the code. tools/descriptors.py renders the English sentence from this file; no module repeats it. A code is never reworded.",
+  "codes": {
+    "descriptorDuplicateSymbol": {
+      "code": "qualify.descriptor.duplicate-symbol",
+      "text": {
+        "en": "Two ports of this plugin share the symbol {symbol}, so neither can be addressed by it; the plugin is not described."
+      },
+      "args": [
+        "symbol"
+      ]
+    }
+  }
+}

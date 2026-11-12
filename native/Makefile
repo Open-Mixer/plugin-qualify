@@ -7,12 +7,12 @@
 #   make -C native           build/clap-qualify, build/lv2_measure, build/lv2_host_probe, build/jack_peak, build/rt_interpose.so, build/rt_watch.so, build/jack_compare,
 #                            build/fixtures/{rt-safe,rt-unsafe,controls,params-2048,params-2049,info-fails,leaky-delay,undeclared-delay}.clap,
 #                            build/fixtures-faulty/{crashes-at-load,hangs}.clap, apart: a scan of build/fixtures never meets them,
-#                            build/fixtures/{synth,synth-alloc,synth-midi,synth-voices,synth-no-voices,synth-input,synth-strict,synth-attack,synth-delay}.clap,
+#                            build/fixtures/{synth,synth-alloc,synth-midi,synth-voices,synth-no-voices,synth-input,synth-strict,synth-attack,synth-delay,synth-sweep}.clap,
 #                            build/fixtures/{pool-synth,pool-synth-slow,pool-synth-quiet,pool-synth-helper,pool-synth-serial}.clap (the pool step's),
 #                            build/fixtures/{requires-voice-info,requires-timer,requires-thread-pool}.clap,
 #                            build/fixtures/fail-alloc.so, build/fixtures-faulty/hogs-memory.clap (apart, as the faulty ones),
 #                            build/fixtures-faulty/synth-voice-memory.clap (apart, its memory fails any budget),
-#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,latency,activate-reads,needs-display,abi-breaker}.lv2,
+#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-input,synth-thru,synth-sweep,latency,activate-reads,needs-display,abi-breaker,eq10q}.lv2,
 #                            build/fixtures-faulty/lv2/{leaks,large-activate}.lv2 (apart, as the faulty ones)
 #   build/lv2_measure_options_test    the measurer's feature options oracle
 #   build/lv2_measure_path_test       the oracle of the LV2 search path made absolute before lilv reads it
@@ -45,7 +45,7 @@ PLUGIN_DB_REF := v0.3.1
 OMX_CONTRACT_VERSION := 3.12.0
 # the omx-clap-core whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
 # packages' floor
-OMX_CLAP_CORE_VERSION := 0.31.1
+OMX_CLAP_CORE_VERSION := 0.31.2
 # the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap-core's provider read: the packages' floor
 OMX_DSP_VERSION := 0.32.0
 
@@ -106,15 +106,16 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures-faulty/crashes-at-load.clap $(BUILD)/fixtures-faulty/hangs.clap $(BUILD)/fixtures-faulty/rate-pinned.clap \
 	$(BUILD)/fixtures/synth.clap $(BUILD)/fixtures/synth-alloc.clap $(BUILD)/fixtures/synth-midi.clap \
 	$(BUILD)/fixtures/synth-voices.clap $(BUILD)/fixtures/synth-no-voices.clap $(BUILD)/fixtures/synth-input.clap \
-	$(BUILD)/fixtures/synth-strict.clap $(BUILD)/fixtures/synth-drum.clap $(BUILD)/fixtures/synth-attack.clap $(BUILD)/fixtures/synth-delay.clap \
+	$(BUILD)/fixtures/synth-strict.clap $(BUILD)/fixtures/synth-drum.clap $(BUILD)/fixtures/synth-attack.clap $(BUILD)/fixtures/synth-delay.clap $(BUILD)/fixtures/synth-sweep.clap \
 	$(BUILD)/fixtures/pool-synth.clap $(BUILD)/fixtures/pool-synth-slow.clap $(BUILD)/fixtures/pool-synth-quiet.clap $(BUILD)/fixtures/pool-synth-serial.clap $(BUILD)/fixtures/pool-synth-helper.clap \
 	$(BUILD)/fixtures/requires-voice-info.clap $(BUILD)/fixtures/requires-timer.clap $(BUILD)/fixtures/requires-thread-pool.clap \
 	$(BUILD)/fixtures/fail-alloc.so $(BUILD)/fixtures-faulty/hogs-memory.clap \
 	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
 	$(BUILD)/fixtures/lv2/host-faithfulness.lv2/host-faithfulness.so \
 	$(BUILD)/fixtures/lv2/synth.lv2/synth.so $(BUILD)/fixtures/lv2/synth-alloc.lv2/synth.so $(BUILD)/fixtures/lv2/synth-drum.lv2/synth.so \
-	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so \
+	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/latency.lv2/latency.so $(BUILD)/fixtures/lv2/spaced.lv2/manifest.ttl \
+	$(BUILD)/fixtures/lv2/eq10q.lv2/eq10q.so \
 	$(BUILD)/fixtures-faulty/synth-voice-memory.clap \
 	$(BUILD)/fixtures-faulty/lv2/leaks.lv2/gain.so $(BUILD)/fixtures-faulty/lv2/large-activate.lv2/gain.so
 
@@ -209,6 +210,9 @@ $(BUILD)/fixtures/synth-midi.clap: fixtures/synth.c | $(BUILD)/fixtures
 # a drum kit: only keys 36 to 40 answer, each with a 20 ms hit
 $(BUILD)/fixtures/synth-drum.clap: fixtures/synth.c | $(BUILD)/fixtures
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_DRUM -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+# an instrument costly whenever its gain leaves its default 1.0: the curve times it at its defaults
+$(BUILD)/fixtures/synth-sweep.clap: fixtures/synth.c | $(BUILD)/fixtures
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_SWEEP_COST -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
 # an instrument's latency, known: a 50 ms linear attack and no delay, and a real 64-frame processing delay (note-onset.h)
 $(BUILD)/fixtures/synth-attack.clap: fixtures/synth.c | $(BUILD)/fixtures
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_ATTACK_MS=50 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
@@ -331,6 +335,34 @@ $(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so: fixtures/lv2-synth.c fixtures/s
 	sed 's/fixture:lv2-synth>/fixture:lv2-synth-attack>/' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_ATTACK_MS=50 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
 
+# the instrument with an audio input it never reads (index 4), still an lv2:InstrumentPlugin
+$(BUILD)/fixtures/lv2/synth-input.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
+	mkdir -p $(@D)
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-input>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-input>/; s/lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 \] \./lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 ] ,\n           [ a lv2:AudioPort , lv2:InputPort ; lv2:index 4 ; lv2:symbol "in" ; lv2:name "In" ] ./' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_INPUT -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# the instrument that plays no note and copies its audio input (index 4) to its outputs
+$(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
+	mkdir -p $(@D)
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-thru>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-thru>/; s/lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 \] \./lv2:default 1.0 ; lv2:minimum 0.0 ; lv2:maximum 2.0 ] ,\n           [ a lv2:AudioPort , lv2:InputPort ; lv2:index 4 ; lv2:symbol "in" ; lv2:name "In" ] ./' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_INPUT_THRU -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# the instrument whose cost explodes whenever its gain is moved off its default 1.0
+$(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
+	mkdir -p $(@D)
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-sweep>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-sweep>/' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_SWEEP_COST -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# the instrument that ignores notes for its first 300 ms after activate, as one that builds its sound on a thread does
+$(BUILD)/fixtures/lv2/synth-late.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
+	mkdir -p $(@D)
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-late>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-late>/' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_LATE_MS=300 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
 $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
 	mkdir -p $(@D)
 	sed 's/fixture:lv2-synth>/fixture:lv2-synth-delay>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
@@ -347,6 +379,13 @@ $(BUILD)/fixtures/lv2/latency.lv2/latency.so: fixtures/lv2-latency.c fixtures/la
 	mkdir -p $(@D)
 	cp fixtures/latency.lv2/manifest.ttl fixtures/latency.lv2/latency.ttl $(@D)/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# two EQ10Q-shaped fixtures (plugin-qualify#27): a toggle named "bypass" with no formal designation, and two
+# output control ports a TTL names the same symbol
+$(BUILD)/fixtures/lv2/eq10q.lv2/eq10q.so: fixtures/lv2-eq10q.c fixtures/eq10q.lv2/manifest.ttl fixtures/eq10q.lv2/eq10q.ttl
+	mkdir -p $(@D)
+	cp fixtures/eq10q.lv2/manifest.ttl fixtures/eq10q.lv2/eq10q.ttl $(@D)/
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
 
 # five plugins, each demanding one thing of the measuring host: options, a worker, patch:Set, a
 # bounded sweep, a stdout of its own

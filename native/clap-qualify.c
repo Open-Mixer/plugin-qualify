@@ -6,7 +6,7 @@
  * It judges nothing: the verdict is plugin-qualify's (`src/clap-qualify.ts`), read from these facts.
  *
  *   clap-qualify --rates <r,...> [--block <frames>] [--blocks <n>] [--offer <ext,...>]
- *                [--probe-notes <n>] [--hold <n>] <path.clap> [<id>]
+ *                [--probe-notes <n>] [--hold <n>] [--curve <n,...>] <path.clap> [<id>]
  *   clap-qualify --json <path>...      the scan (below), the document the CLAP loader reads
  *   clap-qualify --asks-thread-pool <path.clap> <id>   whether the plugin offers clap.thread-pool, one JSON line
  *
@@ -88,6 +88,8 @@ _Static_assert(HOST_PARAM_COUNT_MAX <= MAX_PARAMS, "the prober reads every param
 #define EVENTS_PER_BLOCK 64u
 /* notes the cost arm can hold: one per MIDI key */
 #define NOTE_KEYS_MAX 128
+/* the most counts a voice curve holds */
+#define CURVE_MAX 16
 /* the events one block can carry: every held note's note on beside a sweep block's parameters */
 #define EVENTS_MAX (NOTE_KEYS_MAX + EVENTS_PER_BLOCK)
 /* the cost arm: blocks timed and dropped before the figure is taken, and its high percentile */
@@ -395,8 +397,8 @@ static const clap_host_t g_clap_host = {
   .clap_version = CLAP_VERSION_INIT,
   .host_data = NULL,
   .name = "plugin-qualify",
-  .vendor = "FreeMixer",
-  .url = "https://github.com/FreeMixer/plugin-qualify",
+  .vendor = "OpenMixer",
+  .url = "https://github.com/Open-Mixer/plugin-qualify",
   .version = "1",
   .get_extension = host_get_extension,
   .request_restart = host_request,
@@ -498,6 +500,9 @@ struct facts {
   /* the cost arm, per rate; `cost_notes` is whether it played notes (an instrument) or noise */
   int cost_notes;
   struct cost_at cost[MAX_RATES];
+  /* an instrument's cost at each count of --curve, per rate, every parameter at its default */
+  struct cost_at curve[MAX_RATES][CURVE_MAX];
+  uint32_t n_curve;
   struct footprint footprint[MAX_RATES];
 };
 
@@ -575,7 +580,7 @@ static clap_process_status run_block(const clap_plugin_t *p, struct port_set *in
   return st;
 }
 
-struct param_row { clap_id id; double min, max; void *cookie; int stepped; };
+struct param_row { clap_id id; double min, max, def; void *cookie; int stepped; };
 
 /* where a sweep puts a parameter at `frac` of its range: a stepped one (an enum, a switch) on a whole value, as a
  * host sends it, never between two steps */
@@ -592,11 +597,28 @@ struct options {
   /* the notes the cost arm holds for an instrument that declares no voice capacity (--probe-notes), and
    * the count it holds whatever the plugin declares (--hold); 0 when not given */
   uint32_t probe_notes, hold;
+  /* the counts the voice curve is timed at, every parameter at its default (--curve, else OMX_PROBE_NOTES_CURVE) */
+  uint32_t curve[CURVE_MAX], n_curve;
   /* the helper threads of the pool the host offers (--pool), 0 for none: every task then runs on the calling thread */
   uint32_t pool_helpers;
   const char *path; /* as invoked, before realpath: the name the pin holds */
   const char *id;
 };
+
+/* --curve's list of counts, each 1 to NOTE_KEYS_MAX, at most CURVE_MAX of them */
+static int parse_curve(const char *list, struct options *o) {
+  o->n_curve = 0;
+  for (const char *q = list; *q;) {
+    char *end;
+    const unsigned long n = strtoul(q, &end, 10);
+    if (end == q || n == 0 || n > NOTE_KEYS_MAX || o->n_curve == CURVE_MAX) return -1;
+    o->curve[o->n_curve++] = (uint32_t)n;
+    if (*end == ',') q = end + 1;
+    else if (*end == 0) q = end;
+    else return -1;
+  }
+  return o->n_curve ? 0 : -1;
+}
 
 static void note_key(int clap_dialect, uint32_t time, int on, int16_t key, double velocity);
 
@@ -902,14 +924,16 @@ static int64_t now_ns(void) {
 }
 
 /*
- * One rate of the cost arm. Every parameter is moved across its range through events, a block's worth
- * at a time, as the RT sweep moves them, and every audio input hears the sweep's noise; an instrument
- * also holds its notes, all struck in the first block and never let go. Each process() is timed alone;
- * the warm-up head is dropped and the rest folded into nanoseconds per sample.
+ * One timed run of the cost arm into c. With sweep, every parameter is moved across its range through events, a block's
+ * worth at a time, as the RT sweep moves them, and every audio input hears the sweep's noise; an instrument (notes) also
+ * holds its notes, all struck in the first block and never let go: held_fixed of them when given, else the count
+ * cost_rate's rule picks. Without sweep (the voice curve) every parameter stays at its default and an instrument's
+ * inputs carry silence, so the run is what a played instrument costs. Each process() is timed alone; the warm-up head
+ * is dropped and the rest folded into nanoseconds per sample.
  */
-static void cost_rate(const clap_plugin_t *p, double rate, uint32_t frames, uint32_t blocks, const struct param_row *rows,
-                      uint32_t n_rows, int clap_dialect, const struct options *o, struct facts *f, uint32_t r) {
-  struct cost_at *c = &f->cost[r];
+static void cost_time(const clap_plugin_t *p, double rate, uint32_t frames, uint32_t blocks, const struct param_row *rows,
+                      uint32_t n_rows, int clap_dialect, const struct options *o, int notes, int sweep, uint32_t held_fixed,
+                      struct cost_at *c) {
   const clap_plugin_audio_ports_t *ports = p->get_extension(p, CLAP_EXT_AUDIO_PORTS);
   struct port_set ins, outs;
   uint32_t main_in, main_out, others;
@@ -920,9 +944,11 @@ static void cost_rate(const clap_plugin_t *p, double rate, uint32_t frames, uint
     c->unmeasured = "refused-instantiation", c->detail = "activate failed for the cost run";
     return;
   }
-  if (f->cost_notes) {
+  if (notes) {
     c->capacity = voice_capacity(p, &c->has_capacity);
-    if (o->hold) {
+    if (held_fixed) {
+      c->held = held_fixed, c->basis = BASIS_PROBE;
+    } else if (o->hold) {
       c->held = o->hold, c->basis = BASIS_PROBE;
     } else if (c->has_capacity && c->capacity == 0) {
       c->unmeasured = "no-voices", c->detail = "voice-info declares a voice capacity of 0";
@@ -954,7 +980,21 @@ static void cost_rate(const clap_plugin_t *p, double rate, uint32_t frames, uint
   for (uint32_t b = 0; b < total; b++) {
     if (b == 0)
       for (uint32_t k = 0; k < c->held; k++) note_key(clap_dialect, 0, 1, held_key(k, c->held), HELD_VELOCITY);
-    for (uint32_t k = 0; k < n_rows && k < EVENTS_PER_BLOCK; k++) {
+    /* without the sweep, the first blocks put every parameter back to its default: the instance may come from a
+     * swept run */
+    for (uint32_t k = 0; !sweep && k < EVENTS_PER_BLOCK && b * EVENTS_PER_BLOCK + k < n_rows; k++) {
+      const struct param_row *row = &rows[b * EVENTS_PER_BLOCK + k];
+      union any_event *e = note_event(0, CLAP_EVENT_PARAM_VALUE, sizeof(clap_event_param_value_t));
+      if (!e) break;
+      e->param.param_id = row->id;
+      e->param.cookie = row->cookie;
+      e->param.note_id = -1;
+      e->param.port_index = -1;
+      e->param.channel = -1;
+      e->param.key = -1;
+      e->param.value = row->def;
+    }
+    for (uint32_t k = 0; sweep && k < n_rows && k < EVENTS_PER_BLOCK; k++) {
       const uint32_t row = (b * EVENTS_PER_BLOCK + k) % n_rows;
       const double frac = (double)((b * 7u + row * 13u) % 101u) / 100.0;
       union any_event *e = note_event(0, CLAP_EVENT_PARAM_VALUE, sizeof(clap_event_param_value_t));
@@ -971,7 +1011,7 @@ static void cost_rate(const clap_plugin_t *p, double rate, uint32_t frames, uint
         for (uint32_t ch = 0; ch < ins.buf[k].channel_count; ch++)
           for (uint32_t i = 0; i < frames; i++) {
             seed = seed * 1664525u + 1013904223u;
-            ins.chan[k][ch][i] = ((float)(seed >> 8) / 16777216.0f - 0.5f) * 0.5f;
+            ins.chan[k][ch][i] = sweep || !notes ? ((float)(seed >> 8) / 16777216.0f - 0.5f) * 0.5f : 0.0f;
           }
     const int64_t t0 = now_ns();
     run_block(p, &ins, &outs, frames, &steady, NULL);
@@ -992,6 +1032,17 @@ static void cost_rate(const clap_plugin_t *p, double rate, uint32_t frames, uint
   c->max = timed[blocks - 1];
   c->blocks = blocks;
   free(ns);
+}
+
+/* One rate of the cost arm: the main cost under the parameter sweep, then for an instrument the voice curve, a run per
+ * count of --curve with every parameter at its default. */
+static void cost_rate(const clap_plugin_t *p, double rate, uint32_t frames, uint32_t blocks, const struct param_row *rows,
+                      uint32_t n_rows, int clap_dialect, const struct options *o, struct facts *f, uint32_t r) {
+  cost_time(p, rate, frames, blocks, rows, n_rows, clap_dialect, o, f->cost_notes, 1, 0, &f->cost[r]);
+  if (!f->cost_notes) return;
+  f->n_curve = o->n_curve;
+  for (uint32_t i = 0; i < o->n_curve; i++)
+    cost_time(p, rate, frames, blocks, rows, n_rows, clap_dialect, o, 1, 0, o->curve[i], &f->curve[r][i]);
 }
 
 /* ---- the footprint ---- */
@@ -1248,6 +1299,21 @@ static void put_cost(const struct facts *f, uint32_t frames) {
       if (c->basis != BASIS_NONE) fprintf(g_out, "\"held\":%u,\"basis\":\"%s\"%s", c->held, BASIS_NAME[c->basis], c->has_capacity ? "," : "");
       if (c->has_capacity) fprintf(g_out, "\"capacity\":%u", c->capacity);
       fputc_out('}');
+    }
+    if (f->cost_notes && f->n_curve) {
+      fprintf(g_out, ",\"voiceCurve\":[");
+      for (uint32_t i = 0; i < f->n_curve; i++) {
+        const struct cost_at *k = &f->curve[r][i];
+        fprintf(g_out, "%s{\"held\":%u", i ? "," : "", k->held);
+        if (k->unmeasured) {
+          fprintf(g_out, ",\"unmeasuredReason\":");
+          put_string(k->unmeasured);
+        } else {
+          fprintf(g_out, ",\"nsPerSampleMedian\":%.6g,\"nsPerSampleP95\":%.6g", k->median, k->p95);
+        }
+        fputc_out('}');
+      }
+      fputc_out(']');
     }
     const struct footprint *fp = &f->footprint[r];
     fprintf(g_out, ",\"memory\":{");
@@ -1790,7 +1856,7 @@ static uint32_t param_rows(const clap_plugin_t *p, struct param_row *rows)
     if (!params->get_info(p, i, &info)) continue;
     if (info.flags & CLAP_PARAM_IS_READONLY) continue;
     if (!isfinite(info.min_value) || !isfinite(info.max_value)) continue;
-    rows[n_rows++] = (struct param_row){ info.id, info.min_value, info.max_value, info.cookie, (info.flags & CLAP_PARAM_IS_STEPPED) != 0 };
+    rows[n_rows++] = (struct param_row){ info.id, info.min_value, info.max_value, info.default_value, info.cookie, (info.flags & CLAP_PARAM_IS_STEPPED) != 0 };
   }
   return n_rows;
 }
@@ -1975,7 +2041,7 @@ static int parse_offer(const char *s) {
 
 static int usage(const char *name) {
   fprintf(stderr,
-          "usage: %s --rates <r,...> [--block <frames>] [--blocks <n>] [--offer <ext,...>] [--probe-notes <n>] [--hold <n>]\n"
+          "usage: %s --rates <r,...> [--block <frames>] [--blocks <n>] [--offer <ext,...>] [--probe-notes <n>] [--hold <n>] [--curve <n,...>]\n"
           "          [--pool <helpers>]   (helper threads for clap.thread-pool, 1 to " STR(POOL_HELPERS_MAX) ")\n"
           "          <path.clap> [<id>]   (--probe-notes and --hold: 1 to " STR(NOTE_KEYS_MAX) " notes)\n"
           "       %s --json <path>...   (the scan: a .clap file, or a directory searched for them)\n"
@@ -2041,6 +2107,8 @@ int main(int argc, char **argv) {
       if (parse_u32(argv[a + 1], &o.pool_helpers) != 0 || o.pool_helpers > POOL_HELPERS_MAX) return usage(argv[0]);
     } else if (!strcmp(argv[a], "--hold")) {
       if (parse_u32(argv[a + 1], &o.hold) != 0 || o.hold > NOTE_KEYS_MAX) return usage(argv[0]);
+    } else if (!strcmp(argv[a], "--curve")) {
+      if (parse_curve(argv[a + 1], &o) != 0) return usage(argv[0]);
     } else {
       return usage(argv[0]);
     }
@@ -2051,6 +2119,8 @@ int main(int argc, char **argv) {
   /* the count plugin-qualify's memory-only run gives an instrument that declares none, as lv2_measure reads it */
   if (getenv("OMX_PROBE_MEMORY_ONLY") && !o.probe_notes && getenv("OMX_PROBE_NOTES") && parse_u32(getenv("OMX_PROBE_NOTES"), &o.probe_notes) != 0) o.probe_notes = 0;
   if (o.probe_notes > NOTE_KEYS_MAX) o.probe_notes = NOTE_KEYS_MAX;
+  /* the curve plugin-qualify's runner names, as lv2_measure reads it */
+  if (!o.n_curve && getenv("OMX_PROBE_NOTES_CURVE") && parse_curve(getenv("OMX_PROBE_NOTES_CURVE"), &o) != 0) o.n_curve = 0;
 
   char path[PATH_MAX];
   if (!realpath(argv[a], path)) {
