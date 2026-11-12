@@ -211,3 +211,20 @@ describe("the limit on a direct spawn", () => {
     expect(isSanitizerBuild("x", () => { throw new Error("gone"); })).toBe(false);
   });
 });
+
+describe("the LV2 lifecycle pass, bounded between cycles (#28)", () => {
+  live("each cycle keeps 64 MiB it never frees; past a bound the cycles together outgrow, the pass stops short and the record names the bound instead of the kernel taking the process", () => {
+    const line = lv2Line("urn:plugin-qualify:fixture:lv2-large-activate", { LD_PRELOAD: INTERPOSER, OMX_PROBE_MEMORY_BOUND_KB: String(150 * MIB) }, [String(RATE), String(QUANTUM), "20", "1"]);
+    expect(line.lifecycle.cycles).toBe(20);
+    expect(line.lifecycle.outcome).toBe("probe.memory-bound");
+    expect(line.lifecycle.cyclesDone).toBeGreaterThan(0);
+    expect(line.lifecycle.cyclesDone).toBeLessThan(20);
+    expect(line.lifecycle.instantiated).toBe(line.lifecycle.cyclesDone);
+    expect(line.lifecycle.failed).toBe(0);
+  });
+
+  live("well under the bound, every cycle still runs and nothing names an outcome", () => {
+    const line = lv2Line("urn:plugin-qualify:fixture:lv2-large-activate", { LD_PRELOAD: INTERPOSER, OMX_PROBE_MEMORY_BOUND_KB: String(2000 * MIB) }, [String(RATE), String(QUANTUM), "5", "1"]);
+    expect(line.lifecycle).toEqual({ cycles: 5, instantiated: 5, failed: 0 });
+  });
+});

@@ -82,6 +82,8 @@
 
 #include <plugin-hostd/protocol.h>
 #include <malloc.h>
+#include <sys/mman.h>
+#include <sys/resource.h>
 #include <sys/wait.h>
 
 #include <lilv/lilv.h>
@@ -1262,6 +1264,377 @@ static void emit_cost(double rate, const struct cost_at *C, uint32_t block, int 
   fprintf(jout, "}}}}");
 }
 
+/* ---- the lifecycle pass, isolated (#28) ----------------------------------------------------------------
+ *
+ * Surge XT's content does not come back to the allocator between instances, through the plugin or through
+ * malloc_trim: each lifecycle cycle opens a fresh one, and this process grows the way nothing else in it
+ * does until the kernel ends it (`global_oom`, or a cgroup's `memory.max`) with no record at all — the
+ * Raspberry Pi 5 repro died at cycle 5 of 9 seconds, 3 GB resident, no JSON ever written. The loop still
+ * runs every cycle the same way; it now runs them in a child of its own, so the memory each cycle keeps
+ * comes back to the OS the moment that child exits, whether or not it reached the last cycle.
+ *
+ * WHEN THE RUN HAS A MEMORY BOUND the child is held to it too (RLIMIT_AS), so a cycle that would have
+ * outgrown the whole process instead ends the child alone: the parent, which never grew, writes what ran
+ * before that as `probe.memory-bound` rather than losing the record to the kernel's killer. The bound is
+ * the one already on this process (a direct spawn's RLIMIT_AS, src/direct-limit.ts) or, for a runner that
+ * enforces its own bound through a cgroup instead (plugin-hostd's `memory.max`, which a `setrlimit` here
+ * cannot see), OMX_PROBE_MEMORY_BOUND_KB, which such a runner sets to the same figure so this program can
+ * still fork the pass under it. Neither set, cycles still isolate, just unbounded. */
+static long g_pass_bound_kb;
+
+/* Where a refusal the lifecycle pass's child read on H (which dies with it) is copied, so emit_refusal can
+ * still read it from the parent after the child is gone. */
+static char g_lifecycle_refused[128];
+
+static void resolve_pass_bound(void) {
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_AS, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY) g_pass_bound_kb = (long)(rl.rlim_cur / 1024);
+  const char *env = getenv("OMX_PROBE_MEMORY_BOUND_KB");
+  const long from_env = env ? atol(env) : 0;
+  if (from_env > 0) g_pass_bound_kb = from_env;
+}
+
+/* Memory a pass's child writes into as it runs, shared with this process: a plain calloc would give the
+ * child its own copy at fork and the parent would read back nothing, so a kill mid-pass has to land in a
+ * mapping both sides already hold. NULL only when the kernel has no anonymous shared mappings to give. */
+static void *pass_alloc(size_t n) {
+  void *p = mmap(NULL, n, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+  return p == MAP_FAILED ? NULL : p;
+}
+static void pass_free(void *p, size_t n) {
+  if (p != NULL) munmap(p, n);
+}
+
+/* Runs body(ctx) in a child of its own, bounded at g_pass_bound_kb when it is known: RLIMIT_AS, with
+ * OMX_RT_OOM_EXIT_ENV forced on so the interposer (rt-interpose.c, when preloaded) ends the child at the
+ * first allocation the bound refuses — the same convention a whole run's own bound is read by. Returns 1
+ * when the child reached its own _exit(0) (body measured everything it set out to), 0 when the bound, a
+ * crash, or anything else ended it first: ctx then holds whatever body had written by then, never nothing,
+ * since ctx is shared rather than piped back at the end. */
+static int run_bounded_pass(void *ctx, void (*body)(void *)) {
+  fflush(NULL);
+  const pid_t child = fork();
+  if (child == 0) {
+    if (g_pass_bound_kb > 0) {
+      const struct rlimit rl = {(rlim_t)g_pass_bound_kb * 1024, (rlim_t)g_pass_bound_kb * 1024};
+      setrlimit(RLIMIT_AS, &rl);
+      setenv(OMX_RT_OOM_EXIT_ENV, "1", 1);
+    }
+    body(ctx);
+    _exit(0);
+  }
+  if (child < 0) return 0;
+  int status = 0;
+  waitpid(child, &status, 0);
+  return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+/* The lifecycle pass's own context: what it needs to run (rig_open's arguments), and what it reports,
+ * updated after every cycle so a kill mid-pass leaves the cycles that ran before it, not an empty record. */
+struct lifecycle_ctx {
+  struct host *H;
+  double rate;
+  uint32_t block;
+  int cycles;
+  int threads_before, threads_after_first, threads_after;
+  int instantiated, failed, cycles_done;
+  char refused[128];
+};
+
+static void lifecycle_body(void *v) {
+  struct lifecycle_ctx *lc = v;
+  lc->threads_before = count_threads();
+  lc->threads_after_first = -1;
+  for (int c = 0; c < lc->cycles; c++) {
+    struct rig *ci = rig_open(lc->H, lc->rate, lc->block);
+    if (ci == NULL) {
+      lc->failed++;
+      lc->cycles_done = c + 1;
+      continue;
+    }
+    m_activate(ci->inst);
+    if (c == 0) lc->threads_after_first = count_threads();
+    m_deactivate(ci->inst);
+    m_free(ci->inst);
+    rig_close(ci);
+    lc->instantiated++;
+    lc->cycles_done = c + 1;
+  }
+  lc->threads_after = count_threads();
+  if (lc->H->refused != NULL) snprintf(lc->refused, sizeof lc->refused, "%s", lc->H->refused);
+}
+
+/* The rest of the measurement's own context (#28): rt-safety, the note sweep, rate support, latency and
+ * cost all run as one further pass, in a child of their own — a fresh instance every rate of the rates
+ * loop alone outgrows a tight bound (proven against lv2-large-activate, 64 MiB held past cleanup), well
+ * before latency or cost even start. `required`/`optional` and `fp` are read-only, inherited from the
+ * parent at fork; the rest is what the lifecycle pass already found, carried along so this pass's own
+ * part of the record can sit beside it. */
+struct measure_rest_args {
+  struct host *H;
+  double rate;
+  uint32_t block;
+  int repeats, use_noise;
+  const char *uri;
+  LilvNodes *required, *optional;
+  int cycles, instantiated, failed;
+  int threads_before, threads_after_first, threads_after;
+  int lifecycle_bounded, cycles_done;
+  const struct footprint *fp;
+};
+
+/* Writes the object's remaining keys, from `rate` to the closing brace, into `out`: buffered (a
+ * memstream) when this runs in a child that might be killed mid-way, so nothing malformed ever reaches
+ * the real output; the real `jout` directly when the caller already knows the whole thing will complete.
+ * Every emit_* helper below reads the global `jout`, so it is pointed at `out` for the call and put back
+ * after — the plainest way to reuse them unchanged rather than threading a FILE* through all of them. */
+static void measure_rest(FILE *out, const struct measure_rest_args *a) {
+  FILE *const saved_jout = jout;
+  jout = out;
+  struct host *H = a->H;
+  const double rate = a->rate;
+  const uint32_t block = a->block;
+  const int repeats = a->repeats, use_noise = a->use_noise;
+  const char *uri = a->uri;
+  LilvNodes *required = a->required, *optional = a->optional;
+  const uint32_t n_audio_in = H->n_audio_in, n_audio_out = H->n_audio_out, n_cv = H->n_cv, n_control_in = H->n_control_in;
+  const int warmup_blocks = 64, measured_blocks = 512;
+  unsigned rng = 12345u;
+
+  /* ---- rt-safety: repeated, worst-case ---- */
+  uint64_t allocs = 0, locks = 0, syscalls = 0;
+  uint64_t allocs_min = UINT64_MAX, locks_min = UINT64_MAX, syscalls_min = UINT64_MAX;
+  int swept = 0;
+  struct omx_rt_event seen[OMX_RT_EV_MAX];
+  int n_seen = 0;
+  for (int rep = 0; rep < repeats; rep++) {
+  struct rig *inst = rig_open(H, rate, block);
+  uint64_t r_allocs = 0, r_locks = 0, r_syscalls = 0;
+  if (inst != NULL) {
+    /* Every port gets the buffer type it actually expects (rig_open). An atom port handed a
+     * float* is a segfault, not a measurement — LSP's equalisers carry two of them
+     * beside 196 control ports, which is how this was found. */
+
+    /* A -20 dBFS tone, so the plugin has real signal rather than silence: a gate or
+     * an expander given silence never leaves its quiet branch and would measure as
+     * RT-clean while its loud path allocates. */
+    fill_input(inst, &rng, use_noise, block, rate, 0);
+
+    m_activate(inst->inst);
+    for (int b = 0; b < warmup_blocks; b++) {
+      rig_prepare(inst);
+      m_run(inst->inst, block);
+      rig_after(inst);
+    }
+
+    if (rt_reset) rt_reset();
+    for (int b = 0; b < measured_blocks; b++) {
+      /* Sweep every control input, and every patch:writable parameter, across its FULL
+       * declared range as the blocks go by: this judges what allocates when a control
+       * crosses a threshold, not level, so it is not bounded like the soak. */
+      const float t = (float)b / (float)measured_blocks;
+      if (rig_sweep(inst, t, 0) > 0) swept = 1;
+      rig_prepare(inst);
+      if (rt_begin) rt_begin();
+      m_run(inst->inst, block);
+      if (rt_end) rt_end();
+      rig_after(inst);
+    }
+    if (rt_counts) rt_counts(&r_allocs, &r_locks, &r_syscalls);
+    if (rt_events && n_seen == 0) n_seen = rt_events(seen, OMX_RT_EV_MAX);
+    m_deactivate(inst->inst);
+    m_free(inst->inst);
+    rig_close(inst);
+  }
+  if (r_allocs > allocs) allocs = r_allocs;
+  if (r_locks > locks) locks = r_locks;
+  if (r_syscalls > syscalls) syscalls = r_syscalls;
+  if (r_allocs < allocs_min) allocs_min = r_allocs;
+  if (r_locks < locks_min) locks_min = r_locks;
+  if (r_syscalls < syscalls_min) syscalls_min = r_syscalls;
+  }
+  if (allocs_min == UINT64_MAX) allocs_min = 0;
+  if (locks_min == UINT64_MAX) locks_min = 0;
+  if (syscalls_min == UINT64_MAX) syscalls_min = 0;
+
+  /* ---- the note sweep: a plugin with a MIDI input, played, counted apart ---- */
+  struct {
+    int played, nonfinite, n_seen;
+    long events;
+    uint64_t allocs, locks, syscalls;
+    struct omx_rt_event seen[OMX_RT_EV_MAX];
+  } ns = {0};
+  if (H->midi_port >= 0) {
+    struct rig *ni = rig_open(H, rate, block);
+    if (ni != NULL) {
+      fill_input(ni, &rng, use_noise, block, rate, 0);
+      m_activate(ni->inst);
+      for (int b = 0; b < warmup_blocks; b++) {
+        rig_prepare(ni);
+        m_run(ni->inst, block);
+        rig_after(ni);
+      }
+      const long before = H->note_events;
+      if (rt_reset) rt_reset();
+      for (int b = 0; b < measured_blocks; b++) {
+        ni->note_block = b;
+        rig_prepare(ni);
+        if (rt_begin) rt_begin();
+        m_run(ni->inst, block);
+        if (rt_end) rt_end();
+        rig_after(ni);
+        if (n_audio_out > 0) {
+          const float *o = rig_out(ni);
+          for (uint32_t f = 0; f < block; f++)
+            if (!isfinite(o[f])) ns.nonfinite = 1;
+        }
+      }
+      ns.events = H->note_events - before;
+      if (rt_counts) rt_counts(&ns.allocs, &ns.locks, &ns.syscalls);
+      if (rt_events) ns.n_seen = rt_events(ns.seen, OMX_RT_EV_MAX);
+      ns.played = 1;
+      m_deactivate(ni->inst);
+      m_free(ni->inst);
+      rig_close(ni);
+    }
+  }
+
+  /* A plugin with no sweepable control was still measured; saying it was swept would
+   * be a lie the classifier would act on. Report what happened. */
+  const int sweep_applicable = n_control_in > 0 || H->n_params > 0;
+
+  fprintf(jout, "{\"uri\":");
+  json_str(jout, uri);
+  fprintf(jout, ",\"found\":true,\"instantiated\":true");
+  fprintf(jout, ",\"rate\":%.0f,\"block\":%u", rate, block);
+  fprintf(jout, ",\"audioInputs\":%u,\"audioOutputs\":%u,\"cvPorts\":%u,\"controlInputs\":%u",
+         n_audio_in, n_audio_out, n_cv, n_control_in);
+  /* the pin (plugin-qualify spec §11): the files this world loaded the plugin from, and its layout */
+  omx_lv2_pin_print(jout, H->world, H->plugin);
+
+  fprintf(jout, ",\"requiredFeatures\":[");
+  int first = 1;
+  LILV_FOREACH (nodes, i, required) {
+    const LilvNode *n = lilv_nodes_get(required, i);
+    if (!first) fprintf(jout, ",");
+    json_str(jout, lilv_node_as_string(n));
+    first = 0;
+  }
+  fprintf(jout, "],\"optionalFeatures\":[");
+  first = 1;
+  LILV_FOREACH (nodes, i, optional) {
+    const LilvNode *n = lilv_nodes_get(optional, i);
+    if (!first) fprintf(jout, ",");
+    json_str(jout, lilv_node_as_string(n));
+    first = 0;
+  }
+  fprintf(jout, "]");
+
+  fprintf(jout, ",\"lifecycle\":{\"cycles\":%d,\"instantiated\":%d,\"failed\":%d", a->cycles, a->instantiated, a->failed);
+  if (a->lifecycle_bounded) fprintf(jout, ",\"outcome\":\"probe.memory-bound\",\"cyclesDone\":%d", a->cycles_done);
+  fprintf(jout, "}");
+  fprintf(jout, ",\"threads\":{\"before\":%d,\"afterFirstInstantiate\":%d,\"afterAllFreed\":%d,\"leaked\":%d}",
+         a->threads_before, a->threads_after_first, a->threads_after,
+         a->threads_after > a->threads_before ? a->threads_after - a->threads_before : 0);
+  fprintf(jout, ",\"rtSafety\":{\"interposer\":%s,\"blocks\":%d,\"repeats\":%d,\"swept\":%s,"
+         "\"sweepApplicable\":%s,\"allocationsInRun\":%llu,\"allocationsMin\":%llu,"
+         "\"variable\":%s,\"locksInRun\":%llu,\"locksMin\":%llu,"
+         "\"syscallsInRun\":%llu,\"syscallsMin\":%llu,\"events\":[",
+         (rt_present && rt_present()) ? "true" : "false",
+         measured_blocks, repeats, swept ? "true" : "false", sweep_applicable ? "true" : "false",
+         (unsigned long long)allocs, (unsigned long long)allocs_min,
+         (allocs != allocs_min || locks != locks_min || syscalls != syscalls_min) ? "true" : "false",
+         (unsigned long long)locks, (unsigned long long)locks_min,
+         (unsigned long long)syscalls, (unsigned long long)syscalls_min);
+  emit_rt_events(seen, n_seen);
+  fprintf(jout, "]");
+  /* the note sweep: not applicable without a MIDI input, its counts only under the interposer */
+  if (!ns.played) {
+    fprintf(jout, ",\"noteSweep\":{\"applicable\":false}");
+  } else {
+    const int counted = rt_present && rt_present();
+    fprintf(jout, ",\"noteSweep\":{\"applicable\":true,\"dialect\":\"midi\",\"blocks\":%d,\"blockFrames\":%u,"
+            "\"noteEvents\":%ld,\"processErrors\":0,\"nonFinite\":%s,\"interposer\":%s",
+            measured_blocks, block, ns.events, ns.nonfinite ? "true" : "false", counted ? "true" : "false");
+    if (counted) {
+      fprintf(jout, ",\"allocationsInRun\":%llu,\"locksInRun\":%llu,\"syscallsInRun\":%llu,\"events\":[",
+              (unsigned long long)ns.allocs, (unsigned long long)ns.locks, (unsigned long long)ns.syscalls);
+      emit_rt_events(ns.seen, ns.n_seen);
+      fprintf(jout, "]");
+    }
+    fprintf(jout, "}");
+  }
+  fprintf(jout, "}");
+
+  /* ---- rate support: instantiate and RUN at each rate the console can boot at ----
+   * Instantiating is not enough. AmpVTS instantiates happily at 96 kHz and then
+   * outputs digital silence, which is why this runs blocks and checks the output is
+   * finite and non-silent for a plugin that was given signal. A plugin that dies or
+   * goes quiet at a rate must not be offered at that rate. The rates are the declared ones
+   * (OMX_DECLARED_RATES, <omxcontract/omx_contract_limits.h>: omx-contract's STANDARD_SAMPLE_RATES). The probe
+   * runs through the same host as everything else — options, worker — so a plugin whose sound
+   * depends on its worker is measured built. */
+  fprintf(jout, ",\"rates\":{");
+  for (size_t ri = 0; ri < OMX_DECLARED_RATE_COUNT; ri++) {
+    const double r = OMX_DECLARED_RATES[ri];
+    int ok = 0, nonfinite = 0;
+    double rms_out = -1.0;
+    struct rig *pr = rig_open(H, r, block);
+    if (pr != NULL) {
+      m_activate(pr->inst);
+      double sum = 0.0;
+      const char *pb = getenv("OMX_PROBE_BLOCKS");
+      const int probe_blocks = pb ? atoi(pb) : 96;
+      const int probe_settle = probe_blocks / 3;
+      for (int b2 = 0; b2 < probe_blocks; b2++) {
+        fill_input(pr, &rng, use_noise, block, r, (long)b2 * block);
+        rig_prepare(pr);
+        m_run(pr->inst, block);
+        rig_after(pr);
+        if (b2 >= probe_settle && n_audio_out > 0) {
+          const float *o = rig_out(pr);
+          for (uint32_t f = 0; f < block; f++) {
+            const float v = o[f];
+            if (!isfinite(v)) nonfinite = 1;
+            else sum += (double)v * (double)v;
+          }
+        }
+      }
+      rms_out = n_audio_out ? sqrt(sum / ((double)(probe_blocks - probe_settle) * block)) : -1.0;
+      /* An ABSOLUTE silence threshold cannot see AmpVTS: it reads 1.07e-5 at 96 kHz,
+       * quiet enough to be useless and loud enough to pass any fixed floor. The
+       * verdict is a RATIO against the plugin's own best rate, computed by the
+       * caller from the per-rate rms this emits. Reported here, judged there. */
+      ok = 1;
+      m_deactivate(pr->inst);
+      m_free(pr->inst);
+      rig_close(pr);
+    }
+    fprintf(jout, "%s\"%.0f\":{\"instantiated\":%s,\"nonFinite\":%s,"
+           "\"rms\":%.9g,\"rmsDbfs\":%.2f}",
+           ri ? "," : "", r, ok ? "true" : "false",
+           nonfinite ? "true" : "false", rms_out,
+           rms_out > 0 ? omx_lin_to_db_d(rms_out, 0.0) : -999.0);
+  }
+  fprintf(jout, "}");
+
+  /* ---- latency and cost at the run's rate and block (see the passes above) ---- */
+  {
+    struct latency_at lat;
+    struct cost_at cost;
+    measure_latency(H, rate, block, &lat);
+    measure_cost(H, rate, block, &cost);
+    emit_latency(rate, &lat);
+    emit_cost(rate, &cost, block, n_audio_in == 0 && H->midi_port >= 0, a->fp);
+  }
+  emit_host_facts(H);
+  emit_feature_options();
+  fprintf(jout, "}\n");
+  fflush(jout);
+
+  jout = saved_jout;
+}
+
 static void usage(FILE *out, const char *self) {
   fprintf(out,
           "usage: %s [flags] <plugin-uri> [rate] [block] [cycles] [repeats]\n"
@@ -1347,8 +1720,6 @@ int main(int argc, char **argv) {
     if (fd >= 0 && dup2(2, 1) >= 0) jout = fdopen(fd, "w");
     if (jout == NULL) jout = stdout;
   }
-  const int warmup_blocks = 64, measured_blocks = 512;
-
   /* A tone excites a narrow band; noise excites everything. AmpVTS's rate-dependent
    * death showed under noise and hid under a 1 kHz sine, so the stimulus is a knob
    * and the sweep runs the one that reproduces known failures. */
@@ -1356,6 +1727,7 @@ int main(int argc, char **argv) {
   unsigned rng = 12345u;
 
   resolve_interposer();
+  resolve_pass_bound();
 
   LilvWorld *world = lilv_world_new();
   lilv_world_load_all(world);
@@ -1389,7 +1761,6 @@ int main(int argc, char **argv) {
     LILV_FOREACH (nodes, i, required) if (H->required) H->required[k++] = lilv_node_as_uri(lilv_nodes_get(required, i));
   }
   const uint32_t n_audio_in = H->n_audio_in, n_audio_out = H->n_audio_out;
-  const uint32_t n_cv = H->n_cv, n_control_in = H->n_control_in;
 
   /* ---- SOAK MODE ----------------------------------------------------------
    * The stability dimension's real question is not "does it start" but "does it
@@ -1516,29 +1887,37 @@ int main(int argc, char **argv) {
     return refused ? 2 : 0;
   }
 
-  /* ---- lifecycle: instantiate and destroy, counting what does not come back ---- */
-  const int threads_before = count_threads();
-  int instantiated = 0, failed = 0;
-  int threads_after_first = -1;
-  for (int c = 0; c < cycles; c++) {
-    struct rig *ci = rig_open(H, rate, block);
-    if (ci == NULL) {
-      failed++;
-      continue;
+  /* ---- lifecycle: instantiate and destroy, counting what does not come back, in a child of its own (#28) ---- */
+  struct lifecycle_ctx *lc = pass_alloc(sizeof *lc);
+  int lifecycle_clean = 1;
+  int threads_before = -1, threads_after_first = -1, threads_after = -1;
+  int instantiated = 0, failed = cycles, cycles_done = 0;
+  if (lc != NULL) {
+    memset(lc, 0, sizeof *lc);
+    lc->H = H;
+    lc->rate = rate;
+    lc->block = block;
+    lc->cycles = cycles;
+    lifecycle_clean = run_bounded_pass(lc, lifecycle_body);
+    threads_before = lc->threads_before;
+    threads_after_first = lc->threads_after_first;
+    threads_after = lc->threads_after;
+    instantiated = lc->instantiated;
+    failed = lc->failed;
+    cycles_done = lc->cycles_done;
+    if (lc->refused[0] != '\0') {
+      snprintf(g_lifecycle_refused, sizeof g_lifecycle_refused, "%s", lc->refused);
+      H->refused = g_lifecycle_refused;
     }
-    m_activate(ci->inst);
-    if (c == 0) threads_after_first = count_threads();
-    m_deactivate(ci->inst);
-    m_free(ci->inst);
-    rig_close(ci);
-    instantiated++;
+    pass_free(lc, sizeof *lc);
   }
-  const int threads_after = count_threads();
+  const int lifecycle_bounded = !lifecycle_clean;
 
   if (instantiated == 0) {
     fprintf(jout, "{\"uri\":");
     json_str(jout, uri);
     fprintf(jout, ",\"found\":true,\"instantiated\":false,\"cyclesAttempted\":%d", cycles);
+    if (lifecycle_bounded) fprintf(jout, ",\"lifecycle\":{\"outcome\":\"probe.memory-bound\",\"cyclesDone\":%d}", cycles_done);
     emit_refusal(H);
     emit_feature_options();
     fprintf(jout, "}\n");
@@ -1546,235 +1925,59 @@ int main(int argc, char **argv) {
     return 2;
   }
 
-  /* ---- rt-safety: repeated, worst-case ---- */
-  uint64_t allocs = 0, locks = 0, syscalls = 0;
-  uint64_t allocs_min = UINT64_MAX, locks_min = UINT64_MAX, syscalls_min = UINT64_MAX;
-  int swept = 0;
-  struct omx_rt_event seen[OMX_RT_EV_MAX];
-  int n_seen = 0;
-  for (int rep = 0; rep < repeats; rep++) {
-  struct rig *inst = rig_open(H, rate, block);
-  uint64_t r_allocs = 0, r_locks = 0, r_syscalls = 0;
-  if (inst != NULL) {
-    /* Every port gets the buffer type it actually expects (rig_open). An atom port handed a
-     * float* is a segfault, not a measurement — LSP's equalisers carry two of them
-     * beside 196 control ports, which is how this was found. */
-
-    /* A -20 dBFS tone, so the plugin has real signal rather than silence: a gate or
-     * an expander given silence never leaves its quiet branch and would measure as
-     * RT-clean while its loud path allocates. */
-    fill_input(inst, &rng, use_noise, block, rate, 0);
-
-    m_activate(inst->inst);
-    for (int b = 0; b < warmup_blocks; b++) {
-      rig_prepare(inst);
-      m_run(inst->inst, block);
-      rig_after(inst);
+  /* ---- the rest of the measurement: rt-safety, the note sweep, rate support, latency and cost, in a
+   * child of their own (#28), for the same reason as the lifecycle pass just above: a fresh instance
+   * every rate of the rates loop alone outgrows a tight bound (proven against lv2-large-activate, 64 MiB
+   * held past cleanup), well before latency or cost even start. measure_rest builds the object's
+   * remaining keys into a memstream first, so a kill mid-pass never reaches the real output malformed;
+   * only once it is complete does the child copy it there and exit clean. */
+  const struct measure_rest_args rest_args = {
+      .H = H, .rate = rate, .block = block, .repeats = repeats, .use_noise = use_noise, .uri = uri,
+      .required = required, .optional = optional, .cycles = cycles, .instantiated = instantiated,
+      .failed = failed, .threads_before = threads_before, .threads_after_first = threads_after_first,
+      .threads_after = threads_after, .lifecycle_bounded = lifecycle_bounded, .cycles_done = cycles_done,
+      .fp = &footprint,
+  };
+  fflush(NULL);
+  const pid_t rest_child = fork();
+  if (rest_child == 0) {
+    if (g_pass_bound_kb > 0) {
+      const struct rlimit rl = {(rlim_t)g_pass_bound_kb * 1024, (rlim_t)g_pass_bound_kb * 1024};
+      setrlimit(RLIMIT_AS, &rl);
+      setenv(OMX_RT_OOM_EXIT_ENV, "1", 1);
     }
-
-    if (rt_reset) rt_reset();
-    for (int b = 0; b < measured_blocks; b++) {
-      /* Sweep every control input, and every patch:writable parameter, across its FULL
-       * declared range as the blocks go by: this judges what allocates when a control
-       * crosses a threshold, not level, so it is not bounded like the soak. */
-      const float t = (float)b / (float)measured_blocks;
-      if (rig_sweep(inst, t, 0) > 0) swept = 1;
-      rig_prepare(inst);
-      if (rt_begin) rt_begin();
-      m_run(inst->inst, block);
-      if (rt_end) rt_end();
-      rig_after(inst);
+    char *buf = NULL;
+    size_t buf_size = 0;
+    FILE *mem = open_memstream(&buf, &buf_size);
+    if (mem != NULL) {
+      measure_rest(mem, &rest_args);
+      fclose(mem);
+      fwrite(buf, 1, buf_size, jout);
+      fflush(jout);
     }
-    if (rt_counts) rt_counts(&r_allocs, &r_locks, &r_syscalls);
-    if (rt_events && n_seen == 0) n_seen = rt_events(seen, OMX_RT_EV_MAX);
-    m_deactivate(inst->inst);
-    m_free(inst->inst);
-    rig_close(inst);
+    _exit(0);
   }
-  if (r_allocs > allocs) allocs = r_allocs;
-  if (r_locks > locks) locks = r_locks;
-  if (r_syscalls > syscalls) syscalls = r_syscalls;
-  if (r_allocs < allocs_min) allocs_min = r_allocs;
-  if (r_locks < locks_min) locks_min = r_locks;
-  if (r_syscalls < syscalls_min) syscalls_min = r_syscalls;
-  }
-  if (allocs_min == UINT64_MAX) allocs_min = 0;
-  if (locks_min == UINT64_MAX) locks_min = 0;
-  if (syscalls_min == UINT64_MAX) syscalls_min = 0;
-
-  /* ---- the note sweep: a plugin with a MIDI input, played, counted apart ---- */
-  struct {
-    int played, nonfinite, n_seen;
-    long events;
-    uint64_t allocs, locks, syscalls;
-    struct omx_rt_event seen[OMX_RT_EV_MAX];
-  } ns = {0};
-  if (H->midi_port >= 0) {
-    struct rig *ni = rig_open(H, rate, block);
-    if (ni != NULL) {
-      fill_input(ni, &rng, use_noise, block, rate, 0);
-      m_activate(ni->inst);
-      for (int b = 0; b < warmup_blocks; b++) {
-        rig_prepare(ni);
-        m_run(ni->inst, block);
-        rig_after(ni);
-      }
-      const long before = H->note_events;
-      if (rt_reset) rt_reset();
-      for (int b = 0; b < measured_blocks; b++) {
-        ni->note_block = b;
-        rig_prepare(ni);
-        if (rt_begin) rt_begin();
-        m_run(ni->inst, block);
-        if (rt_end) rt_end();
-        rig_after(ni);
-        if (n_audio_out > 0) {
-          const float *o = rig_out(ni);
-          for (uint32_t f = 0; f < block; f++)
-            if (!isfinite(o[f])) ns.nonfinite = 1;
-        }
-      }
-      ns.events = H->note_events - before;
-      if (rt_counts) rt_counts(&ns.allocs, &ns.locks, &ns.syscalls);
-      if (rt_events) ns.n_seen = rt_events(ns.seen, OMX_RT_EV_MAX);
-      ns.played = 1;
-      m_deactivate(ni->inst);
-      m_free(ni->inst);
-      rig_close(ni);
-    }
-  }
-
-  /* A plugin with no sweepable control was still measured; saying it was swept would
-   * be a lie the classifier would act on. Report what happened. */
-  const int sweep_applicable = n_control_in > 0 || H->n_params > 0;
-
-  fprintf(jout, "{\"uri\":");
-  json_str(jout, uri);
-  fprintf(jout, ",\"found\":true,\"instantiated\":true");
-  fprintf(jout, ",\"rate\":%.0f,\"block\":%u", rate, block);
-  fprintf(jout, ",\"audioInputs\":%u,\"audioOutputs\":%u,\"cvPorts\":%u,\"controlInputs\":%u",
-         n_audio_in, n_audio_out, n_cv, n_control_in);
-  /* the pin (plugin-qualify spec §11): the files this world loaded the plugin from, and its layout */
-  omx_lv2_pin_print(jout, world, plugin);
-
-  fprintf(jout, ",\"requiredFeatures\":[");
-  int first = 1;
-  LILV_FOREACH (nodes, i, required) {
-    const LilvNode *n = lilv_nodes_get(required, i);
-    if (!first) fprintf(jout, ",");
-    json_str(jout, lilv_node_as_string(n));
-    first = 0;
-  }
-  fprintf(jout, "],\"optionalFeatures\":[");
-  first = 1;
-  LILV_FOREACH (nodes, i, optional) {
-    const LilvNode *n = lilv_nodes_get(optional, i);
-    if (!first) fprintf(jout, ",");
-    json_str(jout, lilv_node_as_string(n));
-    first = 0;
-  }
-  fprintf(jout, "]");
-
-  fprintf(jout, ",\"lifecycle\":{\"cycles\":%d,\"instantiated\":%d,\"failed\":%d}",
-         cycles, instantiated, failed);
-  fprintf(jout, ",\"threads\":{\"before\":%d,\"afterFirstInstantiate\":%d,\"afterAllFreed\":%d,\"leaked\":%d}",
-         threads_before, threads_after_first, threads_after,
-         threads_after > threads_before ? threads_after - threads_before : 0);
-  fprintf(jout, ",\"rtSafety\":{\"interposer\":%s,\"blocks\":%d,\"repeats\":%d,\"swept\":%s,"
-         "\"sweepApplicable\":%s,\"allocationsInRun\":%llu,\"allocationsMin\":%llu,"
-         "\"variable\":%s,\"locksInRun\":%llu,\"locksMin\":%llu,"
-         "\"syscallsInRun\":%llu,\"syscallsMin\":%llu,\"events\":[",
-         (rt_present && rt_present()) ? "true" : "false",
-         measured_blocks, repeats, swept ? "true" : "false", sweep_applicable ? "true" : "false",
-         (unsigned long long)allocs, (unsigned long long)allocs_min,
-         (allocs != allocs_min || locks != locks_min || syscalls != syscalls_min) ? "true" : "false",
-         (unsigned long long)locks, (unsigned long long)locks_min,
-         (unsigned long long)syscalls, (unsigned long long)syscalls_min);
-  emit_rt_events(seen, n_seen);
-  fprintf(jout, "]");
-  /* the note sweep: not applicable without a MIDI input, its counts only under the interposer */
-  if (!ns.played) {
-    fprintf(jout, ",\"noteSweep\":{\"applicable\":false}");
-  } else {
-    const int counted = rt_present && rt_present();
-    fprintf(jout, ",\"noteSweep\":{\"applicable\":true,\"dialect\":\"midi\",\"blocks\":%d,\"blockFrames\":%u,"
-            "\"noteEvents\":%ld,\"processErrors\":0,\"nonFinite\":%s,\"interposer\":%s",
-            measured_blocks, block, ns.events, ns.nonfinite ? "true" : "false", counted ? "true" : "false");
-    if (counted) {
-      fprintf(jout, ",\"allocationsInRun\":%llu,\"locksInRun\":%llu,\"syscallsInRun\":%llu,\"events\":[",
-              (unsigned long long)ns.allocs, (unsigned long long)ns.locks, (unsigned long long)ns.syscalls);
-      emit_rt_events(ns.seen, ns.n_seen);
-      fprintf(jout, "]");
-    }
+  int rest_status = 0;
+  const int rest_clean = rest_child > 0 && waitpid(rest_child, &rest_status, 0) == rest_child &&
+                          WIFEXITED(rest_status) && WEXITSTATUS(rest_status) == 0;
+  if (!rest_clean) {
+    /* the child never reached its own end: what it would have written stays unwritten, not malformed,
+     * and this writes the record the lifecycle pass already earns instead of losing it too. */
+    fprintf(jout, "{\"uri\":");
+    json_str(jout, uri);
+    fprintf(jout, ",\"found\":true,\"instantiated\":true,\"rate\":%.0f,\"block\":%u", rate, block);
+    omx_lv2_pin_print(jout, world, plugin);
+    fprintf(jout, ",\"lifecycle\":{\"cycles\":%d,\"instantiated\":%d,\"failed\":%d", cycles, instantiated, failed);
+    if (lifecycle_bounded) fprintf(jout, ",\"outcome\":\"probe.memory-bound\",\"cyclesDone\":%d", cycles_done);
     fprintf(jout, "}");
+    fprintf(jout, ",\"threads\":{\"before\":%d,\"afterFirstInstantiate\":%d,\"afterAllFreed\":%d,\"leaked\":%d}",
+            threads_before, threads_after_first, threads_after,
+            threads_after > threads_before ? threads_after - threads_before : 0);
+    fprintf(jout, ",\"measurement\":{\"outcome\":\"probe.memory-bound\"}");
+    emit_feature_options();
+    fprintf(jout, "}\n");
+    fflush(jout);
   }
-  fprintf(jout, "}");
-
-  /* ---- rate support: instantiate and RUN at each rate the console can boot at ----
-   * Instantiating is not enough. AmpVTS instantiates happily at 96 kHz and then
-   * outputs digital silence, which is why this runs blocks and checks the output is
-   * finite and non-silent for a plugin that was given signal. A plugin that dies or
-   * goes quiet at a rate must not be offered at that rate. The rates are the declared ones
-   * (OMX_DECLARED_RATES, <omxcontract/omx_contract_limits.h>: omx-contract's STANDARD_SAMPLE_RATES). The probe
-   * runs through the same host as everything else — options, worker — so a plugin whose sound
-   * depends on its worker is measured built. */
-  fprintf(jout, ",\"rates\":{");
-  for (size_t ri = 0; ri < OMX_DECLARED_RATE_COUNT; ri++) {
-    const double r = OMX_DECLARED_RATES[ri];
-    int ok = 0, nonfinite = 0;
-    double rms_out = -1.0;
-    struct rig *pr = rig_open(H, r, block);
-    if (pr != NULL) {
-      m_activate(pr->inst);
-      double sum = 0.0;
-      const char *pb = getenv("OMX_PROBE_BLOCKS");
-      const int probe_blocks = pb ? atoi(pb) : 96;
-      const int probe_settle = probe_blocks / 3;
-      for (int b2 = 0; b2 < probe_blocks; b2++) {
-        fill_input(pr, &rng, use_noise, block, r, (long)b2 * block);
-        rig_prepare(pr);
-        m_run(pr->inst, block);
-        rig_after(pr);
-        if (b2 >= probe_settle && n_audio_out > 0) {
-          const float *o = rig_out(pr);
-          for (uint32_t f = 0; f < block; f++) {
-            const float v = o[f];
-            if (!isfinite(v)) nonfinite = 1;
-            else sum += (double)v * (double)v;
-          }
-        }
-      }
-      rms_out = n_audio_out ? sqrt(sum / ((double)(probe_blocks - probe_settle) * block)) : -1.0;
-      /* An ABSOLUTE silence threshold cannot see AmpVTS: it reads 1.07e-5 at 96 kHz,
-       * quiet enough to be useless and loud enough to pass any fixed floor. The
-       * verdict is a RATIO against the plugin's own best rate, computed by the
-       * caller from the per-rate rms this emits. Reported here, judged there. */
-      ok = 1;
-      m_deactivate(pr->inst);
-      m_free(pr->inst);
-      rig_close(pr);
-    }
-    fprintf(jout, "%s\"%.0f\":{\"instantiated\":%s,\"nonFinite\":%s,"
-           "\"rms\":%.9g,\"rmsDbfs\":%.2f}",
-           ri ? "," : "", r, ok ? "true" : "false",
-           nonfinite ? "true" : "false", rms_out,
-           rms_out > 0 ? omx_lin_to_db_d(rms_out, 0.0) : -999.0);
-  }
-  fprintf(jout, "}");
-
-  /* ---- latency and cost at the run's rate and block (see the passes above) ---- */
-  {
-    struct latency_at lat;
-    struct cost_at cost;
-    measure_latency(H, rate, block, &lat);
-    measure_cost(H, rate, block, &cost);
-    emit_latency(rate, &lat);
-    emit_cost(rate, &cost, block, n_audio_in == 0 && H->midi_port >= 0, &footprint);
-  }
-  emit_host_facts(H);
-  emit_feature_options();
-  fprintf(jout, "}\n");
-  fflush(jout);
 
   release(H, required, optional, uri_node, world);
   return 0;
