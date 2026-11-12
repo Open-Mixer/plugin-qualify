@@ -3,6 +3,9 @@
   "lang": "ca",
   "owner": "plugin-qualify",
   "messages": {
-    "qualify.descriptor.duplicate-symbol": "Dos ports d'aquest connector comparteixen el símbol {symbol}, de manera que no es pot adreçar cap dels dos per aquest símbol; el connector no es descriu."
+    "qualify.descriptor.duplicate-symbol": {
+      "text": "Dos ports d'aquest connector comparteixen el símbol {symbol}, de manera que no es pot adreçar cap dels dos per aquest símbol; el connector no es descriu.",
+      "by": "human"
+    }
   }
 }
