@@ -7,7 +7,7 @@
  * scanner refuses a plugin by to an entry there, each sentence to naming exactly its args, and each shipped catalog
  * to the same codes and placeholders. Both files ship in the package (plugin-qualify#27).
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -18,7 +18,8 @@ const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 /** The codes a scan refuses a plugin by, each carrying args the sentence names. */
 const SCAN_REFUSALS = [DESCRIPTOR_CODE_DUPLICATE_SYMBOL];
 /** The languages this package ships a catalog for, each complete. */
-const CATALOG_LANGS = ["ca"];
+// every catalog the tree carries, one per listed language (omx-contract's languages.json), each complete
+const CATALOG_LANGS = readdirSync(join(PKG, "catalogs")).filter((f) => f.endsWith(".json")).map((f) => f.slice(0, -5)).sort();
 
 interface CodeEntry { code: string; text: { en: string }; args: string[] }
 
@@ -44,11 +45,13 @@ describe("each scan refusal code has its source sentence and its catalog entries
     });
     for (const lang of CATALOG_LANGS) {
       it(`${code} has a ${lang} sentence in catalogs/${lang}.json naming only its args`, () => {
-        const cat = readJson(`catalogs/${lang}.json`) as { kind?: string; lang?: string; owner?: string; messages?: Record<string, string> } | undefined;
+        // an entry is the sentence, or {text, by[, model, source]} with its provenance (omx-contract 3.16.0)
+        const cat = readJson(`catalogs/${lang}.json`) as { kind?: string; lang?: string; owner?: string; messages?: Record<string, string | { text?: string }> } | undefined;
         expect(cat?.kind).toBe("catalog");
         expect(cat?.lang).toBe(lang);
         expect(cat?.owner).toBe("plugin-qualify");
-        const sentence = cat?.messages?.[code];
+        const said = cat?.messages?.[code];
+        const sentence = typeof said === "string" ? said : said?.text;
         expect(sentence, `${code} has no ${lang} sentence`).toBeTypeOf("string");
         expect(placeholders(sentence ?? "")).toEqual([...(entries().get(code)?.args ?? [])].sort());
       });
@@ -58,7 +61,7 @@ describe("each scan refusal code has its source sentence and its catalog entries
   it("a catalog holds no code schema/codes.json does not declare", () => {
     const declared = entries();
     for (const lang of CATALOG_LANGS) {
-      const cat = readJson(`catalogs/${lang}.json`) as { messages?: Record<string, string> } | undefined;
+      const cat = readJson(`catalogs/${lang}.json`) as { messages?: Record<string, unknown> } | undefined;
       for (const code of Object.keys(cat?.messages ?? {})) expect(declared.has(code), `${lang}: ${code}`).toBe(true);
     }
   });
