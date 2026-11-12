@@ -1,0 +1,9 @@
+{
+  "$schema": "../schema/omx-contract.schema.json#/$defs/catalog",
+  "kind": "catalog",
+  "lang": "fr",
+  "owner": "plugin-qualify",
+  "messages": {
+    "qualify.descriptor.duplicate-symbol": { "text": "Deux ports de ce plugin partagent le symbole {symbol}, aucun ne peut donc être adressé par celui-ci ; le plugin n'est pas décrit.", "by": "machine", "model": "draft-prose", "source": "49bf98ce6378ab6684add3f1b765244e97334f2f5544fb6239982117b54cca72" }
+  }
+}
