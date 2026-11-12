@@ -12,6 +12,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { TEXT_CODE, type ReasonText } from "./text-codes.js";
+
 /** The daemon binary, else `plugin-hostd` on the PATH. */
 export const HOSTD_ENV = "PLUGIN_HOSTD";
 
@@ -41,9 +43,12 @@ export const SPAWNED_PIN_FILES: PinFilesRun = (uri, lv2Dirs, env) => {
 
 export type PinFiles =
   | { readonly ok: true; readonly root: string; readonly files: readonly { readonly path: string; readonly sha256: string }[] }
-  | { readonly ok: false; readonly detail: string };
+  | { readonly ok: false; readonly detail: ReasonText };
 
-/** The files plugin-hostd collects for `uri`, each hashed; why not, when it cannot say. */
+/**
+ * The files plugin-hostd collects for `uri`, each hashed; why not, when it cannot say: one of this package's codes
+ * (`reasonText` renders it), or the daemon's own last line as it wrote it.
+ */
 export function hostdPinFiles(
   uri: string,
   lv2Dirs: readonly string[],
@@ -52,11 +57,11 @@ export function hostdPinFiles(
   read: (path: string) => Buffer = (p) => readFileSync(p),
 ): PinFiles {
   const r = run(uri, lv2Dirs, env);
-  if (r.missing) return { ok: false, detail: "plugin-hostd is not installed: the files of a pin are plugin-hostd's to name" };
+  if (r.missing) return { ok: false, detail: { code: TEXT_CODE.pinHostdNotInstalled } };
   if (r.status !== 0) {
-    const why = r.stdout.startsWith("Usage:")
-      ? "this plugin-hostd has no --pin-files (plugin-hostd 0.15.0 or later names the files of a pin)"
-      : r.stderr.trim().split("\n").pop() || `plugin-hostd --pin-files exited ${String(r.status)}`;
+    const why: ReasonText = r.stdout.startsWith("Usage:")
+      ? { code: TEXT_CODE.pinHostdNoPinFiles }
+      : r.stderr.trim().split("\n").pop() || { code: TEXT_CODE.pinHostdExited, args: { status: String(r.status) } };
     return { ok: false, detail: why };
   }
   let root: string | undefined;
@@ -65,13 +70,13 @@ export function hostdPinFiles(
     if (line.startsWith("root ")) root = line.slice(5);
     else if (line.startsWith("file ")) names.push(line.slice(5));
   }
-  if (root === undefined || names.length === 0) return { ok: false, detail: "plugin-hostd --pin-files printed no root or no file" };
+  if (root === undefined || names.length === 0) return { ok: false, detail: { code: TEXT_CODE.pinHostdNoRootOrFile } };
   try {
     // a name is the word of a pin, percent-encoded when the file's name needs it (Surge XT's libSurge%20XT.so): the pin
     // keeps it as written, the file is the name it decodes to, as the daemon opens it
     const files = names.map((path) => ({ path, sha256: createHash("sha256").update(read(join(root!, decodeURIComponent(path)))).digest("hex") }));
     return { ok: true, root, files: files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0)) };
   } catch (e) {
-    return { ok: false, detail: `a file plugin-hostd names cannot be read: ${e instanceof Error ? e.message : String(e)}` };
+    return { ok: false, detail: { code: TEXT_CODE.pinFileUnreadable, args: { error: e instanceof Error ? e.message : String(e) } } };
   }
 }
