@@ -20,7 +20,7 @@ BuildRequires: pkgconfig
 BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: (pkgconfig(plugin-db) >= 0.3.1 with pkgconfig(plugin-db) < 0.4)
+BuildRequires: (pkgconfig(plugin-db) >= 0.4.0 with pkgconfig(plugin-db) < 0.5)
 BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.3 with pkgconfig(plugin-hostd-protocol) < 0.6)
 BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
 BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.31.2 with pkgconfig(omx-clap-lv2) < 0.32)
