@@ -13,6 +13,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { parsePinLine } from "./pins-file.js";
 import { parseSyncArgs, resolveSyncSettings, runSync } from "./qualify-sync.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-multi-id-"));
@@ -70,9 +71,10 @@ describe("a .clap that declares two plugin ids", () => {
   it("yields two records and two pins, each with the file's path, and the summary counts both", async () => {
     const ids = ["studio.kx.distrho.MVerb", "studio.kx.distrho.3BandEQ"];
     const m = stands(ids);
-    const args = parseSyncArgs(m.flags);
+    const sp = splitPathFlags(m.flags);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u");
+    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const lines: string[] = [];
     const summary = await runSync(r.settings, { env: m.env, log: (l) => lines.push(l) });
@@ -92,9 +94,10 @@ describe("a .clap that declares two plugin ids", () => {
 
   it("a bundle with one id keeps the key it always had, clap:<path>#<id>", async () => {
     const m = stands(["org.example.one"]);
-    const args = parseSyncArgs(m.flags);
+    const sp = splitPathFlags(m.flags);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u");
+    const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const summary = await runSync(r.settings, { env: m.env, log: () => {} });
     const pins = readFileSync(join(m.out, "qualified.pins"), "utf8").split("\n").map((l) => parsePinLine(l)).filter((p) => p !== undefined);

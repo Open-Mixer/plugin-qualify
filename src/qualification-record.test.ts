@@ -55,7 +55,7 @@ describe("the qualification record and the probe output it judged", () => {
     ]);
     expect(record.cost.map((c) => [c.host, c.rate, c.quantum, c.reasons.map((r) => r.code)])).toEqual([
       ["omx-clap-host", 48000, 128, ["hosting.cost.within-ceiling"]],
-      ["openmixer-console", 96000, 1024, ["hosting.cost.unmeasured-at-rate-and-quantum"]],
+      ["openmixer-console", 96000, 256, ["hosting.cost.unmeasured-at-rate-and-quantum"]],
     ]);
     expect(record.measurements.grid.map((p) => [p.rate, p.quantum, p.cost?.median])).toEqual([
       [48000, 128, 41.2],

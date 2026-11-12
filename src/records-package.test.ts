@@ -15,6 +15,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { FIXTURE_CLAP_ID, writeFakeClap, writeFixtureRecord } from "./distributed-records.support.js";
 import { parseSyncArgs, resolveSyncSettings, runSync } from "./qualify-sync.js";
 import { readDeb, recordsDependsRange, recordsPackageName } from "./records-package.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 // the plugin-qualify these records are written by: its minor, up to the next one
 const ownVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
@@ -117,14 +118,15 @@ describe("plugin-qualify-records-package", () => {
     readDeb(deb, tree);
     const m = join(scratch, "fresh");
     mkdirSync(join(m, "lv2"), { recursive: true });
-    const args = parseSyncArgs([
+    const sp = splitPathFlags([
       "--clap-path", dirname(device.clap), "--lv2-path", join(m, "lv2"), "--lv2-extra", "",
       "--qualification-dir", join(m, "q"), "--descriptor-dir", join(m, "d"), "--state-file", join(m, "s.json"), "--pin-file", join(m, "p.pins"),
       "--hostd-port", "0", "--budget-s", "5", "--host-class", "test-class", "--distributed-dir", join(tree, "usr", "share", "omx", "qualification"),
       "--grid", "48000/128",
     ]);
+    const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
-    const s = resolveSyncSettings(new Map(), args.args, {}, m);
+    const s = resolveSyncSettings(new Map(), args.args, {}, m, undefined, undefined, sp.run);
     if (!s.ok) throw new Error(s.error);
     // other.clap has no record in the package and is measured; plate.clap is taken from it
     unlinkSync(join(dirname(device.clap), "other.clap"));
@@ -211,14 +213,15 @@ describe("a run of two cells, one package per cell (#317, plugin-db-qualificatio
       for (const o of cells) readDeb(debOf(o.set), tree);
       const m = join(scratch, `run-fresh-${String(c.rate)}`);
       mkdirSync(join(m, "lv2"), { recursive: true });
-      const args = parseSyncArgs([
+      const sp = splitPathFlags([
         "--clap-path", dirname(clap), "--lv2-path", join(m, "lv2"), "--lv2-extra", "",
         "--qualification-dir", join(m, "q"), "--descriptor-dir", join(m, "d"), "--state-file", join(m, "s.json"), "--pin-file", join(m, "p.pins"),
         "--hostd-port", "0", "--budget-s", "5", "--host-class", "x86-64", "--distributed-dir", join(tree, "usr", "share", "omx", "qualification"),
         "--grid", `${String(c.rate)}/${String(c.quantum)}`,
       ]);
+      const args = parseSyncArgs(sp.argv);
       if (!args.ok) throw new Error(args.error);
-      const s = resolveSyncSettings(new Map(), args.args, {}, m);
+      const s = resolveSyncSettings(new Map(), args.args, {}, m, undefined, undefined, sp.run);
       if (!s.ok) throw new Error(s.error);
       const lines: string[] = [];
       await runSync(s.settings, { env: {}, log: (l) => lines.push(l) });

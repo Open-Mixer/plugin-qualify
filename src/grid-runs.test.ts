@@ -109,7 +109,7 @@ describe("the runner is invoked at every cell of the grid, an LV2 plugin like a 
   it("a budget measures the first cells alone, and --blocks reaches the CLAP sweep", () => {
     qualifyTargets([CLAP], { rates: QUALIFY_RATES, quanta: QUALIFY_QUANTA, grid: GRID_HOSTS, cellsPerPluginBudget: 3, blocks: 128, profiles: HOST_PROFILES, env: env(), exists, admissions: HOSTS_ADMIT });
     const cs = calls();
-    expect(invokedCells(cs.slice(0, cs.length / 2))).toEqual(["48000/128", "48000/256", "96000/1024"]);
+    expect(invokedCells(cs.slice(0, cs.length / 2))).toEqual(["48000/128", "48000/256", "96000/256"]);
     expect(cs.every((c) => c.blocks === 128)).toBe(true);
   });
 });
@@ -138,9 +138,9 @@ describe("the verdict reads the host's own cell", () => {
     }
   });
 
-  it("an absent cell is named: openmixer-console at 96000/1024, with 96000/512 measured beside it", () => {
+  it("an absent cell is named: openmixer-console at 96000/256, with 96000/512 measured beside it", () => {
     const [h] = judgeProbeOutput(doc(), [OPENMIXER_CONSOLE_PROFILE]).hosts;
-    expect(h!.cost.reasons).toEqual([{ dimension: "cost", rating: "unknown", code: HOSTING_CODE.costUnmeasured, params: { rate: 96000, quantum: 1024 } }]);
+    expect(h!.cost.reasons).toEqual([{ dimension: "cost", rating: "unknown", code: HOSTING_CODE.costUnmeasured, params: { rate: 96000, quantum: 256 } }]);
   });
 
   it("a child the kernel killed at memory.max is a cell of the runner's own outcome, with the mechanism, and the others are judged", () => {
@@ -247,6 +247,7 @@ describe("the memory bound", () => {
       const at = (key: string) => w.record.measurements.grid.find((p) => cellKey(p) === key);
       expect(at("192000/512")).toMatchObject({ rate: 192000, quantum: 512, outcome: PROBE_OOM, memoryLimit: { bytes: bound.bytes, mechanism: MEMORY_BOUND_MECHANISM } });
       expect(at("48000/128")?.outcome).toBe("probe.ok");
+      expect(at("96000/256")?.outcome).toBe("probe.ok");
       expect(at("96000/1024")?.outcome).toBe("probe.ok");
       expect(w.record.probe.outcome).toBe("probe.ok");
       // every host's own cell was measured, so every host is judged on its figure

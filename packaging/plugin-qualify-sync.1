@@ -75,9 +75,13 @@ Any setting of the file, as a flag: \fB\-\-budget\-s 30\fR for \fBbudget_s 30\fR
 /etc/omx/qualify.conf, /var/lib/omx/qualified.pins, /var/lib/omx/qualification, /var/lib/omx/descriptors,
 /var/lib/omx/qualify-sync.json, /var/lib/omx/qualify-owed.json, /usr/share/omx/qualification
 .PP
-plugin-qualify-sync.path watches the standard plugin folders. The folders the settings file adds
-(\fBlv2_path\fR, \fBlv2_extra\fR, \fBclap_path\fR, \fBclap_extra\fR) are written into a drop-in of that unit by a
+plugin-qualify-sync.path watches the standard plugin folders. The other folders plugin-hostd searches
+(\fBplugin-hostd \-\-search\-path \-c\fR \fIhostd_conf\fR) are written into a drop-in of that unit by a
 systemd generator at boot and at every \fBsystemctl daemon\-reload\fR.
+.PP
+The directories scanned are the ones \fBplugin-hostd \-\-search\-path\fR prints for \fBhostd_conf\fR;
+\fBlv2_path\fR, \fBlv2_extra\fR, \fBclap_path\fR and \fBclap_extra\fR belong in plugin-hostd's settings file and are
+refused here.
 .PP
 The path unit sees a bundle appear in a watched folder at once, but not a bundle's files being replaced in
 place (an upgrade). A plugin from a package is still caught at once, by the distribution's install triggers

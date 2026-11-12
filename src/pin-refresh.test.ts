@@ -27,6 +27,7 @@ import {
   type SyncContext,
   type SyncState,
 } from "./qualify-sync.js";
+import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const HOSTD = process.env["PLUGIN_HOSTD"];
 const FAKE_HOST = process.env["PLUGIN_HOSTD_FAKE_HOST"];
@@ -86,7 +87,7 @@ function ctxOf(dir: string, logs: string[]): SyncContext {
 function settingsFor(lv2: string) {
   const args = parseSyncArgs([]);
   if (!args.ok) throw new Error(args.error);
-  const r = resolveSyncSettings(new Map([["lv2_path", lv2], ["lv2_extra", ""]]), args.args, {}, scratch);
+  const r = resolveSyncSettings(new Map(), args.args, {}, scratch, undefined, undefined, searchPathOf([lv2], []));
   if (!r.ok) throw new Error(r.error);
   return r.settings;
 }
