@@ -358,8 +358,9 @@ class Lv2RoundTrip(unittest.TestCase):
         self.assertEqual(self.refused, [])
         self.assertEqual(sorted(self.docs()), sorted(u for u in self.rows if u != self.EQ10QS))
         # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19,
-        # eq10qm and eq10qs (plugin-qualify#27) the 21
-        self.assertEqual(len(self.rows), 23)
+        # eq10qm and eq10qs (plugin-qualify#27) the 21, and synth-late, synth-input, synth-thru and synth-sweep
+        # (plugin-qualify#21, the instruments' notes) the 27
+        self.assertEqual(len(self.rows), 27)
 
     def test_a_duplicate_port_symbol_refuses_the_descriptor_by_its_code_naming_the_symbol(self):
         """eq10qs's TTL names both output meters out_2_vu_ctl (EQ10Q's eq1qs..eq10qs): not drawn, refused."""

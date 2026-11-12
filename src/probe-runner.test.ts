@@ -24,6 +24,10 @@ import {
   CLAP_QUALIFY_TIMEOUT_S,
   CLAP_SWEEP_BLOCKS,
   LV2_HOSTING_TIMEOUT_S,
+  MEMORY_PASS_PROBE_NOTES,
+  PROBE_NOTES_CURVE,
+  PROBE_NOTES_CURVE_ENV,
+  PROBE_NOTES_ENV,
   PROBE_RUNNER_ENV,
   RT_INTERPOSE_ENV,
 } from "./qualify-declarations.js";
@@ -257,6 +261,64 @@ describe("qualifyTargets: a pass over the targets", () => {
       [LV2.uri, "jalv", "conditional", HOSTING_CODE.rtSafetyViolations],
     ]);
     expect(pass.documents).toEqual([]);
+  });
+
+  it("an LV2 instrument is played: the run holds the declared probe count of notes, or the count the caller set", () => {
+    const doc = fixtureJson("success-msi");
+    doc.plugin = { format: "lv2", id: LV2.uri };
+    const notes: (string | undefined)[] = [];
+    const run: ProbeRun = (tool, args, env) => {
+      notes.push(env[PROBE_NOTES_ENV]);
+      writeFileSync(args[args.indexOf("--out") + 1]!, JSON.stringify(doc));
+      return { status: 0, signal: null };
+    };
+    probeTarget(LV2, { rates: [48000], run, env: {} });
+    probeTarget(LV2, { rates: [48000], run, env: { [PROBE_NOTES_ENV]: "4" } });
+    expect(notes).toEqual([String(MEMORY_PASS_PROBE_NOTES), "4"]);
+  });
+
+  it("an LV2 instrument is timed at every count of the declared curve, or the curve the caller set", () => {
+    const doc = fixtureJson("success-msi");
+    doc.plugin = { format: "lv2", id: LV2.uri };
+    const curves: (string | undefined)[] = [];
+    const run: ProbeRun = (tool, args, env) => {
+      curves.push(env[PROBE_NOTES_CURVE_ENV]);
+      writeFileSync(args[args.indexOf("--out") + 1]!, JSON.stringify(doc));
+      return { status: 0, signal: null };
+    };
+    probeTarget(LV2, { rates: [48000], run, env: {} });
+    probeTarget(LV2, { rates: [48000], run, env: { [PROBE_NOTES_CURVE_ENV]: "1,2" } });
+    expect(curves).toEqual([PROBE_NOTES_CURVE.join(","), "1,2"]);
+  });
+
+  it("a run starts with a HOME of its own, under its scratch directory, never the caller's (Surge XT died without one)", () => {
+    const doc = fixtureJson("success-msi");
+    doc.plugin = { format: "lv2", id: LV2.uri };
+    const homes: (string | undefined)[] = [];
+    const run: ProbeRun = (tool, args, env) => {
+      homes.push(env["HOME"]);
+      writeFileSync(args[args.indexOf("--out") + 1]!, JSON.stringify(doc));
+      return { status: 0, signal: null };
+    };
+    probeTarget(LV2, { rates: [48000], run, env: { HOME: "/home/someone" } });
+    probeTarget(LV2, { rates: [48000], run, env: {} });
+    for (const h of homes) {
+      expect(h).toBeDefined();
+      expect(h).not.toBe("/home/someone");
+      expect(h!.startsWith(tmpdir())).toBe(true);
+    }
+  });
+
+  it("a CLAP instrument is timed at the declared curve too: the prober reads it from the run's environment", () => {
+    const curves: (string | undefined)[] = [];
+    const { run } = runner((args) => fixtureText("success-msi").replace("urn:clap:org.example.plate", "org.example.plate"));
+    const capture: ProbeRun = (tool, args, env) => (curves.push(env[PROBE_NOTES_CURVE_ENV]), run(tool, args, env));
+    try {
+      probeTarget(CLAP, { rates: [48000], run: capture, env: TOOLS, exists });
+    } catch {
+      // the document may not be about this plugin; the environment the run was given is what is checked
+    }
+    expect(curves).toEqual([PROBE_NOTES_CURVE.join(",")]);
   });
 
   it("no JACK server stops the pass by name, and the probe runner is never started", () => {
