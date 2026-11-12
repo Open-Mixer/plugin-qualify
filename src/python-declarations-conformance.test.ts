@@ -24,7 +24,7 @@ describe('tools/_declarations.py is generated, verbatim', () => {
   it('the generator produces a non-trivial module naming both figures — positive control', () => {
     const content = declarationsFile();
     expect(content).toContain('COST_REFERENCE_RATE = 96000');
-    expect(content).toContain('QUANTUM_FRAMES = 1024');
+    expect(content).toContain('QUANTUM_FRAMES = 256');
   });
 
   it('a stale, hand-typed COST_REFERENCE_RATE is NOT what the file states — sabotage control', () => {

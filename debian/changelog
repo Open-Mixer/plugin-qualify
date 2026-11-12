@@ -1,3 +1,21 @@
+plugin-qualify (0.20.3) unstable; urgency=medium
+
+  * The directories the sync scans are the ones plugin-hostd --search-path
+    prints for hostd_conf, a new setting (plugin-hostd's own settings file by
+    default); lv2_path, lv2_extra, clap_path and clap_extra are refused in
+    qualify.conf and as flags, with a pointer to plugin-hostd's settings file;
+    a list plugin-hostd takes from its environment or default is said to possibly
+    differ from the running daemon's (#9).
+  * The path unit's drop-in holds the folders plugin-hostd --search-path
+    prints.
+  * Built and run against the inner layers' latest releases: plugin-hostd
+    >= 0.20.3 (its --search-path), omx-clap-host, omx-clap-core and
+    omx-clap-lv2 >= 0.31.2, each below the next minor.
+  * The manual page, the overview and the CLAP host the qualifier presents
+    name Open-Mixer/plugin-qualify and OpenMixer, not FreeMixer.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Wed, 11 Nov 2026 00:30:00 +0000
+
 plugin-qualify (0.20.2) unstable; urgency=medium
 
   * Built and run against the inner layers' latest releases: plugin-hostd
