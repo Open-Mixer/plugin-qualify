@@ -34,6 +34,7 @@ import {
   writeFileWhole,
   localeOf,
   reasonText,
+  TEXT_CODE,
 } from "../dist/index.js";
 
 const LANG = localeOf();
@@ -65,7 +66,7 @@ function presence(hosts) {
     const program = HOST_TRAITS[host].program;
     const w = sh("sh", ["-c", `command -v "$1"`, "sh", program]);
     const path = w.status === 0 ? w.stdout.trim() : "";
-    if (!path) return { host, installed: false, version: null, reason: `${program} is not installed (not on PATH)` };
+    if (!path) return { host, installed: false, version: null, reason: { code: TEXT_CODE.compareHostNotInstalled, args: { program } } };
     return { host, installed: true, version: versionOf(program, path) };
   });
 }
