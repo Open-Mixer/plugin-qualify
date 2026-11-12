@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.2
+Version:        0.20.3
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -133,6 +133,15 @@ fi
 %{_libexecdir}/%{name}/
 
 %changelog
+* Thu Nov 12 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.3-1
+- lv2_measure's lifecycle and measurement passes each run in a child of their
+  own: a plugin whose content never comes back to the allocator between
+  instances (Surge XT's LV2, on the Raspberry Pi 5) grew the process until
+  the kernel ended it, with no record at all. The memory a pass keeps now
+  comes back to the OS when its child exits, and a pass that would outgrow
+  the run's memory bound ends that child alone, naming probe.memory-bound
+  instead (#28)
+
 * Tue Nov 10 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.2-1
 - built and run against the inner layers' latest releases: plugin-hostd >= 0.20.2,
   omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.31.1, plugin-hostd-protocol

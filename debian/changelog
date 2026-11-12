@@ -1,3 +1,15 @@
+plugin-qualify (0.20.3) unstable; urgency=medium
+
+  * lv2_measure's lifecycle and measurement passes each run in a child of
+    their own: a plugin whose content never comes back to the allocator
+    between instances (Surge XT's LV2, on the Raspberry Pi 5) grew the
+    process until the kernel ended it, with no record at all. The memory
+    a pass keeps now comes back to the OS when its child exits, and a
+    pass that would outgrow the run's memory bound ends that child alone,
+    naming probe.memory-bound instead (#28).
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Thu, 12 Nov 2026 12:00:00 +0100
+
 plugin-qualify (0.20.2) unstable; urgency=medium
 
   * Built and run against the inner layers' latest releases: plugin-hostd
