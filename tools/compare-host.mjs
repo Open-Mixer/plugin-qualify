@@ -316,7 +316,7 @@ async function protocolHost() {
   for (let i = 0; i < CYCLES; i++) {
     const base = ports() ?? [];
     const a = await ask(`add ${spec} ${INSTANCE}`);
-    if (i === 0) obs.load = a.resp !== undefined ? { ok: a.resp >= 0, resp: a.resp } : { ok: false, ...(a.died ? { died: a.died } : { detail: "no answer in time" }) };
+    if (i === 0) obs.load = a.resp !== undefined ? { ok: a.resp >= 0, resp: a.resp } : { ok: false, ...(a.died ? { died: a.died } : {}) };
     if (a.resp === undefined || a.resp < 0) {
       obs.cycles = { done, of: CYCLES, failedAt: "add", ...(a.died ? { died: a.died } : {}) };
       if (!alive() || closed) crashed(i === 0 ? "load" : `cycle ${String(i + 1)}`);
