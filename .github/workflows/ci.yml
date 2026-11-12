@@ -66,6 +66,9 @@ jobs:
       - name: Type-check
         run: pnpm lint
 
+      - name: package.json names the repository this workflow runs in
+        run: node packaging/check-repository.mjs
+
       - name: Test
         run: pnpm test
 
