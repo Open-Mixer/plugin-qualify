@@ -239,6 +239,8 @@ export const DESCRIPTOR_CODE_SCHEMA_MISSING = "qualify.descriptor.schema-missing
 export const DESCRIPTOR_CODE_SCHEMA_FLOOR = "qualify.descriptor.schema-floor";
 export const DESCRIPTOR_CODE_BINARY_UNHASHED = "qualify.descriptor.binary-unhashed";
 export const DESCRIPTOR_CODE_DIR_UNWRITABLE = "qualify.descriptor.dir-unwritable";
+/** Two ports of one plugin carry the same symbol: neither can be addressed by it, so the plugin is not described. Args: `symbol`. */
+export const DESCRIPTOR_CODE_DUPLICATE_SYMBOL = "qualify.descriptor.duplicate-symbol";
 
 
 
