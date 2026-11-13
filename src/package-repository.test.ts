@@ -3,7 +3,7 @@
 /**
  * npm's provenance check refuses a publish whose `package.json` names a different repository than
  * the one the publish ran in (E422). `v0.20.2` carried `repository.url: git+https://github.com/
- * FreeMixer/plugin-qualify.git` while the publish ran in Open-Mixer/plugin-qualify, so npm refused it
+ * Open-Mixer/plugin-qualify.git` while the publish ran in Open-Mixer/plugin-qualify, so npm refused it
  * and the tag never reached npm (#34). ci checks this on every pull request, before a tag can repeat it.
  */
 import { readFileSync } from "node:fs";
@@ -21,9 +21,9 @@ describe("package.json's repository.url names the repository a publish runs in (
   });
 
   it("sabotage: the field v0.20.2 actually shipped fails the check", () => {
-    const sabotaged = { ...PACKAGE, repository: { type: "git", url: "git+https://github.com/FreeMixer/plugin-qualify.git" } };
+    const sabotaged = { ...PACKAGE, repository: { type: "git", url: "git+https://github.com/Open-Mixer/plugin-qualify.git" } };
     expect(checkRepository(sabotaged, "Open-Mixer/plugin-qualify")).toBe(
-      'package.json: "repository.url" is "git+https://github.com/FreeMixer/plugin-qualify.git", expected to match "https://github.com/Open-Mixer/plugin-qualify.git" (GITHUB_REPOSITORY=Open-Mixer/plugin-qualify)',
+      'package.json: "repository.url" is "git+https://github.com/Open-Mixer/plugin-qualify.git", expected to match "https://github.com/Open-Mixer/plugin-qualify.git" (GITHUB_REPOSITORY=Open-Mixer/plugin-qualify)',
     );
   });
 
