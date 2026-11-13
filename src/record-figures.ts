@@ -5,9 +5,10 @@
  * menus and the zynthian-ui fork both need to show, read from `plugin-qualify.qualification-record/1`
  * (`qualification-record.ts`) rather than re-derived.
  *
- * `tools/record_figures.py` is the same reader for a Python console (zynthian-ui): the two are
- * held equal over the same fixtures (`record-figures-python-conformance.test.ts`), figure for
- * figure, word for word and code for code.
+ * This is the one reader of a record's figures; there is no Python twin (#55). The zynthian-ui fork
+ * reads no qualification record and no pins file: its `zynthian_plugin_qualification` asks plugin-db
+ * (`plugin-db query --json`, python3-plugin-db), whose answer carries the state, the tier and the
+ * figures at the rate and quantum, and the pins are plugin-hostd's, set and read through its verbs.
  *
  * This reader takes no side on the plugin: no tier, no state, no verdict. A figure plugin-qualify
  * did not take is absent here, never a zero and never guessed — that is plugin-db's reader
