@@ -94,14 +94,14 @@ in `/usr/libexec/plugin-qualify/` on Fedora and `/usr/lib/plugin-qualify/` on De
 come from packages, never from `make deps`: `clap-devel`, `lilv-devel`, `lv2-devel`,
 `plugin-db-devel`, `plugin-hostd-protocol-devel` and `omx-clap-lv2-devel` on Fedora, `clap-headers`, `liblilv-dev`, `lv2-dev`,
 `plugin-db-dev`, `libplugin-hostd-protocol-dev` and `libomx-clap-lv2-dev` on Debian (`clap-headers`, `plugin-db-dev` and
-`libomx-clap-lv2-dev` from the FreeMixer channel). An installed package is
+`libomx-clap-lv2-dev` from the OpenMixer channel). An installed package is
 checked with `packaging/check-installed.sh <rt-safe.clap> <rt-unsafe.clap> <lv2-fixture-dir>`, run
 with nothing set.
 
 There is no changelog file: git history is the changelog. `debian/changelog` and the spec's `%changelog`
 are packaging metadata. Bump `version` in `package.json` and `Version:` in the spec together.
 
-The tag publishes the RPM and DEB through the shared workflows of FreeMixer/.github and attaches the
+The tag publishes the RPM and DEB through the shared workflows of Open-Mixer/.github and attaches the
 `pnpm pack` tarball, `openmixer-plugin-qualify-<version>.tgz` with `dist/` built in, to the GitHub
 release. Pull requests build both package kinds, install each in its distribution's container and run
 `packaging/check-installed.sh` there, and pack the tarball, as a dry run that publishes nothing;
