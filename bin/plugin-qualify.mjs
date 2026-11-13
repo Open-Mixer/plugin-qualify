@@ -50,6 +50,14 @@ import {
   writeQualification,
   textTable,
   writeFileWhole,
+  HOSTD_ENV,
+  SYNC_CONF,
+  hereFacts,
+  hereHelpText,
+  hereText,
+  parseHereArgs,
+  parseSyncConf,
+  toolVersion,
 } from "../dist/index.js";
 
 /**
@@ -97,6 +105,33 @@ if (process.argv[2] === "judge") {
       : textTable(result.verdicts),
   );
   process.exit(judgeExitCode(result));
+}
+
+// the facts of here a plugin-db query is asked with (#56): text, or --json one object by plugin-db's keys
+if (process.argv[2] === "here") {
+  const h = parseHereArgs(process.argv.slice(3));
+  if (!h.ok) {
+    process.stderr.write(`plugin-qualify here: ${h.error}\n\n${hereHelpText()}`);
+    process.exit(2);
+  }
+  const confPath = h.args.config ?? SYNC_CONF;
+  let confText = "";
+  try {
+    confText = readFileSync(confPath, "utf8");
+  } catch (e) {
+    if (e.code !== "ENOENT") {
+      process.stderr.write(`plugin-qualify here: ${confPath}: cannot read: ${e.message}\n`);
+      process.exit(2);
+    }
+  }
+  const conf = parseSyncConf(confText, confPath);
+  if (!conf.ok) {
+    process.stderr.write(`plugin-qualify here: ${conf.error}\n`);
+    process.exit(2);
+  }
+  const facts = hereFacts({ file: conf.values, hostdVersion: toolVersion(process.env[HOSTD_ENV] ?? "plugin-hostd") });
+  process.stdout.write(h.args.json ? `${JSON.stringify(facts)}\n` : hereText(facts));
+  process.exit(0);
 }
 
 if (process.argv[2] === "judged-layer") {
