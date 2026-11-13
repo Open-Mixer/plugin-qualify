@@ -45,3 +45,4 @@ export * from "./adjust-cli.js";
 export * from "./compare.js";
 export * from "./text-codes.js";
 export * from "./text-catalog.js";
+export * from "./refused-stderr-kept.js";
