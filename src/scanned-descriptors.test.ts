@@ -180,7 +180,7 @@ describe("the CLAP fixture set through clap-qualify and descriptors.py", () => {
     const doc = parseClapScan(text);
     const rows = clapScanDescriptors(doc);
     const written = readDir(dir);
-    expect(rows.length).toBe(27);
+    expect(rows.length).toBe(28); // synth-decay.clap among them (#26)
     expect([...written.keys()].sort()).toEqual(rows.map((r) => r.uri.replace(/^urn:clap:/, "")).sort());
     for (const row of rows) {
       const id = row.uri.replace(/^urn:clap:/, "");
