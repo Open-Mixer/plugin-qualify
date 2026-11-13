@@ -17,6 +17,8 @@ import { judgeProbeOutput } from "./probe-judge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
 import { buildQualificationRecord, type QualificationRecord } from "./qualification-record.js";
+import { rendered } from "./text-rendered.support.js";
+import { textOf } from "./text-catalog.js";
 
 const PIN = { files: "a".repeat(64), layout: `omx-layout/1:${"b".repeat(64)}` };
 
@@ -30,7 +32,7 @@ function recordOf(patch: (d: Record<string, any>) => void = () => {}): Qualifica
 
 const layerOf = (rec: QualificationRecord, extra: Partial<Parameters<typeof judgedLayerOf>[1]> = {}) => judgedLayerOf(rec, { machineClass: "x86-64", pin: PIN, ...extra });
 const mustLayer = (x: ReturnType<typeof judgedLayerOf>): JudgedLayer => {
-  if (!("envelope" in x)) throw new Error(x.reason);
+  if (!("envelope" in x)) throw new Error(textOf(x.reason));
   return x;
 };
 
@@ -104,14 +106,14 @@ describe("a record's judged layer", () => {
   it("is not written when the verdict was not measured, and says why", () => {
     const rec = recordOf();
     const r = { ...rec, verdicts: rec.verdicts.map((v) => (v.host === "omx-clap-host" ? { ...v, measured: false, rating: "unknown", deciding: "probe.timeout" } : v)) };
-    expect(layerOf(r)).toEqual({ layer: null, reason: "omx-clap-host: not measured (probe.timeout)" });
+    expect(rendered(layerOf(r))).toEqual({ layer: null, reason: "omx-clap-host: not measured (probe.timeout)" });
     const gone = { ...rec, verdicts: rec.verdicts.filter((v) => v.host !== "omx-clap-host") };
-    expect((layerOf(gone) as { reason: string }).reason).toMatch(/no verdict under omx-clap-host/);
+    expect((rendered(layerOf(gone)) as unknown as { reason: string }).reason).toMatch(/no verdict under omx-clap-host/);
   });
 
   it("a record from before the rules were stated takes them from the plugin-qualify that judged its set, or has no layer", () => {
     const { rules: _r, latencyLineMs: _l, ...old } = recordOf();
-    expect((layerOf(old as QualificationRecord) as { reason: string }).reason).toMatch(/no rules/);
+    expect((rendered(layerOf(old as QualificationRecord)) as unknown as { reason: string }).reason).toMatch(/no rules/);
     const l = mustLayer(layerOf(old as QualificationRecord, { judgedBy: "0.19.1" }));
     expect(l.body.rules).toBe("plugin-qualify-rules/0.19");
     expect(l.body.latencyLineMs).toBe(LATENCY_LINE_MS);
@@ -119,7 +121,7 @@ describe("a record's judged layer", () => {
 
   it("a record with no plugin-hostd-probe version has no layer: the host version is never guessed", () => {
     const rec = { ...recordOf(), tool: { runner: "something-else 1.0" } };
-    expect((layerOf(rec) as { reason: string }).reason).toMatch(/plugin-hostd-probe/);
+    expect((rendered(layerOf(rec)) as unknown as { reason: string }).reason).toMatch(/plugin-hostd-probe/);
   });
 });
 
@@ -156,10 +158,10 @@ describe("plugin-qualify judged-layer", () => {
     const { parseJudgedLayerArgs } = await import("./judged-layer.js");
     const ok = parseJudgedLayerArgs(["r.json", "--machine-class", "x86-64", "--files", PIN.files, "--layout", PIN.layout, "--body"]);
     expect(ok).toEqual({ ok: true, args: { record: "r.json", machineClass: "x86-64", files: PIN.files, layout: PIN.layout, body: true } });
-    expect(parseJudgedLayerArgs(["r.json", "--files", PIN.files])).toEqual({ ok: false, error: "--machine-class is required" });
-    expect(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", "abc"]).ok).toBe(false);
-    expect(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", PIN.files, "--layout", "nope"]).ok).toBe(false);
-    expect(parseJudgedLayerArgs(["--machine-class", "x", "--files", PIN.files]).ok).toBe(false);
+    expect(rendered(parseJudgedLayerArgs(["r.json", "--files", PIN.files]))).toEqual({ ok: false, error: "--machine-class is required" });
+    expect(rendered(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", "abc"])).ok).toBe(false);
+    expect(rendered(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", PIN.files, "--layout", "nope"])).ok).toBe(false);
+    expect(rendered(parseJudgedLayerArgs(["--machine-class", "x", "--files", PIN.files])).ok).toBe(false);
   });
 
   it("the built command prints the layer, the body for plugin-db put, and exits 1 with the reason for no layer", async () => {

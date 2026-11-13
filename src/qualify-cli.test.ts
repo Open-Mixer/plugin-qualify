@@ -30,6 +30,7 @@ import {
 import { JALV_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import { readMeasurementDocument, serialiseMeasurementDocument } from "./measurement/format.js";
 import { fixtureRun } from "./measurement/fixtures.js";
+import { rendered } from "./text-rendered.support.js";
 
 /** A run record, as every document must carry one. */
 const RUN = fixtureRun();
@@ -59,10 +60,10 @@ describe("parseQualifyArgs — the named-plugin path is first-class", () => {
     expect(f.ok && [f.args.grid, f.args.cellsPerPluginBudget, f.args.blocks, f.args.memoryLimit]).toEqual([{ kind: "full" }, 3, 128, 2 ** 31]);
     const c = parseQualifyArgs([ZERO_PATH_URI, "--grid", "48000/128"]);
     expect(c.ok && c.args.grid).toEqual({ kind: "cells", cells: [{ rate: 48000, quantum: 128 }] });
-    expect(parseQualifyArgs([ZERO_PATH_URI, "--grid-hosts"]).ok).toBe(true);
-    expect(parseQualifyArgs([ZERO_PATH_URI, "--memory-limit", "off"]).ok).toBe(true);
+    expect(rendered(parseQualifyArgs([ZERO_PATH_URI, "--grid-hosts"])).ok).toBe(true);
+    expect(rendered(parseQualifyArgs([ZERO_PATH_URI, "--memory-limit", "off"])).ok).toBe(true);
     for (const bad of [["--grid", "48000"], ["--grid-hosts", "--grid", "full"], ["--cells-per-plugin-budget", "-1"], ["--blocks", "0"], ["--memory-limit", "lots"]]) {
-      expect(parseQualifyArgs([ZERO_PATH_URI, ...bad]).ok, bad.join(" ")).toBe(false);
+      expect(rendered(parseQualifyArgs([ZERO_PATH_URI, ...bad])).ok, bad.join(" ")).toBe(false);
     }
   });
 
@@ -74,23 +75,23 @@ describe("parseQualifyArgs — the named-plugin path is first-class", () => {
 
   it("the removed --no-host-sweep flag is refused, never silently ignored", () => {
     const a = parseQualifyArgs([ZERO_PATH_URI, "--no-host-sweep"]);
-    expect(a).toEqual({ ok: false, error: "unknown option --no-host-sweep" });
+    expect(rendered(a)).toEqual({ ok: false, error: "unknown option --no-host-sweep" });
   });
 
   it("--all takes no targets; targets and --all together are refused, as is neither", () => {
     const all = parseQualifyArgs(["--all"]);
     expect(all.ok && all.args.all).toBe(true);
-    expect(parseQualifyArgs(["--all", ZERO_PATH_URI]).ok).toBe(false);
-    expect(parseQualifyArgs([]).ok).toBe(false);
+    expect(rendered(parseQualifyArgs(["--all", ZERO_PATH_URI])).ok).toBe(false);
+    expect(rendered(parseQualifyArgs([])).ok).toBe(false);
   });
 
   it("--rates/--quanta override the declarations; a non-number or an unknown flag is refused", () => {
     const a = parseQualifyArgs(["--rates", "48000,96000", "--quanta", "256", "x:y"]);
     expect(a.ok && a.args.rates).toEqual([48000, 96000]);
     expect(a.ok && a.args.quanta).toEqual([256]);
-    expect(parseQualifyArgs(["--rates", "fast", "x:y"]).ok).toBe(false);
-    expect(parseQualifyArgs(["--format", "xml", "x:y"]).ok).toBe(false);
-    expect(parseQualifyArgs(["--bogus", "x:y"]).ok).toBe(false);
+    expect(rendered(parseQualifyArgs(["--rates", "fast", "x:y"])).ok).toBe(false);
+    expect(rendered(parseQualifyArgs(["--format", "xml", "x:y"])).ok).toBe(false);
+    expect(rendered(parseQualifyArgs(["--bogus", "x:y"])).ok).toBe(false);
   });
 
   it("--out, --isolate are carried", () => {

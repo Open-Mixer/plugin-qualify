@@ -18,6 +18,7 @@ import { clapPinUri, pinVerdictOf, type PinEntry, type PinVerdict } from "./pins
 import { QUALIFICATION_RECORD_SCHEMA, type HistoryBlock, type QualificationRecord, type RecordVerdict } from "./qualification-record.js";
 import { EXIT_CODE, OUTPUT_FORMATS, type OutputFormat } from "./qualify-options.js";
 import type { SuitabilityRating } from "./rating.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 export interface AdjustArgs {
   readonly history: string;
@@ -31,7 +32,7 @@ export interface AdjustArgs {
   readonly help: boolean;
 }
 
-export type ParseAdjustResult = { ok: true; args: AdjustArgs } | { ok: false; error: string };
+export type ParseAdjustResult = { ok: true; args: AdjustArgs } | { ok: false; error: TextRef };
 
 const VALUE_FLAGS = ["--history", "--host-profile", "--qualification-dir", "--host-class", "--pins", "--now", "--format"];
 
@@ -41,24 +42,24 @@ export function parseAdjustArgs(argv: readonly string[]): ParseAdjustResult {
   let help = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (!a.startsWith("--")) return { ok: false, error: `${a}: adjust takes options only; the records are read from --qualification-dir` };
+    if (!a.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.adjustOptionsOnly, args: { argument: a } } };
     if (a === "--help") {
       help = true;
       continue;
     }
-    if (!VALUE_FLAGS.includes(a)) return { ok: false, error: `unknown option ${a}` };
+    if (!VALUE_FLAGS.includes(a)) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     const v = argv[++i];
-    if (v === undefined || v.startsWith("--")) return { ok: false, error: `${a} needs a value` };
+    if (v === undefined || v.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: a } } };
     if (a === "--host-profile") specs.push(...v.split(",").map((t) => t.trim()).filter((t) => t !== ""));
     else got.set(a, v);
   }
   const format = got.get("--format") ?? "text";
-  if (!(OUTPUT_FORMATS as readonly string[]).includes(format)) return { ok: false, error: `--format must be one of ${OUTPUT_FORMATS.join(", ")}` };
+  if (!(OUTPUT_FORMATS as readonly string[]).includes(format)) return { ok: false, error: { code: TEXT_CODE.cliFormatOneOf, args: { formats: OUTPUT_FORMATS.join(", ") } } };
   const nowText = got.get("--now");
   const now = nowText === undefined ? undefined : Number(nowText);
-  if (now !== undefined && !(Number.isInteger(now) && now >= 0)) return { ok: false, error: "--now must be UTC seconds, a whole number" };
+  if (now !== undefined && !(Number.isInteger(now) && now >= 0)) return { ok: false, error: { code: TEXT_CODE.adjustNowSeconds } };
   const history = got.get("--history");
-  if (!help && history === undefined) return { ok: false, error: "name the history file with --history" };
+  if (!help && history === undefined) return { ok: false, error: { code: TEXT_CODE.adjustNameHistory } };
   const dir = got.get("--qualification-dir");
   const hostClass = got.get("--host-class");
   const pins = got.get("--pins");

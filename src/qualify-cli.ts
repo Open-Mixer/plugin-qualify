@@ -22,6 +22,7 @@ import type { PluginLoader, PluginTarget } from "./loader.js";
 import { EXIT_CODE, OUTPUT_FORMATS, QUALIFY_OPTIONS, type OutputFormat } from "./qualify-options.js";
 import { GRID_FULL, parseGridSpec, type GridSpec } from "./measurement-grid.js";
 import { parseMemoryLimit } from "./memory-bound.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 export interface QualifyArgs {
   readonly all: boolean;
@@ -46,7 +47,7 @@ export interface QualifyArgs {
   readonly help: boolean;
 }
 
-export type ParseResult = { ok: true; args: QualifyArgs } | { ok: false; error: string };
+export type ParseResult = { ok: true; args: QualifyArgs } | { ok: false; error: TextRef };
 
 function defaultOf(flag: string): string {
   const d = QUALIFY_OPTIONS.find((o) => o.flag === flag)?.default;
@@ -73,26 +74,26 @@ export function parseQualifyArgs(argv: readonly string[]): ParseResult {
       targets.push(a);
       continue;
     }
-    if (!known.has(a)) return { ok: false, error: `unknown option ${a}` };
+    if (!known.has(a)) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     if (takesValue.has(a)) {
       const v = argv[++i];
-      if (v === undefined) return { ok: false, error: `${a} needs a value` };
+      if (v === undefined) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: a } } };
       if (a === "--host-profile") profileSpecs.push(...v.split(",").map((t) => t.trim()).filter((t) => t !== ""));
       seen.set(a, v);
     } else seen.set(a, true);
   }
   const help = seen.has("--help");
   const all = seen.has("--all");
-  if (!help && all && targets.length > 0) return { ok: false, error: "--all takes no plugin targets" };
-  if (!help && !all && targets.length === 0) return { ok: false, error: "name a plugin (URI or .lv2 bundle) or pass --all" };
+  if (!help && all && targets.length > 0) return { ok: false, error: { code: TEXT_CODE.cliAllTakesNoTargets } };
+  if (!help && !all && targets.length === 0) return { ok: false, error: { code: TEXT_CODE.cliNameTarget } };
   const rates = numberList((seen.get("--rates") as string | undefined) ?? defaultOf("--rates"));
-  if (rates === undefined) return { ok: false, error: "--rates must be positive integers, comma-separated" };
+  if (rates === undefined) return { ok: false, error: { code: TEXT_CODE.cliRatesList } };
   const quanta = numberList((seen.get("--quanta") as string | undefined) ?? defaultOf("--quanta"));
-  if (quanta === undefined) return { ok: false, error: "--quanta must be positive integers, comma-separated" };
+  if (quanta === undefined) return { ok: false, error: { code: TEXT_CODE.cliQuantaList } };
   const gridText = seen.get("--grid") as string | undefined;
-  if (gridText !== undefined && seen.has("--grid-hosts") && gridText.trim() !== "hosts") return { ok: false, error: "--grid-hosts and --grid name two grids; give one" };
+  if (gridText !== undefined && seen.has("--grid-hosts") && gridText.trim() !== "hosts") return { ok: false, error: { code: TEXT_CODE.cliTwoGrids } };
   const grid = gridText === undefined && seen.has("--grid-hosts") ? parseGridSpec("hosts") : gridText === undefined ? { ok: true as const, spec: GRID_FULL } : parseGridSpec(gridText);
-  if (!grid.ok) return { ok: false, error: `--grid: ${grid.error}` };
+  if (!grid.ok) return { ok: false, error: { code: TEXT_CODE.cliOptionProblem, args: { option: "--grid", problem: grid.error } } };
   const count = (flag: string, min: number): number | undefined => {
     const v = seen.get(flag) as string | undefined;
     if (v === undefined) return undefined;
@@ -100,19 +101,19 @@ export function parseQualifyArgs(argv: readonly string[]): ParseResult {
     return /^\d+$/.test(v.trim()) && Number.isSafeInteger(n) && n >= min ? n : NaN;
   };
   const cellsPerPluginBudget = count("--cells-per-plugin-budget", 0) ?? 0;
-  if (Number.isNaN(cellsPerPluginBudget)) return { ok: false, error: "--cells-per-plugin-budget must be a whole number, 0 or more" };
+  if (Number.isNaN(cellsPerPluginBudget)) return { ok: false, error: { code: TEXT_CODE.cliCellsBudget } };
   const blocks = count("--blocks", 1);
-  if (blocks !== undefined && Number.isNaN(blocks)) return { ok: false, error: "--blocks must be a whole number, 1 or more" };
+  if (blocks !== undefined && Number.isNaN(blocks)) return { ok: false, error: { code: TEXT_CODE.cliBlocks } };
   const memoryText = seen.get("--memory-limit") as string | undefined;
   const memory = memoryText === undefined ? undefined : parseMemoryLimit(memoryText);
-  if (memory !== undefined && !memory.ok) return { ok: false, error: `--memory-limit: ${memory.error}` };
+  if (memory !== undefined && !memory.ok) return { ok: false, error: { code: TEXT_CODE.cliOptionProblem, args: { option: "--memory-limit", problem: memory.error } } };
   const format = (seen.get("--format") as string | undefined) ?? defaultOf("--format");
   if (!(OUTPUT_FORMATS as readonly string[]).includes(format)) {
-    return { ok: false, error: `--format must be one of ${OUTPUT_FORMATS.join(", ")}` };
+    return { ok: false, error: { code: TEXT_CODE.cliFormatOneOf, args: { formats: OUTPUT_FORMATS.join(", ") } } };
   }
   const out = seen.get("--out") as string | undefined;
   const pins = seen.get("--pins") as string | undefined;
-  if (pins !== undefined && pins.startsWith("--")) return { ok: false, error: "--pins needs a file name" };
+  if (pins !== undefined && pins.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliPinsFile } };
   const hostProfiles = [...new Set(profileSpecs.length > 0 ? profileSpecs : [defaultOf("--host-profile")])];
   return {
     ok: true,

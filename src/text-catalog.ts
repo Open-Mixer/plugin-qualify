@@ -99,7 +99,8 @@ export function sourceOf(code: string): string {
 export function textOf(ref: TextRef, lang?: string): string {
   const source = sourceOf(ref.code);
   const sentence = lang === undefined || lang === "en" ? source : (entrySentence(loadMessages(lang)?.[ref.code], source) ?? source);
-  return fill(sentence, ref.args ?? {});
+  const args = Object.fromEntries(Object.entries(ref.args ?? {}).map(([k, v]) => [k, typeof v === "object" ? textOf(v, lang) : v]));
+  return fill(sentence, args);
 }
 
 /** A {@link ReasonText} rendered for `lang`: another tool's own words pass straight through; plugin-qualify's own go through {@link textOf}. */

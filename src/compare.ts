@@ -15,7 +15,7 @@
  */
 import { createHash } from "node:crypto";
 
-import { TEXT_CODE, type ReasonText } from "./text-codes.js";
+import { type ReasonText, TEXT_CODE, type TextRef } from "./text-codes.js";
 import { reasonText } from "./text-catalog.js";
 
 export const COMPARISON_RECORD_SCHEMA = "plugin-qualify.comparison-record/1";
@@ -105,7 +105,7 @@ export const COMPARE_DEFAULTS = {
   timeoutMs: 10000,
 } as const;
 
-export type ParseCompare = { ok: true; args: CompareArgs } | { ok: false; error: string };
+export type ParseCompare = { ok: true; args: CompareArgs } | { ok: false; error: TextRef };
 
 const positiveInt = (v: string | undefined): number | undefined => (v !== undefined && /^[1-9]\d*$/.test(v) ? Number(v) : undefined);
 
@@ -143,15 +143,15 @@ export function parseCompareArgs(argv: readonly string[]): ParseCompare {
       const v = value();
       const list = (v ?? "").split(",").filter(Boolean);
       const bad = list.filter((h) => !isCompareHost(h));
-      if (list.length === 0 || bad.length > 0) return { ok: false, error: `--hosts takes a list of ${COMPARE_HOSTS.join(", ")}${bad.length ? `; not a host: ${bad.join(", ")}` : ""}` };
+      if (list.length === 0 || bad.length > 0) return { ok: false, error: bad.length ? { code: TEXT_CODE.compareHostsListBad, args: { hosts: COMPARE_HOSTS.join(", "), bad: bad.join(", ") } } : { code: TEXT_CODE.compareHostsList, args: { hosts: COMPARE_HOSTS.join(", ") } } };
       hosts = COMPARE_HOSTS.filter((h) => list.includes(h));
     } else if (key !== undefined) {
       const v = positiveInt(value());
-      if (v === undefined) return { ok: false, error: `${a} takes a whole number above 0` };
+      if (v === undefined) return { ok: false, error: { code: TEXT_CODE.cliWholeAboveZero, args: { option: a } } };
       n[key] = v;
     } else if (a === "--limit") {
       const v = positiveInt(value());
-      if (v === undefined) return { ok: false, error: "--limit takes a whole number above 0" };
+      if (v === undefined) return { ok: false, error: { code: TEXT_CODE.cliWholeAboveZero, args: { option: "--limit" } } };
       limit = v;
     } else if (a === "--out") out = value();
     else if (a === "--host-class") hostClass = value();
@@ -159,21 +159,21 @@ export function parseCompareArgs(argv: readonly string[]): ParseCompare {
     else if (a === "--server") server = value();
     else if (a === "--format") {
       const v = value();
-      if (v !== "text" && v !== "json") return { ok: false, error: "--format is text or json" };
+      if (v !== "text" && v !== "json") return { ok: false, error: { code: TEXT_CODE.cliFormatTextOrJson } };
       format = v;
-    } else if (a.startsWith("-")) return { ok: false, error: `unknown option ${a}` };
+    } else if (a.startsWith("-")) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     else targets.push(a);
   }
   for (const [k, v] of [["--out", out], ["--host-class", hostClass], ["--set", set], ["--server", server]] as const) {
-    if (argv.includes(k) && (v === undefined || v.startsWith("-"))) return { ok: false, error: `${k} needs a value` };
+    if (argv.includes(k) && (v === undefined || v.startsWith("-"))) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: k } } };
   }
-  if (!help && !all && targets.length === 0) return { ok: false, error: "name the plugins (LV2 URIs, bundles or .clap files) or --all" };
-  if (all && targets.length > 0) return { ok: false, error: "--all and named plugins do not go together" };
+  if (!help && !all && targets.length === 0) return { ok: false, error: { code: TEXT_CODE.compareNameTargets } };
+  if (all && targets.length > 0) return { ok: false, error: { code: TEXT_CODE.cliAllWithTargets } };
   if (publish && (out === undefined || hostClass === undefined || set === undefined)) {
-    return { ok: false, error: "--publish writes a summary for the records: it needs --out, --host-class and --set" };
+    return { ok: false, error: { code: TEXT_CODE.comparePublishNeeds } };
   }
   if (publish && !REFERENCE_HOSTS.every((h) => hosts.includes(h))) {
-    return { ok: false, error: `--publish compares against ${REFERENCE_HOSTS.join(" and ")}: --hosts must name them` };
+    return { ok: false, error: { code: TEXT_CODE.comparePublishHosts, args: { hosts: REFERENCE_HOSTS.join(" and ") } } };
   }
   return {
     ok: true,
@@ -264,7 +264,7 @@ export function presenceFromRecords(records: readonly ComparisonRecord[]): HostP
 }
 
 /** The arguments of `plugin-qualify compare summary <dir>`: the summary of the records already in a directory. */
-export type ParseSummary = { ok: true; args: { dir: string; hostClass?: string; set?: string; publish: boolean; help: boolean } } | { ok: false; error: string };
+export type ParseSummary = { ok: true; args: { dir: string; hostClass?: string; set?: string; publish: boolean; help: boolean } } | { ok: false; error: TextRef };
 
 export function parseSummaryArgs(argv: readonly string[]): ParseSummary {
   let dir: string | undefined;
@@ -278,13 +278,13 @@ export function parseSummaryArgs(argv: readonly string[]): ParseSummary {
     else if (a === "--publish") publish = true;
     else if (a === "--host-class") hostClass = argv[++i];
     else if (a === "--set") set = argv[++i];
-    else if (a.startsWith("-")) return { ok: false, error: `unknown option ${a}` };
+    else if (a.startsWith("-")) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     else if (dir === undefined) dir = a;
-    else return { ok: false, error: "one directory" };
+    else return { ok: false, error: { code: TEXT_CODE.compareOneDirectory } };
   }
   if (help) return { ok: true, args: { dir: dir ?? ".", publish, help } };
-  if (dir === undefined) return { ok: false, error: "name the directory of the comparison records" };
-  if (publish && (hostClass === undefined || set === undefined)) return { ok: false, error: "--publish needs --host-class and --set" };
+  if (dir === undefined) return { ok: false, error: { code: TEXT_CODE.compareNameDirectory } };
+  if (publish && (hostClass === undefined || set === undefined)) return { ok: false, error: { code: TEXT_CODE.comparePublishNeedsSet } };
   return { ok: true, args: { dir, publish, help, ...(hostClass === undefined ? {} : { hostClass }), ...(set === undefined ? {} : { set }) } };
 }
 

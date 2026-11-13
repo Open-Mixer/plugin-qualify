@@ -11,6 +11,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import { defaultQualificationDir, judgeExitCode, judgeFiles, parseJudgeArgs } from "./judge-cli.js";
 import { fixtureJson, fixtureText } from "./probe-output-fixtures.js";
+import { rendered } from "./text-rendered.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "judge-cli-"));
@@ -31,11 +32,11 @@ describe("parseJudgeArgs", () => {
   });
 
   it("refuses an unknown option, a missing value, a bad format and no file", () => {
-    expect(parseJudgeArgs(["--nope", "a"])).toEqual({ ok: false, error: "unknown option --nope" });
-    expect(parseJudgeArgs(["a", "--qualification-dir"])).toEqual({ ok: false, error: "--qualification-dir needs a value" });
-    expect(parseJudgeArgs(["a", "--format", "xml"]).ok).toBe(false);
-    expect(parseJudgeArgs([]).ok).toBe(false);
-    expect(parseJudgeArgs(["--help"]).ok).toBe(true);
+    expect(rendered(parseJudgeArgs(["--nope", "a"]))).toEqual({ ok: false, error: "unknown option --nope" });
+    expect(rendered(parseJudgeArgs(["a", "--qualification-dir"]))).toEqual({ ok: false, error: "--qualification-dir needs a value" });
+    expect(rendered(parseJudgeArgs(["a", "--format", "xml"])).ok).toBe(false);
+    expect(rendered(parseJudgeArgs([])).ok).toBe(false);
+    expect(rendered(parseJudgeArgs(["--help"])).ok).toBe(true);
   });
 });
 

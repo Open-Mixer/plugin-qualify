@@ -198,7 +198,7 @@ function writeSummary(dir, records, present, meta, format) {
 export async function compareSummaryMain(argv) {
   const parsed = parseSummaryArgs(argv);
   if (!parsed.ok) {
-    process.stderr.write(`plugin-qualify compare summary: ${parsed.error}\n\n${summaryHelpText()}`);
+    process.stderr.write(`plugin-qualify compare summary: ${reasonText(parsed.error, localeOf(process.env))}\n\n${summaryHelpText()}`);
     return 2;
   }
   if (parsed.args.help) {
@@ -224,7 +224,7 @@ export async function compareMain(argv) {
   if (argv[0] === "summary") return compareSummaryMain(argv.slice(1));
   const parsed = parseCompareArgs(argv);
   if (!parsed.ok) {
-    process.stderr.write(`plugin-qualify compare: ${parsed.error}\n\n${compareHelpText()}`);
+    process.stderr.write(`plugin-qualify compare: ${reasonText(parsed.error, localeOf(process.env))}\n\n${compareHelpText()}`);
     return 2;
   }
   const a = parsed.args;

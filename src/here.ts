@@ -12,6 +12,7 @@ import { hostClassOf, readBoardModel, readMachine } from "./distributed-records.
 import { HOSTING_EPOCH, JUDGED_HOST } from "./judged-layer.js";
 import { judgementRules } from "./judgement-line.js";
 import { QUALIFICATION_RECORD_SCHEMA } from "./qualification-record.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** The facts of here, by plugin-db's keys. */
 export interface HereFacts {
@@ -54,7 +55,7 @@ export interface HereArgs {
   readonly config?: string;
 }
 
-export function parseHereArgs(argv: readonly string[]): { ok: true; args: HereArgs } | { ok: false; error: string } {
+export function parseHereArgs(argv: readonly string[]): { ok: true; args: HereArgs } | { ok: false; error: TextRef } {
   let json = false;
   let config: string | undefined;
   for (let i = 0; i < argv.length; i++) {
@@ -62,8 +63,8 @@ export function parseHereArgs(argv: readonly string[]): { ok: true; args: HereAr
     if (a === "--json") json = true;
     else if (a === "--config") {
       config = argv[++i];
-      if (config === undefined) return { ok: false, error: "--config takes a file" };
-    } else return { ok: false, error: `unknown option ${a}` };
+      if (config === undefined) return { ok: false, error: { code: TEXT_CODE.hereConfigFile } };
+    } else return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
   }
   return { ok: true, args: { json, ...(config === undefined ? {} : { config }) } };
 }

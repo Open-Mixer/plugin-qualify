@@ -26,6 +26,8 @@ import { QUALIFICATION_RECORD_SCHEMA, type AdapterBlock, type QualificationRecor
 import { ADMIT_ADDRESS_KB_ENV, ADMIT_STATE_DIR_ENV, ADMIT_STEP_MS_ENV, PI_CELLS } from "./qualify-declarations.js";
 import { digestFiles, type SyncContext, type SyncState } from "./qualify-sync.js";
 import { writeFileWhole } from "./whole-file.js";
+import { localeOf, textOf } from "./text-catalog.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** The cells the pass runs at: the ones a Pi runs. */
 export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
@@ -59,11 +61,11 @@ export function toolVersion(tool: string, run: VersionRun = spawnVersion): strin
 }
 
 /** The versions of the hosts as installed now, or which of them could not say. */
-export function hostVersions(env: Readonly<Record<string, string | undefined>>, run: VersionRun = spawnVersion): { ok: true; versions: Readonly<Record<string, string>> } | { ok: false; error: string } {
+export function hostVersions(env: Readonly<Record<string, string | undefined>>, run: VersionRun = spawnVersion): { ok: true; versions: Readonly<Record<string, string>> } | { ok: false; error: TextRef } {
   const versions: Record<string, string> = {};
   for (const [name, tool] of [[ADAPTER_HOST, ADAPTER_HOST], ["plugin-hostd", env[HOSTD_ENV] ?? "plugin-hostd"]] as const) {
     const version = toolVersion(tool, run);
-    if (version === undefined) return { ok: false, error: `${tool} --version names no version, so a run could not say which host it was under` };
+    if (version === undefined) return { ok: false, error: { code: TEXT_CODE.adapterNoVersion, args: { tool: tool } } };
     versions[name] = version;
   }
   return { ok: true, versions };
@@ -247,7 +249,7 @@ const readRecord = (path: string): QualificationRecord | undefined => {
  */
 export function adapterPass(ctx: SyncContext, state: SyncState, options: AdapterPassOptions = {}): AdapterPassResult {
   const read = hostVersions(ctx.env, options.versions);
-  if (!read.ok) throw new AdapterPassRefused(read.error);
+  if (!read.ok) throw new AdapterPassRefused(textOf(read.error, localeOf(ctx.env)));
   if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${NO_PRIVATE_SERVER}, and the device's own JACK server is never used for this`);
   const { versions } = read;
   const starter = options.jack ?? startPrivateJack;

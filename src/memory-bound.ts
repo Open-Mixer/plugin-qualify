@@ -13,6 +13,7 @@ import { totalmem } from "node:os";
 
 import type { ProbeOutput } from "./probe-output.js";
 import { MEMORY_BOUND_EXIT_STATUS, MEMORY_LIMIT_RAM_FRACTION } from "./qualify-declarations.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** How the bound is applied: the runner's data limit on the child. */
 export const MEMORY_BOUND_MECHANISM = "rlimit-data";
@@ -37,12 +38,12 @@ export interface MemoryBound {
 const UNITS: Readonly<Record<string, number>> = { "": 1, K: 2 ** 10, M: 2 ** 20, G: 2 ** 30, T: 2 ** 40 };
 
 /** `off`, a number of bytes, or one with a K, M, G or T suffix (powers of two: K is 2 ** 10 bytes). */
-export function parseMemoryLimit(text: string): { ok: true; bytes: number | "off" } | { ok: false; error: string } {
+export function parseMemoryLimit(text: string): { ok: true; bytes: number | "off" } | { ok: false; error: TextRef } {
   const t = text.trim();
   if (t === "off") return { ok: true, bytes: "off" };
   const m = /^(\d+)([KMGT]?)(?:i?B)?$/i.exec(t);
   const bytes = m === null ? NaN : Number(m[1]) * UNITS[m[2]!.toUpperCase()]!;
-  if (!Number.isSafeInteger(bytes) || bytes <= 0) return { ok: false, error: `the memory limit is off, or bytes as 2147483648, 2048M or 2G; "${t}" is neither` };
+  if (!Number.isSafeInteger(bytes) || bytes <= 0) return { ok: false, error: { code: TEXT_CODE.memoryLimitUnread, args: { value: t } } };
   return { ok: true, bytes };
 }
 

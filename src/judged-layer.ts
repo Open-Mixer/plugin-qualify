@@ -20,6 +20,7 @@ import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.j
 import { pinVerdictOf, type PinVerdict } from "./pins-file.js";
 import { QUALIFICATION_RECORD_SCHEMA, ISOLATED_TIER_HOST, type QualificationRecord } from "./qualification-record.js";
 import type { SuitabilityRating } from "./rating.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** The host a judged layer is written for: the one that runs plugins, in workers of its own (PLUGIN_DB_ISOLATION_HOSTS). */
 export const JUDGED_HOST = "plugin-hostd";
@@ -79,7 +80,7 @@ export interface JudgedLayerInput {
 }
 
 /** Why a record has no judged layer, when it has none. */
-export type NoLayer = { readonly layer: null; readonly reason: string };
+export type NoLayer = { readonly layer: null; readonly reason: TextRef };
 
 /** The version of a tool named `<name> <version>` in the record's `tool`. */
 function versionOf(record: QualificationRecord, name: string): string | undefined {
@@ -105,16 +106,16 @@ export function judgedCells(record: QualificationRecord): JudgedCell[] {
  * it; the host is plugin-hostd at the probe runner's version, which is plugin-hostd's.
  */
 export function judgedLayerOf(record: QualificationRecord, input: JudgedLayerInput): JudgedLayer | NoLayer {
-  if (record.schema !== QUALIFICATION_RECORD_SCHEMA) return { layer: null, reason: `record schema ${JSON.stringify(record.schema)} is not ${QUALIFICATION_RECORD_SCHEMA}` };
+  if (record.schema !== QUALIFICATION_RECORD_SCHEMA) return { layer: null, reason: { code: TEXT_CODE.judgedSchemaOther, args: { schema: JSON.stringify(record.schema), expected: QUALIFICATION_RECORD_SCHEMA } } };
   const tierHost = ISOLATED_TIER_HOST[record.plugin.format];
   const v = record.verdicts.find((r) => r.host === tierHost);
-  if (v === undefined) return { layer: null, reason: `no verdict under ${tierHost ?? `a host for ${record.plugin.format}`}` };
+  if (v === undefined) return { layer: null, reason: tierHost === undefined ? { code: TEXT_CODE.judgedNoVerdictFormat, args: { format: record.plugin.format } } : { code: TEXT_CODE.judgedNoVerdict, args: { host: tierHost } } };
   const verdict = v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
-  if (verdict === undefined) return { layer: null, reason: `${tierHost}: not measured (${v.deciding ?? v.rating})` };
+  if (verdict === undefined) return { layer: null, reason: { code: TEXT_CODE.judgedNotMeasured, args: { host: String(tierHost), deciding: v.deciding ?? v.rating } } };
   const hostVersion = versionOf(record, "plugin-hostd-probe");
-  if (hostVersion === undefined) return { layer: null, reason: "the record names no plugin-hostd-probe version" };
+  if (hostVersion === undefined) return { layer: null, reason: { code: TEXT_CODE.judgedNoProbeVersion } };
   const rules = record.rules ?? (input.judgedBy === undefined ? undefined : judgementRules(input.judgedBy));
-  if (rules === undefined) return { layer: null, reason: "the record states no rules, and no judgedBy was given" };
+  if (rules === undefined) return { layer: null, reason: { code: TEXT_CODE.judgedNoRules } };
   return {
     envelope: PLUGIN_DB_ENVELOPE,
     layer: "judged",
@@ -158,7 +159,7 @@ export function judgedLayerHelpText(): string {
   ].join("\n");
 }
 
-export type ParsedJudgedLayerArgs = { ok: true; args: JudgedLayerArgs } | { ok: true; help: true } | { ok: false; error: string };
+export type ParsedJudgedLayerArgs = { ok: true; args: JudgedLayerArgs } | { ok: true; help: true } | { ok: false; error: TextRef };
 
 export function parseJudgedLayerArgs(argv: readonly string[]): ParsedJudgedLayerArgs {
   const opts: Record<string, string> = {};
@@ -170,18 +171,18 @@ export function parseJudgedLayerArgs(argv: readonly string[]): ParsedJudgedLayer
     if (a === "--body") body = true;
     else if (["--machine-class", "--files", "--layout", "--judged-by", "--address"].includes(a)) {
       const v = argv[++i];
-      if (v === undefined || v.startsWith("--")) return { ok: false, error: `${a} needs a value` };
+      if (v === undefined || v.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: a } } };
       opts[a] = v;
-    } else if (a.startsWith("--")) return { ok: false, error: `unknown option ${a}` };
+    } else if (a.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     else files.push(a);
   }
-  if (files.length !== 1) return { ok: false, error: "name one record" };
+  if (files.length !== 1) return { ok: false, error: { code: TEXT_CODE.judgedNameOneRecord } };
   const machineClass = opts["--machine-class"];
   const pinFiles = opts["--files"];
-  if (machineClass === undefined) return { ok: false, error: "--machine-class is required" };
-  if (pinFiles === undefined || !/^[0-9a-f]{64}$/.test(pinFiles)) return { ok: false, error: "--files must be the 64 hex digits of the files pin" };
+  if (machineClass === undefined) return { ok: false, error: { code: TEXT_CODE.judgedMachineClass } };
+  if (pinFiles === undefined || !/^[0-9a-f]{64}$/.test(pinFiles)) return { ok: false, error: { code: TEXT_CODE.judgedFilesPin } };
   const layout = opts["--layout"] ?? null;
-  if (layout !== null && !/^[^:]+:[0-9a-f]{64}$/.test(layout)) return { ok: false, error: "--layout must be <scheme>:<sha256>" };
+  if (layout !== null && !/^[^:]+:[0-9a-f]{64}$/.test(layout)) return { ok: false, error: { code: TEXT_CODE.judgedLayoutForm } };
   return {
     ok: true,
     args: {
