@@ -158,8 +158,21 @@ struct interposer {
   void (*end)(void);
   void (*reset)(void);
   void (*counts)(uint64_t *, uint64_t *, uint64_t *);
+  /* D20: the other threads' counts, absent from an interposer before them */
+  void (*other_counts)(uint64_t *, uint64_t *, uint64_t *);
   int (*events)(struct omx_rt_event *, int);
 };
+
+/* the threads of this process now: /proc/self/task's entries, or -1 when it cannot be read */
+static long task_count(void) {
+  DIR *d = opendir("/proc/self/task");
+  long n = 0;
+  if (!d) return -1;
+  for (struct dirent *e; (e = readdir(d));)
+    if (e->d_name[0] != '.') n++;
+  closedir(d);
+  return n;
+}
 
 static int interposer_find(struct interposer *ip) {
   memset(ip, 0, sizeof *ip);
@@ -169,6 +182,7 @@ static int interposer_find(struct interposer *ip) {
   *(void **)&ip->reset = dlsym(RTLD_DEFAULT, "omx_rt_reset");
   *(void **)&ip->counts = dlsym(RTLD_DEFAULT, "omx_rt_counts");
   *(void **)&ip->events = dlsym(RTLD_DEFAULT, "omx_rt_events");
+  *(void **)&ip->other_counts = dlsym(RTLD_DEFAULT, "omx_rt_other_counts");
   return ip->begin && ip->end && ip->reset && ip->counts && ip->events;
 }
 
@@ -488,6 +502,10 @@ struct facts {
   int interposer;
   uint32_t params;
   uint64_t allocations, locks, syscalls;
+  /* D20: what other threads did while the audio thread was armed (a figure), and the threads the plugin started */
+  uint64_t other_allocations, other_locks, other_syscalls;
+  int other_counted;
+  long own_threads;
   struct omx_rt_event events[OMX_RT_EV_MAX];
   int n_events;
   /* the note sweep: the dialect it spoke (NULL: no note input, or none it speaks), and what it counted */
@@ -1362,7 +1380,12 @@ static void put_facts(const clap_plugin_descriptor_t *d, const struct facts *f, 
     const int k = f->events[i].kind;
     fprintf(g_out, "%s\"%s\"", i ? "," : "", k > 0 && k < (int)(sizeof EVENT_KIND / sizeof EVENT_KIND[0]) ? EVENT_KIND[k] : "unknown");
   }
-  fprintf(g_out, "]}");
+  fprintf(g_out, "]");
+  if (f->own_threads >= 0) fprintf(g_out, ",\"ownThreads\":%ld", f->own_threads);
+  if (f->other_counted)
+    fprintf(g_out, ",\"otherThreads\":{\"allocationsInRun\":%llu,\"locksInRun\":%llu,\"syscallsInRun\":%llu}",
+            (unsigned long long)f->other_allocations, (unsigned long long)f->other_locks, (unsigned long long)f->other_syscalls);
+  fprintf(g_out, "}");
   put_note_sweep(f, frames);
   if (f->n_rates && f->headless_ok) put_cost(f, frames);
 }
@@ -1920,6 +1943,7 @@ static int qualify_plugin(const clap_plugin_factory_t *factory, const clap_plugi
   }
 
   struct integrity pin = { "refused-instantiation", "create_plugin or init failed", "" };
+  const long tasks_before = task_count();
   const clap_plugin_t *p = factory->create_plugin(factory, &g_clap_host, d->id);
   if (!p || !p->init(p)) {
     if (p) p->destroy(p);
@@ -1954,6 +1978,17 @@ static int qualify_plugin(const clap_plugin_factory_t *factory, const clap_plugi
   if (f.interposer) {
     ip.counts(&f.allocations, &f.locks, &f.syscalls);
     f.n_events = ip.events(f.events, OMX_RT_EV_MAX);
+    if (ip.other_counts) {
+      ip.other_counts(&f.other_allocations, &f.other_locks, &f.other_syscalls);
+      f.other_counted = 1;
+    }
+  }
+  /* the threads the plugin started, instantiated and activated: those of the process now, less those before it was
+   * created and the host's own pool helpers (D20); -1 when either count could not be read */
+  {
+    const long now = task_count();
+    f.own_threads = now < 0 || tasks_before < 0 ? -1 : now - tasks_before - (long)o->pool_helpers;
+    if (f.own_threads < -1) f.own_threads = 0;
   }
   int clap_dialect = 0, midi_too = 0;
   f.note_dialect = f.headless_ok ? note_dialect(p, &clap_dialect, &midi_too) : NULL;

@@ -98,6 +98,20 @@ export function rtSafetyOfProbeOutput(output: ProbeOutput): ClapRtSafetyReading 
     ...(locks === undefined ? {} : { locksInRun: locks }),
     ...(syscalls === undefined ? {} : { syscallsInRun: syscalls }),
     events: points.flatMap((p) => reading(p)?.events ?? []),
+    // D20: each cell is an instance of its own; the threads the plugin started are the most any cell saw, and what
+    // other threads did is a figure, summed as the audio thread's counts are
+    ...(points.some((p) => reading(p)?.ownThreads !== undefined)
+      ? { ownThreads: Math.max(...points.map((p) => reading(p)?.ownThreads ?? 0)) }
+      : {}),
+    ...(points.some((p) => reading(p)?.otherThreads !== undefined)
+      ? {
+          otherThreads: {
+            allocationsInRun: total(points, (p) => reading(p)?.otherThreads?.allocations ?? 0) ?? 0,
+            locksInRun: total(points, (p) => reading(p)?.otherThreads?.locks ?? 0) ?? 0,
+            syscallsInRun: total(points, (p) => reading(p)?.otherThreads?.syscalls ?? 0) ?? 0,
+          },
+        }
+      : {}),
   };
 }
 
