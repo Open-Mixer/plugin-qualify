@@ -6,7 +6,10 @@
  *   worker-engine  output is -6 dB once its work() ran and work_response() was delivered
  *   patch-gain     its only parameter is a patch:writable Float, driven by patch:Set
  *   wide-gain      one linear gain control port, 1/64 .. 64, default 1
- *   banner         prints into stdout while instantiating, like Guitarix */
+ *   banner         prints into stdout while instantiating, like Guitarix
+ *   stepped        an lv2:integer port 0 .. 6 and an lv2:toggled port, and aborts on any other value, like ZamVerb
+ *                  (which reloads and resamples its impulse response for every value its room port takes) */
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +30,7 @@ typedef struct {
     const float *in;
     float *out;
     const float *gain;               /* wide-gain: control port */
+    const float *room, *on;          /* stepped: an integer port and a toggled port */
     const LV2_Atom_Sequence *ctl;    /* patch-gain: its only parameter arrives here */
     float param;
     LV2_URID patch_Set, patch_property, patch_value, atom_Float, p_gain;
@@ -34,7 +38,7 @@ typedef struct {
     int built, asked;
 } F;
 
-enum { NEEDS_OPTIONS, WORKER, PATCH, WIDE, BANNER };
+enum { NEEDS_OPTIONS, WORKER, PATCH, WIDE, BANNER, STEPPED };
 
 static const LV2_Descriptor descs[];
 
@@ -93,6 +97,9 @@ static void connect_port(LV2_Handle h, uint32_t port, void *data)
     case WIDE:
         if (port == 0) f->gain = data; else if (port == 1) f->in = data; else f->out = data;
         break;
+    case STEPPED:
+        if (port == 0) f->room = data; else if (port == 1) f->on = data; else if (port == 2) f->in = data; else f->out = data;
+        break;
     default:
         if (port == 0) f->in = data; else f->out = data;
     }
@@ -105,6 +112,13 @@ static void run(LV2_Handle h, uint32_t n)
     F *f = h;
     float g = 1.0f;
     if (f->kind == WIDE) g = *f->gain;
+    if (f->kind == STEPPED) {
+        /* What the ports declare is all the plugin is written for: a room between two rooms, or a switch half on,
+         * is a value no real host sends, and a plugin that trusts its ports may do anything with it. */
+        const float room = *f->room, on = *f->on;
+        if (room != floorf(room) || room < 0.0f || room > 6.0f || (on != 0.0f && on != 1.0f)) abort();
+        g = on == 1.0f ? 1.0f : 0.5f;
+    }
     if (f->kind == WORKER) {
         if (!f->asked && f->sched) {
             f->asked = 1;
@@ -154,7 +168,7 @@ static const void *extension_data(const char *uri)
 
 #define D(u) {NS u, instantiate, connect_port, activate, run, deactivate, cleanup, extension_data}
 static const LV2_Descriptor descs[] = {D("needs-options"), D("worker-engine"), D("patch-gain"),
-                                       D("wide-gain"), D("banner")};
+                                       D("wide-gain"), D("banner"), D("stepped")};
 
 LV2_SYMBOL_EXPORT const LV2_Descriptor *lv2_descriptor(uint32_t i)
 {

@@ -159,6 +159,7 @@ struct host {
   uint32_t n_ports, n_audio_in, n_audio_out, n_cv, n_control_in;
   uint8_t *pk;   /* PK_* per port */
   uint8_t *is_db; /* units:db per port */
+  uint8_t *is_int, *is_toggled; /* lv2:integer, lv2:toggled per port: what a sweep may send it */
   uint8_t *is_in; /* input port, per port */
   float *mins, *maxes, *defs;
   struct param params[MAX_PARAMS];
@@ -280,12 +281,16 @@ static int host_open(struct host *h, LilvWorld *world, const LilvPlugin *plugin)
   LilvNode *atom_class = lilv_new_uri(world, LV2_ATOM__AtomPort);
   LilvNode *unit_pred = lilv_new_uri(world, LV2_UNITS__unit);
   LilvNode *db_unit = lilv_new_uri(world, LV2_UNITS__db);
+  LilvNode *integer_prop = lilv_new_uri(world, LV2_CORE__integer);
+  LilvNode *toggled_prop = lilv_new_uri(world, LV2_CORE__toggled);
   LilvNode *patch_msg = lilv_new_uri(world, LV2_PATCH__Message);
   LilvNode *midi_event = lilv_new_uri(world, LV2_MIDI__MidiEvent);
 
   h->n_ports = lilv_plugin_get_num_ports(plugin);
   h->pk = calloc(h->n_ports, 1);
   h->is_db = calloc(h->n_ports, 1);
+  h->is_int = calloc(h->n_ports, 1);
+  h->is_toggled = calloc(h->n_ports, 1);
   h->is_in = calloc(h->n_ports, 1);
   h->mins = calloc(h->n_ports, sizeof(float));
   h->maxes = calloc(h->n_ports, sizeof(float));
@@ -306,6 +311,8 @@ static int host_open(struct host *h, LilvWorld *world, const LilvPlugin *plugin)
     } else if (lilv_port_is_a(plugin, port, control_class)) {
       h->pk[i] = in ? PK_CONTROL_IN : PK_CONTROL_OUT;
       if (in) h->n_control_in++;
+      h->is_int[i] = (uint8_t)lilv_port_has_property(plugin, port, integer_prop);
+      h->is_toggled[i] = (uint8_t)lilv_port_has_property(plugin, port, toggled_prop);
       LilvNodes *u = lilv_port_get_value(plugin, port, unit_pred);
       if (u) {
         LILV_FOREACH (nodes, ui, u)
@@ -364,6 +371,8 @@ static int host_open(struct host *h, LilvWorld *world, const LilvPlugin *plugin)
   lilv_node_free(patch_msg);
   lilv_node_free(midi_event);
   lilv_node_free(db_unit);
+  lilv_node_free(integer_prop);
+  lilv_node_free(toggled_prop);
   lilv_node_free(unit_pred);
   lilv_node_free(atom_class);
   lilv_node_free(cv_class);
@@ -383,6 +392,8 @@ static int host_open(struct host *h, LilvWorld *world, const LilvPlugin *plugin)
 static void host_close(struct host *h) {
   free(h->pk);
   free(h->is_db);
+  free(h->is_int);
+  free(h->is_toggled);
   free(h->is_in);
   free(h->mins);
   free(h->maxes);
@@ -532,7 +543,10 @@ static int sweep_range(const struct host *h, double mn, double mx, double def, i
 }
 
 /* Move every control input, and every patch:writable parameter, to position t (0..1) of its
- * range. Returns how many it moved. */
+ * range, sending each only a value it declares: an lv2:toggled port its two ends, an lv2:integer port the nearest
+ * integer inside its range. A real host sends nothing between, and a plugin may do anything with it: ZamVerb
+ * reloads and resamples its impulse response for each value its integer room port takes, and a float sweep made that
+ * almost every block (plugin-qualify#29). Returns how many it moved. */
 static int rig_sweep(struct rig *r, float t, int bounded) {
   struct host *h = r->h;
   int moved = 0;
@@ -540,7 +554,15 @@ static int rig_sweep(struct rig *r, float t, int bounded) {
   for (uint32_t i = 0; i < h->n_ports; i++) {
     if (h->pk[i] != PK_CONTROL_IN) continue;
     if (!sweep_range(h, h->mins[i], h->maxes[i], h->defs[i], h->is_db[i], bounded, &lo, &hi)) continue;
-    r->controls[i] = (float)(lo + (hi - lo) * t);
+    double v = lo + (hi - lo) * t;
+    if (h->is_toggled[i]) {
+      v = t > 0.5f ? hi : lo;
+    } else if (h->is_int[i]) {
+      const double ilo = ceil(lo), ihi = floor(hi);
+      if (ihi < ilo) continue;
+      v = fmin(ihi, fmax(ilo, floor(v + 0.5)));
+    }
+    r->controls[i] = (float)v;
     moved++;
   }
   for (int k = 0; k < h->n_params; k++) {
