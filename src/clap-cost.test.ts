@@ -30,6 +30,7 @@ import { qualifyClap } from "./direct-prober.support.js";
 import { OMX_CLAP_HOST_EXTENSIONS } from "./host-profiles.js";
 import { QUALIFY_RATES } from "./qualify-declarations.js";
 import { clapQualifyToolPath, rtInterposePath } from "./tool-paths.js";
+import { timing } from "./timing-proof.support.js";
 
 const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "native", "build", "fixtures");
 const SYNTH = join(FIXTURES, "synth.clap");
@@ -70,7 +71,7 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
       expect(low.voices).toEqual({ held: 1, basis: "probe" });
       expect(high.voices).toEqual({ held: 16, basis: "probe" });
       // sixteen sines a sample against one: the median grows with the voices, far past timing noise
-      expect(high.nsPerSampleMedian).toBeGreaterThan(3 * low.nsPerSampleMedian);
+      timing("an instrument costs more with more notes", () => expect(high.nsPerSampleMedian).toBeGreaterThan(3 * low.nsPerSampleMedian));
       expect(high.nsPerSampleP95).toBeGreaterThanOrEqual(high.nsPerSampleMedian);
     }
   });
@@ -95,7 +96,9 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
   live("a synth that reads only MIDI holds its notes in MIDI's dialect", () => {
     const [one] = qualifyClap(SYNTH_MIDI, undefined, { rates: [RATE], probeNotes: 1 });
     const [sixteen] = qualifyClap(SYNTH_MIDI, undefined, { rates: [RATE], probeNotes: 16 });
-    expect(figure(sixteen!.cost?.perRate[String(RATE)]).nsPerSampleMedian).toBeGreaterThan(3 * figure(one!.cost?.perRate[String(RATE)]).nsPerSampleMedian);
+    timing("a MIDI-only synth costs more with more notes", () =>
+      expect(figure(sixteen!.cost?.perRate[String(RATE)]).nsPerSampleMedian).toBeGreaterThan(3 * figure(one!.cost?.perRate[String(RATE)]).nsPerSampleMedian),
+    );
   });
 
   live("an instrument with an audio input is still an instrument: it holds notes, its input hearing the noise", () => {
@@ -112,12 +115,14 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
     const [plain] = qualifyClap(SYNTH, undefined, { rates: [RATE], probeNotes: 16, curve: [1, 16] });
     const s = figure(swept!.cost?.perRate[String(RATE)]);
     const p = figure(plain!.cost?.perRate[String(RATE)]);
-    expect(s.nsPerSampleMedian).toBeGreaterThan(5 * p.nsPerSampleMedian);
     expect(s.voiceCurve?.map((e) => e.held)).toEqual([1, 16]);
     const [s1, s16] = s.voiceCurve!.map((e) => e.nsPerSampleMedian!);
     const p16 = p.voiceCurve![1]!.nsPerSampleMedian!;
-    expect(s16!).toBeLessThan(2 * p16);
-    expect(s16!).toBeGreaterThan(3 * s1!);
+    timing("the CLAP voice curve is timed at defaults and grows with the notes", () => {
+      expect(s.nsPerSampleMedian).toBeGreaterThan(5 * p.nsPerSampleMedian);
+      expect(s16!).toBeLessThan(2 * p16);
+      expect(s16!).toBeGreaterThan(3 * s1!);
+    });
   });
 
   live("an effect is timed under the sweep's noise and holds no note", () => {

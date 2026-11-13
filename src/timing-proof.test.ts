@@ -56,7 +56,8 @@ describe("a timing proof", () => {
 });
 
 // A measured cost compared with a bound or with another measured cost: the lines a timing proof is made of.
-const COMPARISON = /nsPerSample\w*\)?\.toBe(Greater|Less)Than|\b(one|eight|thirtyTwo|fortyEight|s1|s16|p16|curve16|plain16)!?\)\.toBe(Greater|Less)Than|Math\.abs\(fortyEight/;
+// A shape assertion (min <= median <= p95 <= max, a figure above 0) is no timing proof: OrEqual and a bare 0 stay out.
+const COMPARISON = /\.toBe(Greater|Less)Than\((?=[^)]*(\*|nsPerSample|\b(one|eight|thirtyTwo|fortyEight|s1|s16|p16|plain16)\b))|Math\.abs\(fortyEight/;
 
 /** The comparisons of `text` that are not inside a timing(...) proof: the nearest opening before each is timing(, not a test. */
 function outsideTiming(text: string): string[] {
