@@ -41,7 +41,7 @@ from _declarations import (
     DESCRIPTOR_SCHEMA_INSTALLED,
 )
 
-SCHEMA_URL = "https://github.com/Open-Mixer/omx-contract/raw/v3/schema/omx-contract.schema.json"
+SCHEMA_URL = "https://github.com/FreeMixer/omx-contract/raw/v3/schema/omx-contract.schema.json"
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(TOOLS)
 
