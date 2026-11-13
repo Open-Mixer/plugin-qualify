@@ -165,7 +165,7 @@ const bundlesNaming = (lv2: string): string[] =>
  * The live arm's bundle and the LV2 path plugin-hostd is given. plugin-hostd takes the first bundle of lv2_path naming
  * the plugin, in the directory's own order (readdir), so the arm's plugin must be named by its bundle alone.
  */
-const LIVE_LV2 = join(scratch, "lv2");
+const LIVE_LV2 = join(scratch, "lv2-live");
 let live: string | undefined;
 const liveBundle = (): string => (live ??= bundle("refresh-e", LIVE_LV2));
 
@@ -173,7 +173,8 @@ describe("plugin-hostd on a pin from before 0.17.3, and on the same pin refreshe
   it("is given an LV2 path that names the plugin in its bundle alone (plugin-qualify#50)", () => {
     // the arms above leave bundles naming the same plugin, refresh-b's with its binary rewritten: a daemon that met
     // that one first collected other files than the pin's, refreshPins kept the old pin, and the add answered -509
-    expect(bundlesNaming(LIVE_LV2)).toEqual([liveBundle()]);
+    const dir = liveBundle();
+    expect(bundlesNaming(LIVE_LV2)).toEqual([dir]);
   });
 
   it("refuses the old pin with -509 and adds the refreshed one", async (ctx) => {
@@ -189,7 +190,11 @@ describe("plugin-hostd on a pin from before 0.17.3, and on the same pin refreshe
     // the real --pin-files, as the sync runs it
     const named = hostdPinFiles(URI, [lv2], { ...process.env, PLUGIN_HOSTD: HOSTD });
     expect(named.ok && named.files.map((f) => f.path)).toContain("presets.ttl");
-    const refreshed = refreshPins({ settings: settingsFor(lv2), env: { PLUGIN_HOSTD: HOSTD }, log: () => {} }, stateOf(dir, oldPin(dir, layout))).state;
+    const why: string[] = [];
+    const run = refreshPins({ settings: settingsFor(lv2), env: { PLUGIN_HOSTD: HOSTD }, log: (l) => why.push(l) }, stateOf(dir, oldPin(dir, layout)));
+    // a pin refreshPins leaves alone is the old pin again, which the daemon refuses as it refused the first: say why here
+    expect({ refreshed: run.refreshed, why }).toEqual({ refreshed: [URI], why: [`${URI}: pin files refreshed, presets.ttl added`] });
+    const refreshed = run.state;
     const oldFile = join(scratch, "e.old.pins");
     const newFile = join(scratch, "e.new.pins");
     writeFileSync(oldFile, pinsFile([oldPin(dir, layout)]).text);
