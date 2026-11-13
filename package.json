@@ -87,7 +87,7 @@
     "lint": "tsc -p tsconfig.lint.json",
     "test:py": "python3 -m pytest tools -q",
     "check:generated": "node tools/gen-python-declarations.mjs --check && node tools/gen-hosting-codes.mjs --check && node tools/gen-text-codes.mjs --check",
-    "check:private-refs": "${FREEMIXER_DOTGITHUB:-../freemixer-dotgithub}/.github/actions/private-refs-check/check.sh ."
+    "check:private-refs": "${OPENMIXER_DOTGITHUB:-../freemixer-dotgithub}/.github/actions/private-refs-check/check.sh ."
   },
   "devDependencies": {
     "@types/node": "^24.9.0",
