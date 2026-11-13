@@ -27,6 +27,7 @@ import {
   type RtReport,
 } from "./compare.js";
 import { TEXT_CODE } from "./text-codes.js";
+import { rendered } from "./text-rendered.support.js";
 
 const COND = { cycles: 3, soakS: 5 };
 const CONDITIONS: ComparisonConditions = { rate: 48000, quantum: 256, cycles: 3, soakS: 5, windowMs: 1000, timeoutMs: 5000, jack: "jackd 1.9.22", realtime: "rtprio 70" };
@@ -57,18 +58,18 @@ describe("compare arguments", () => {
     expect(p.ok && p.args.hosts).toEqual(["omx-clap-host", "plugin-hostd", "mod-host", "jalv"]);
     const bad = parseCompareArgs(["--all", "--hosts", "mod-host,carla"]);
     expect(bad.ok).toBe(false);
-    expect(!bad.ok && bad.error).toContain("carla");
+    expect(!bad.ok && rendered(bad.error)).toContain("carla");
   });
   it("a publishable run names its class and set and compares against mod-host and jalv", () => {
-    expect(parseCompareArgs(["--all", "--publish", "--out", "o"]).ok).toBe(false);
+    expect(rendered(parseCompareArgs(["--all", "--publish", "--out", "o"])).ok).toBe(false);
     const noRef = parseCompareArgs(["--all", "--publish", "--out", "o", "--host-class", "x86-64", "--set", "fedora44", "--hosts", "omx-clap-host,mod-host"]);
-    expect(!noRef.ok && noRef.error).toContain("mod-host and jalv");
-    expect(parseCompareArgs(["--all", "--publish", "--out", "o", "--host-class", "x86-64", "--set", "fedora44"]).ok).toBe(true);
+    expect(!noRef.ok && rendered(noRef.error)).toContain("mod-host and jalv");
+    expect(rendered(parseCompareArgs(["--all", "--publish", "--out", "o", "--host-class", "x86-64", "--set", "fedora44"])).ok).toBe(true);
   });
   it("the same rate, quantum, cycles, soak and timeouts for every host: one set of numbers per run", () => {
     const p = parseCompareArgs(["urn:a", "--rate", "96000", "--quantum", "128", "--cycles", "10", "--soak", "60"]);
     expect(p.ok && [p.args.rate, p.args.quantum, p.args.cycles, p.args.soakS]).toEqual([96000, 128, 10, 60]);
-    expect(parseCompareArgs(["urn:a", "--soak", "0"]).ok).toBe(false);
+    expect(rendered(parseCompareArgs(["urn:a", "--soak", "0"])).ok).toBe(false);
   });
 });
 

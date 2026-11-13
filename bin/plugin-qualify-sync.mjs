@@ -8,7 +8,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { SYNC_CONF, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText } from "../dist/index.js";
+import { SYNC_CONF, localeOf, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText, textOf } from "../dist/index.js";
 
 const log = (line) => process.stderr.write(`plugin-qualify-sync: ${line}\n`);
 
@@ -43,7 +43,7 @@ if (!resolved.ok) {
   log(resolved.error);
   process.exit(2);
 }
-for (const w of resolved.warnings) log(w);
+for (const w of resolved.warnings) log(textOf(w, localeOf(process.env)));
 const s = resolved.settings;
 const grid = s.grid.kind === "cells" ? s.grid.cells.map((c) => `${String(c.rate)}/${String(c.quantum)}`).join(",") : s.grid.kind;
 log(
