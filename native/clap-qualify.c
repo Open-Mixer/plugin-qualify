@@ -442,6 +442,7 @@ struct port_set {
 #include "rss-kb.h"
 #include "timing-sched.h"
 #include "note-onset.h"
+#include "note-restrike.h"
 
 /* how the cost arm chose how many notes to hold */
 enum voice_basis { BASIS_NONE, BASIS_DECLARED, BASIS_PROBE };
@@ -980,6 +981,11 @@ static void cost_time(const clap_plugin_t *p, double rate, uint32_t frames, uint
   for (uint32_t b = 0; b < total; b++) {
     if (b == 0)
       for (uint32_t k = 0; k < c->held; k++) note_key(clap_dialect, 0, 1, held_key(k, c->held), HELD_VELOCITY);
+    else if (note_restrike_due(b, rate, frames)) /* note-restrike.h: a decaying patch is timed while it sounds (#26) */
+      for (uint32_t k = 0; k < c->held; k++) {
+        note_key(clap_dialect, 0, 0, held_key(k, c->held), 0.0);
+        note_key(clap_dialect, 0, 1, held_key(k, c->held), HELD_VELOCITY);
+      }
     /* without the sweep, the first blocks put every parameter back to its default: the instance may come from a
      * swept run */
     for (uint32_t k = 0; !sweep && k < EVENTS_PER_BLOCK && b * EVENTS_PER_BLOCK + k < n_rows; k++) {

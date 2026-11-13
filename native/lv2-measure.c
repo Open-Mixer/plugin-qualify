@@ -206,7 +206,8 @@ struct rig {
   int patch_live, pcursor;
   /* the note sweep's block this block plays, or -1 for none */
   int note_block;
-  /* the latency and cost passes' own note: 0 none, 1 one key struck, 2 that key let go, 3 `held` keys struck */
+  /* the latency and cost passes' own note: 0 none, 1 one key struck, 2 that key let go, 3 `held` keys struck, 4 the
+   * `held` keys let go and struck again (note-restrike.h) */
   int probe_note;
   uint32_t held;
 };
@@ -654,6 +655,12 @@ static void forge_probe_or_note_block(struct rig *r) {
   case 3:
     for (uint32_t k = 0; k < r->held; k++) forge_midi(r, 0, 0x90, held_key(k, r->held), 127);
     break;
+  case 4:
+    for (uint32_t k = 0; k < r->held; k++) {
+      forge_midi(r, 0, 0x80, held_key(k, r->held), 0);
+      forge_midi(r, 0, 0x90, held_key(k, r->held), 127);
+    }
+    break;
   default: forge_note_block(r, (uint32_t)r->note_block, r->block); break;
   }
 }
@@ -745,6 +752,7 @@ static int count_threads(void) {
 #include "rss-kb.h"
 #include "timing-sched.h"
 #include "note-onset.h"
+#include "note-restrike.h"
 
 static const char *rt_kind_name(int k) {
   switch (k) {
@@ -934,6 +942,8 @@ static void release(struct host *h, LilvNodes *required, LilvNodes *optional, Li
  * (plugin-hostd docs/zynthian, pianoteq.py). After the note it is read for NOTE_TAIL_S, or LATENCY_TAIL frames when
  * that is longer: 8192 frames are 43 ms at 192 kHz, shorter than many an attack. */
 #define NOTE_SETTLE_S 1.0
+/* and its held notes are struck again every NOTE_RESTRIKE_S of a cost run (note-restrike.h), so a decaying patch is
+ * timed while its voices sound (#26) */
 #define NOTE_TAIL_S 0.5
 #define COST_WARMUP_BLOCKS 64u
 #define COST_BLOCKS 512u
@@ -1135,7 +1145,7 @@ static void measure_cost(struct host *H, double rate, uint32_t block, struct cos
           in[i] = ((float)(seed >> 8) / 16777216.0f - 0.5f) * 0.5f;
         }
       }
-    r->probe_note = instrument && b == 0 ? 3 : 0;
+    r->probe_note = !instrument ? 0 : b == 0 ? 3 : note_restrike_due(b, rate, block) ? 4 : 0;
     r->held = C->held;
     rig_prepare(r);
     const int64_t t0 = now_ns();
