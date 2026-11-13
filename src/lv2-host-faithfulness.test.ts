@@ -11,6 +11,7 @@
  *   patch-gain      its parameter is patch:writable only (JUCE 8)
  *   wide-gain       a control port 1/64 .. 64 (Calf's gains)
  *   banner          prints on stdout while it instantiates (Guitarix)
+ *   stepped         an lv2:integer port and an lv2:toggled port, and aborts on a value between (ZamVerb, plugin-qualify#29)
  *
  * On CI a missing build is a failure; elsewhere the tests skip, saying how to build.
  */
@@ -70,6 +71,22 @@ function live(name: string, body: () => void, timeout?: number): void {
 }
 
 describe("the measuring host against the faithfulness fixtures", () => {
+  // ZamVerb reloads and resamples its impulse response for every value its integer room port takes: swept as a float
+  // through 2.37, 2.41, ... it reloaded on almost every block and the 96 and 192 kHz runs hit the wall clock
+  // (plugin-qualify#29). A real host sends an integer port integers and a toggled port 0 or 1, and so does the measurer.
+  live("sweeps an lv2:integer port through integers and an lv2:toggled port through 0 and 1, never between", () => {
+    const r = spawnSync(MEASURE, [URN("stepped"), "48000", "256", "2", "2"], {
+      encoding: "utf8",
+      env: { PATH: process.env["PATH"], LV2_PATH: BUNDLES, OMX_PROBE_BLOCKS: "64" },
+      timeout: 110_000,
+    });
+    expect(r.signal, r.stderr).toBeNull();
+    expect(r.status, r.stderr).toBe(0);
+    const record = JSON.parse(r.stdout) as Record<string, any>;
+    expect(record["instantiated"]).toBe(true);
+    expect(record["lifecycle"]).toMatchObject({ cycles: 2, instantiated: 2, failed: 0 });
+  });
+
   live("instantiates a plugin that refuses an empty options table, at every declared rate", () => {
     const r = run("needs-options", ["48000", "256", "2", "1"], { OMX_PROBE_BLOCKS: "24" });
     expect(r.status).toBe(0);
