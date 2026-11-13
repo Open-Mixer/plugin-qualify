@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * plugin-db is the one writer's call into plugin-db's own store (plugin-db docs/design/records.md):
+ * plugin-db is the one writer's call into plugin-db's own store, as plugin-db's records documentation describes it:
  * `plugin-db pin <address> --files <sha256> [--layout <scheme>:<sha256>]` writes the pinned layer, `plugin-db put
  * <address> judged --writer plugin-qualify` writes the judged layer plugin-qualify is the one writer of, its body on
  * stdin. `--system` names the service's store (plugin-db's own default otherwise, for an interactive caller). Nothing
