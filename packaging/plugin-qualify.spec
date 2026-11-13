@@ -25,6 +25,8 @@ BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.3 with pkgconfig(plugin-
 BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
 BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.31.2 with pkgconfig(omx-clap-lv2) < 0.32)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
+# describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
+BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18

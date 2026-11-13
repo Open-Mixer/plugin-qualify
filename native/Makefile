@@ -94,13 +94,17 @@ LILV_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lilv-0)
 LILV_LIBS ?= $(shell $(PKG_CONFIG) --libs lilv-0)
 LV2_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lv2 2>/dev/null)
 
+# describe's JSON reader and writer (plugin-json.c): cJSON, moved from plugin-hostd with it
+CJSON_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags libcjson)
+CJSON_LIBS ?= $(shell $(PKG_CONFIG) --libs libcjson)
+
 LIBEXECDIR ?= /usr/libexec/plugin-qualify
 
 CFLAGS ?= -O2 -g
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type
 
 
-all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap \
+all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/describe_test $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap \
 	$(BUILD)/fixtures/controls.clap $(BUILD)/fixtures/params-2048.clap $(BUILD)/fixtures/params-2049.clap \
 	$(BUILD)/fixtures/info-fails.clap $(BUILD)/fixtures/leaky-delay.clap $(BUILD)/fixtures/undeclared-delay.clap \
 	$(BUILD)/fixtures-faulty/crashes-at-load.clap $(BUILD)/fixtures-faulty/hangs.clap $(BUILD)/fixtures-faulty/rate-pinned.clap \
@@ -150,6 +154,14 @@ $(BUILD)/lv2_measure_options_test: lv2_measure_options.test.c lv2-measure-option
 # the search path's oracle, never installed
 $(BUILD)/lv2_measure_path_test: lv2_measure_path.test.c lv2-measure-path.c lv2-measure-path.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror -I. $(LDFLAGS) -o $@ lv2_measure_path.test.c lv2-measure-path.c
+
+DESCRIBE_SRC := describe.c plugin-json.c transforms.c
+DESCRIBE_HDR := describe.h plugin-json.h transforms.h
+
+# describe's oracle, never installed: the format tables (../data/formats/*.json) against the field dump
+# fixtures (fixtures/fields/), run with the working directory at native/
+$(BUILD)/describe_test: describe.test.c $(DESCRIBE_SRC) $(DESCRIBE_HDR) | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CONTRACT_CFLAGS) $(CJSON_CFLAGS) -I. $(LDFLAGS) -o $@ describe.test.c $(DESCRIBE_SRC) $(CJSON_LIBS) -lm
 
 $(BUILD)/isolated_signal: isolated-signal.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< -ldl -lm
