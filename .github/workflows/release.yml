@@ -94,29 +94,47 @@ jobs:
       arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && '["amd64"]' || '["amd64", "arm64"]' }}
     secrets: inherit
 
+  # the cells the installed package is qualified in runs: check-matrix's answer (rule 11-10: fc45 beside fc44; the quick set while a release wave
+  # is open, the whole matrix declared here otherwise)
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      cells: ${{ steps.m.outputs.cells }}
+      count: ${{ steps.m.outputs.count }}
+    steps:
+      - id: m
+        uses: Open-Mixer/.github/.github/actions/check-matrix@openmixer-v1
+        with:
+          wave: ${{ vars.OMX_RELEASE_MATRIX }}
+          rpm-releases: '["44", "45"]'
+          rpm-arches: '["x86_64"]'
+          deb-releases: '["bookworm", "trixie"]'
+          deb-arches: '["amd64"]'
+
   # the built package, installed in its own distribution, qualifies the fixture plugins with no
   # OMX_* setting: the prober, the measurer and the interposer are found where the package put them
   installed:
-    name: Install and qualify (${{ matrix.image }})
-    needs: [rpm, deb]
+    name: Install and qualify (${{ matrix.cell.image }})
+    needs: [checks, rpm, deb]
     # not on a staged run: it reads packages a staged run does not build
-    if: ${{ !cancelled() && inputs.staged != true }}
+    if: ${{ !cancelled() && inputs.staged != true && needs.checks.outputs.count != '0' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
       contents: read
     container:
-      image: ${{ matrix.image }}
+      image: ${{ matrix.cell.image }}
     defaults:
       run:
         shell: bash
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { image: 'fedora:44', artifact: plugin-qualify-rpms-fc44-x86_64 }
-          - { image: 'debian:bookworm', artifact: plugin-qualify-debs-bookworm-amd64 }
-          - { image: 'debian:trixie', artifact: plugin-qualify-debs-trixie-amd64 }
+        cell: ${{ fromJSON(needs.checks.outputs.cells) }}
+    env:
+      # the cell's build, as build-rpm and build-deb name it
+      ARTIFACT: ${{ matrix.cell.fedora && format('plugin-qualify-rpms-fc{0}-{1}', matrix.cell.fedora, matrix.cell.arch) || format('plugin-qualify-debs-{0}-{1}', matrix.cell.suite, matrix.cell.arch) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -128,13 +146,13 @@ jobs:
         uses: actions/download-artifact@v4
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ env.ARTIFACT }}
           path: pkgs
 
       - name: Say a cell the catch-up did not build is skipped
         if: steps.pkgs.outcome != 'success'
         env:
-          ARTIFACT: ${{ matrix.artifact }}
+          ARTIFACT: ${{ env.ARTIFACT }}
         run: |
           echo "::notice::catch-up: $ARTIFACT was not built by this run (the channel serves that cell), so it is not installed here"
 
@@ -143,11 +161,11 @@ jobs:
       # against on Debian. The package alone pulls no development package; the fixtures' build tools
       # come after that check.
       - name: Add the OpenMixer channel (Fedora)
-        if: startsWith(matrix.image, 'fedora') && steps.pkgs.outcome == 'success'
+        if: startsWith(matrix.cell.image, 'fedora') && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Fedora)
-        if: startsWith(matrix.image, 'fedora') && steps.pkgs.outcome == 'success'
+        if: startsWith(matrix.cell.image, 'fedora') && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           # a mirror that fails in mid-transfer (curl 56, zchunk checksums) is tried again; a real install error fails the
@@ -172,18 +190,18 @@ jobs:
           dnf_retry --setopt=install_weak_deps=False gcc make pkgconf-pkg-config clap-devel lv2-devel
 
       - name: Prepare the container (Debian)
-        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
+        if: startsWith(matrix.cell.image, 'debian') && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           apt-get update -qq
           apt-get install -y --no-install-recommends ca-certificates curl
 
       - name: Add the OpenMixer channel (Debian)
-        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
+        if: startsWith(matrix.cell.image, 'debian') && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Debian)
-        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
+        if: startsWith(matrix.cell.image, 'debian') && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           suite=${IMAGE#debian:}
@@ -197,7 +215,7 @@ jobs:
           if dpkg -s mod-host >/dev/null 2>&1; then echo "plugin-qualify pulled mod-host"; exit 1; fi
           apt-get install -y --no-install-recommends gcc libc6-dev make pkgconf clap-headers lv2-dev
         env:
-          IMAGE: ${{ matrix.image }}
+          IMAGE: ${{ matrix.cell.image }}
 
       - name: Build the fixture plugins
         if: steps.pkgs.outcome == 'success'
