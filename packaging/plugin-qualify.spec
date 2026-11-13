@@ -238,6 +238,11 @@ the English source sentence.
   (#56, #59)
 - lv2-measure sends an integer port integers and a toggled port 0 or 1; the LV2
   fixture set is 28 with a stepped port (#29, #62)
+- ZamVerb: its integer room port is no longer swept as a float, so it no longer
+  reloads its impulse response for every value; 30 lifecycles at 192 kHz in
+  512-frame blocks take 55 s instead of 272 s, inside the wall clock (#62)
+- a pass that hits the memory bound or crashes ends on its own and later passes are
+  still measured; Surge XT no longer loses its document (#61)
 - the organisation's name is Open-Mixer, the project's OpenMixer (#63)
 - contract files keep the $schema the floor's reader reads
 - CI builds against the channel, never the staging channel, guarded (D25, #64, #65);
