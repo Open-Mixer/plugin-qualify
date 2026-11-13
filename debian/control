@@ -9,11 +9,11 @@ Build-Depends: debhelper-compat (= 13),
                clap-headers (>= 1.2.10~), clap-headers (<< 2~),
                liblilv-dev,
                lv2-dev,
-               plugin-db-dev (>= 0.4.1~), plugin-db-dev (<< 0.5~),
-               libplugin-hostd-protocol-dev (>= 0.5.7~), libplugin-hostd-protocol-dev (<< 0.6~),
-               libomx-contract-dev (>= 3.16.0~), libomx-contract-dev (<< 4~),
-               libomx-clap-lv2-dev (>= 0.32.3~), libomx-clap-lv2-dev (<< 0.33~),
-               libomxdsp-dev (>= 0.32.0~), libomxdsp-dev (<< 0.33~),
+               plugin-db-dev (>= 0.4.4~), plugin-db-dev (<< 0.5~),
+               libplugin-hostd-protocol-dev (>= 0.5.9~), libplugin-hostd-protocol-dev (<< 0.6~),
+               libomx-contract-dev (>= 3.18.0~), libomx-contract-dev (<< 4~),
+               libomx-clap-lv2-dev (>= 0.32.5~), libomx-clap-lv2-dev (<< 0.33~),
+               libomxdsp-dev (>= 0.32.1~), libomxdsp-dev (<< 0.33~),
                libcjson-dev (>= 1.7.15~), libcjson-dev (<< 2~)
 Standards-Version: 4.6.2
 Homepage: https://github.com/Open-Mixer/plugin-qualify
@@ -21,7 +21,7 @@ Rules-Requires-Root: no
 
 Package: plugin-qualify
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, nodejs (>= 18), python3, python3-jsonschema, plugin-hostd (>= 0.20.5~), plugin-hostd (<< 0.21~), omx-clap-host (>= 0.32.3~), omx-clap-host (<< 0.33~), libomx-clap-core1 (>= 0.32.3~), libomx-clap-core1 (<< 0.33~), liblilv-0-0, ${lilv:Depends}
+Depends: ${misc:Depends}, ${shlibs:Depends}, nodejs (>= 18), python3, python3-jsonschema, plugin-hostd (>= 0.20.7~), plugin-hostd (<< 0.21~), omx-clap-host (>= 0.32.5~), omx-clap-host (<< 0.33~), libomx-clap-core1 (>= 0.32.5~), libomx-clap-core1 (<< 0.33~), liblilv-0-0, ${lilv:Depends}
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
