@@ -100,7 +100,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          staging: 'true'
       - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.16.0' 'omx-contract < 4' 'omx-contract-data >= 3.16.0'
+      # an ordinary run builds against the channel: name where each omx package came from, refuse one from staging (D25,
+      # plugin-hostd-protocol#27: a stale staged contract package outranked the channel)
+      - name: Every omx package comes from the channel
+        run: |
+          set -euo pipefail
+          dnf repoquery --installed --qf '%{name} %{version} %{from_repo}\n' 'omx-*' 'plugin-*' | tee /tmp/from-repo
+          if grep staging /tmp/from-repo; then echo "a package above came from the staging channel: an ordinary run builds against the channel"; exit 1; fi
       - uses: Open-Mixer/.github/.github/actions/langpacks@openmixer-v1
         with:
           name: plugin-qualify
