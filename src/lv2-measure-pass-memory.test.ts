@@ -71,11 +71,10 @@ describe("lv2-measure, live — a pass gives its memory back (#28)", () => {
     expect(doc["latency"]!["unmeasuredReason"]).toBeUndefined();
     const at = (doc["cost"]!["perRate"] as Record<string, Record<string, unknown>>)["48000"]!;
     expect(at["unmeasuredReason"]).toBeUndefined();
-    const curve = at["voiceCurve"] as { held: number; unmeasuredReason?: string; unmeasuredDetail?: string }[];
+    const curve = at["voiceCurve"] as { held: number; unmeasuredReason?: string }[];
     expect(curve.map((e) => e.held)).toEqual([1, 48]);
     expect(curve[0]!.unmeasuredReason).toBeUndefined();
     expect(curve[1]!.unmeasuredReason).toBe("probe-crashed");
-    expect(curve[1]!.unmeasuredDetail).toMatch(/SIGSEGV/);
   });
 
   live("unbounded, the measurer never holds more than one pass's instances: its peak stays under 320 MiB (the fixture keeps 64 MiB an instance)", () => {

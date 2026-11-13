@@ -1355,7 +1355,23 @@ static void emit_cost(double rate, const struct cost_at *C, uint32_t block, int 
 #define MEMORY_BOUND_REASON "memory-bound"
 #endif
 
-enum pass_end { PASS_DONE, PASS_MEMORY_BOUND };
+enum pass_end { PASS_DONE, PASS_MEMORY_BOUND, PASS_CRASHED };
+
+/* the signal the last pass that ended PASS_CRASHED died of */
+static int g_pass_signal;
+
+/* "worker crashed (SIG...)", the prober's sentence for a death (probe-json.ts reads it as probe-crashed) */
+static const char *crash_detail(int sig) {
+  switch (sig) {
+  case SIGSEGV: return "worker crashed (SIGSEGV)";
+  case SIGABRT: return "worker crashed (SIGABRT)";
+  case SIGBUS: return "worker crashed (SIGBUS)";
+  case SIGFPE: return "worker crashed (SIGFPE)";
+  case SIGILL: return "worker crashed (SIGILL)";
+  case SIGKILL: return "worker crashed (SIGKILL)";
+  default: return "worker crashed (a signal)";
+  }
+}
 
 /* the write end of the running pass's pipe, in its child; -1 in this process */
 static int g_pass_fd = -1;
@@ -1375,7 +1391,10 @@ static void pass_progress(const void *ctx, size_t size) {
 static void carry_out(int fd);
 static void carry_in(int fd);
 
-static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) {
+/* A pass in a child of its own. A death by a signal ends the run with that signal (the passes the verdict rests on:
+ * a plugin that crashes there crashed) unless survive is set: then the pass ends PASS_CRASHED, g_pass_signal names
+ * the signal, and the run goes on (the latency and cost passes, after the verdict's, #28). */
+static enum pass_end pass_in_child(void (*fn)(void *), void *ctx, size_t size, int survive) {
   int fds[2], carry[2];
   fflush(NULL);
   void *got = malloc(size);
@@ -1429,6 +1448,10 @@ static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) {
   }
   if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return PASS_DONE;
   if (WIFEXITED(status) && WEXITSTATUS(status) == OMX_RT_OOM_EXIT_STATUS) return PASS_MEMORY_BOUND;
+  if (survive && WIFSIGNALED(status)) {
+    g_pass_signal = WTERMSIG(status);
+    return PASS_CRASHED;
+  }
   fflush(NULL);
   if (WIFSIGNALED(status)) {
     signal(WTERMSIG(status), SIG_DFL);
@@ -1436,6 +1459,8 @@ static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) {
   }
   _exit(WIFEXITED(status) ? WEXITSTATUS(status) : 1);
 }
+
+static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) { return pass_in_child(fn, ctx, size, 0); }
 
 /* what every pass reads of the run */
 static struct {
@@ -1670,10 +1695,15 @@ static void cost_pass(void *v) {
 static void latency_in_child(struct latency_at *L) {
   struct latency_pass p;
   memset(&p, 0, sizeof p);
-  if (in_child(latency_pass, &p, sizeof p) == PASS_MEMORY_BOUND) {
+  const enum pass_end end = pass_in_child(latency_pass, &p, sizeof p, 1);
+  if (end == PASS_MEMORY_BOUND) {
     memset(&p, 0, sizeof p);
     p.at.unmeasured = MEMORY_BOUND_REASON;
     p.at.detail = "the latency run took the plugin past the run's memory bound";
+  } else if (end == PASS_CRASHED) {
+    memset(&p, 0, sizeof p);
+    p.at.unmeasured = "probe-crashed";
+    p.at.detail = crash_detail(g_pass_signal);
   }
   *L = p.at;
 }
@@ -1682,11 +1712,17 @@ static void cost_in_child(long held, struct cost_at *C) {
   struct cost_pass p;
   memset(&p, 0, sizeof p);
   p.held = held;
-  if (in_child(cost_pass, &p, sizeof p) == PASS_MEMORY_BOUND) {
+  const enum pass_end end = pass_in_child(cost_pass, &p, sizeof p, 1);
+  if (end == PASS_MEMORY_BOUND) {
     memset(&p.at, 0, sizeof p.at);
     p.at.unmeasured = MEMORY_BOUND_REASON;
     p.at.detail = "the cost run took the plugin past the run's memory bound";
+  } else if (end == PASS_CRASHED) {
+    memset(&p.at, 0, sizeof p.at);
+    p.at.unmeasured = "probe-crashed";
+    p.at.detail = crash_detail(g_pass_signal);
   }
+  if (end != PASS_DONE && held > 0) p.at.held = (uint32_t)held; /* the curve's count, kept for its unmeasured point */
   *C = p.at;
 }
 
