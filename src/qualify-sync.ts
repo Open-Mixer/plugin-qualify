@@ -25,7 +25,7 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { withRunHome } from "./run-home.js";
 import { clapQualifyTools } from "./clap-qualify.js";
-import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOfBoard, hostClassOfMachine, outcomeOfVerdict, matchDistributed, readBoardModel, readMachine, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
+import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOf, outcomeOfVerdict, matchDistributed, readBoardModel, readMachine, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
 import { parseClapScan } from "./clap-loader.js";
 import { SPAWNED_SEARCH_PATH, hostdSearchPath, searchPathWarnings, type SearchPathRun } from "./hostd-search-path.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
@@ -283,7 +283,7 @@ export function resolveSyncSettings(
         ? [DISTRIBUTED_DIR_SYSTEM]
         : [dataHome, ...dataDirs].map((d) => join(d, "omx", "qualification"));
   const classNamed = get("host_class");
-  const hostClass = classNamed !== undefined && classNamed !== "" ? classNamed : hostClassOfBoard(boardModel()) ?? hostClassOfMachine(machineArch());
+  const hostClass = hostClassOf(classNamed, boardModel, machineArch);
   if (hostClass !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(hostClass)) return { ok: false, error: `host_class ${hostClass} is not a directory name` };
   return {
     ok: true,
