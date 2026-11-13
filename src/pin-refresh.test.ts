@@ -10,7 +10,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -38,8 +38,8 @@ afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 const sha256 = (path: string): string => createHash("sha256").update(readFileSync(path)).digest("hex");
 
 /** An LV2 bundle whose manifest names a preset file beside the plugin's own TTL, as mda Piano's does. */
-function bundle(name: string): string {
-  const dir = join(scratch, "lv2", `${name}.lv2`);
+function bundle(name: string, lv2 = join(scratch, "lv2")): string {
+  const dir = join(lv2, `${name}.lv2`);
   mkdirSync(dir, { recursive: true });
   const prefixes = "@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n" +
     "@prefix pset: <http://lv2plug.in/ns/ext/presets#> .\n";
@@ -156,14 +156,33 @@ describe("plugin-qualify-sync --refresh-pins", () => {
   });
 });
 
+/** The bundles of an LV2 directory whose manifest names the plugin. */
+const bundlesNaming = (lv2: string): string[] =>
+  readdirSync(lv2).filter((n) => n.endsWith(".lv2")).map((n) => join(lv2, n))
+    .filter((b) => existsSync(join(b, "manifest.ttl")) && readFileSync(join(b, "manifest.ttl"), "utf8").includes(`<${URI}>`));
+
+/**
+ * The live arm's bundle and the LV2 path plugin-hostd is given. plugin-hostd takes the first bundle of lv2_path naming
+ * the plugin, in the directory's own order (readdir), so the arm's plugin must be named by its bundle alone.
+ */
+const LIVE_LV2 = join(scratch, "lv2");
+let live: string | undefined;
+const liveBundle = (): string => (live ??= bundle("refresh-e", LIVE_LV2));
+
 describe("plugin-hostd on a pin from before 0.17.3, and on the same pin refreshed", () => {
+  it("is given an LV2 path that names the plugin in its bundle alone (plugin-qualify#50)", () => {
+    // the arms above leave bundles naming the same plugin, refresh-b's with its binary rewritten: a daemon that met
+    // that one first collected other files than the pin's, refreshPins kept the old pin, and the add answered -509
+    expect(bundlesNaming(LIVE_LV2)).toEqual([liveBundle()]);
+  });
+
   it("refuses the old pin with -509 and adds the refreshed one", async (ctx) => {
     if (HOSTD === undefined || FAKE_HOST === undefined) {
       if (process.env["CI"]) throw new Error("PLUGIN_HOSTD and PLUGIN_HOSTD_FAKE_HOST are needed: CI installs plugin-hostd and plugin-hostd-tests");
       ctx.skip("needs plugin-hostd 0.15.0 and its fake worker: PLUGIN_HOSTD, PLUGIN_HOSTD_FAKE_HOST (plugin-hostd-tests)");
     }
-    const dir = bundle("refresh-e");
-    const lv2 = join(scratch, "lv2");
+    const dir = liveBundle();
+    const lv2 = LIVE_LV2;
     // the fake worker's layout, which it checks a pin against
     const fake = spawnSync(FAKE_HOST!, ["-L"], { encoding: "utf8" }).stdout.trim();
     const layout = { scheme: fake.slice(0, fake.lastIndexOf(":")), sha256: fake.slice(fake.lastIndexOf(":") + 1) };
