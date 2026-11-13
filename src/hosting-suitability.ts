@@ -16,6 +16,7 @@
  * own. So every dimension here fails CLOSED: no measurement means `unknown`, and `unknown`
  * means isolated.
  */
+import { GROUPABLE_CONDITIONAL_CODES } from "./pin-grouping.js";
 import {
   RATING_SEVERITY,
   worstRating,
@@ -709,6 +710,11 @@ export function rtSafetyReasons(
       }),
     ];
   }
+  // D20: a plugin that started threads of its own is conditional and still groupable; what those threads did while the
+  // audio thread was armed is a figure, timing-bound, never the verdict (#53)
+  if ((m.ownThreads ?? 0) > 0) {
+    return [reason("rtSafety", "objective", "conditional", HOSTING_CODE.rtSafetyOwnThreads, { threads: m.ownThreads ?? 0 })];
+  }
   return [
     reason("rtSafety", "objective", "suitable", HOSTING_CODE.rtSafetyClean, {
       blocks: m.blocks ?? 0,
@@ -1153,10 +1159,12 @@ export function classifyPluginHosting(
   }
 
   const rating = worstRating(reasons.map(contributedHostingRating));
+  // of equally rated reasons, a groupable one decides last (D20): a deciding own-threads then means nothing isolates
   const deciding = [...reasons]
     .sort(
       (a, b) =>
-        RATING_SEVERITY[contributedHostingRating(b)] - RATING_SEVERITY[contributedHostingRating(a)],
+        RATING_SEVERITY[contributedHostingRating(b)] - RATING_SEVERITY[contributedHostingRating(a)] ||
+        Number(GROUPABLE_CONDITIONAL_CODES.has(a.code)) - Number(GROUPABLE_CONDITIONAL_CODES.has(b.code)),
     )
     .find((r) => contributedHostingRating(r) === rating);
   return {

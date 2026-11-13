@@ -58,6 +58,8 @@ const FIXTURES = join(PKG, "native", "build", "fixtures");
 const SAFE = join(FIXTURES, "rt-safe.clap");
 const UNSAFE = join(FIXTURES, "rt-unsafe.clap");
 const CONTROLS = join(FIXTURES, "controls.clap");
+const WORKER_ALLOCATES = join(FIXTURES, "worker-allocates.clap");
+const WORKER_IDLE = join(FIXTURES, "worker-idle.clap");
 const SYNTH = join(FIXTURES, "synth.clap");
 const SYNTH_ALLOC = join(FIXTURES, "synth-alloc.clap");
 const SYNTH_MIDI = join(FIXTURES, "synth-midi.clap");
@@ -74,6 +76,8 @@ const BUILT = [
   rtInterposePath(),
   SAFE,
   UNSAFE,
+  WORKER_ALLOCATES,
+  WORKER_IDLE,
   SYNTH,
   SYNTH_ALLOC,
   SYNTH_MIDI,
@@ -170,6 +174,27 @@ describe("clap-qualify, live — the known RT-safe and RT-unsafe fixture plugins
     expect(doc.measured.rtSafety).toMatchObject({ interposer: true, swept: true, allocationsInRun: 0, locksInRun: 0, syscallsInRun: 0 });
     expect(doc.measured.clap.processCalls).toBe(CLAP_SWEEP_BLOCKS * QUALIFY_RATES.length);
     expect(Object.keys(doc.measured.clap.latency)).toEqual(QUALIFY_RATES.map(String));
+  });
+
+  // D20 (#53): the arm counts the audio thread and the other threads apart, and the threads the plugin started. A plugin
+  // whose own thread allocates while process() is clean is own-threads, groupable, with the same verdict on every run:
+  // its thread's calls are a figure, never the verdict. The flip of five LSP plugins came from counting them as the run's.
+  live("a plugin with a thread of its own that allocates: audio thread clean, own-threads, one verdict over five runs", () => {
+    const docs = Array.from({ length: 5 }, () => rtSafetyDocument(qualifyClap(WORKER_ALLOCATES, undefined, { rates: [QUALIFY_RATES[0]!] })[0]!));
+    for (const doc of docs) {
+      expect(doc.measured.rtSafety.allocationsInRun).toBe(0);
+      expect(doc.measured.rtSafety.ownThreads).toBe(1);
+      expect(doc.verdict.deciding?.code).toBe(HOSTING_CODE.rtSafetyOwnThreads);
+    }
+    expect(new Set(docs.map((d) => `${d.verdict.rating} ${d.verdict.deciding?.code}`)).size).toBe(1);
+    // its worker's allocations while the audio thread was armed are a figure: present in at least one run
+    expect(docs.some((d) => (d.measured.rtSafety.otherThreads?.allocationsInRun ?? 0) > 0)).toBe(true);
+  });
+
+  live("a plugin with a thread of its own that only waits: own-threads, no other-thread call", () => {
+    const doc = rtSafetyDocument(qualifyClap(WORKER_IDLE, undefined, { rates: [QUALIFY_RATES[0]!] })[0]!);
+    expect(doc.measured.rtSafety).toMatchObject({ allocationsInRun: 0, ownThreads: 1, otherThreads: { allocationsInRun: 0, locksInRun: 0 } });
+    expect(doc.verdict.deciding?.code).toBe(HOSTING_CODE.rtSafetyOwnThreads);
   });
 
   live("the RT-unsafe plugin is isolated on the interposer's count, and the events name the allocation", () => {

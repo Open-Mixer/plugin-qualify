@@ -57,6 +57,7 @@ export const HOSTING_CODE = Object.freeze({
   "rtSafetyNotesClean": "hosting.rt-safety.clean-under-notes",
   "rtSafetyNotesUnmeasured": "hosting.rt-safety.notes-unmeasured",
   "rtSafetyNotesViolations": "hosting.rt-safety.violations-under-notes",
+  "rtSafetyOwnThreads": "hosting.rt-safety.own-threads",
   "rtSafetyUnmeasured": "hosting.rt-safety.unmeasured",
   "rtSafetyViolations": "hosting.rt-safety.violations-in-run",
   "stabilityBelowFloor": "hosting.stability.cycles-below-floor",

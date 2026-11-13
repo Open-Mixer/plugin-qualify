@@ -21,6 +21,7 @@ import type { RtSafetyDocument } from "./clap-qualify.js";
 import type { IntegrityMeasurement, MeasuredPlugin } from "./measurement/format.js";
 import { integrityOfProbeOutput, type Judgment } from "./probe-judge.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
+import { sharesAWorker, type GroupingReason } from "./pin-grouping.js";
 import type { SuitabilityRating } from "./rating.js";
 
 /** The verb the line starts with in a pins file, hostd's `PHD_VERB_PIN_SET`. */
@@ -40,17 +41,22 @@ export type PinPool = (typeof PIN_POOLS)[number];
 export const PIN_VERDICTS = ["in-process", "isolated", "refused"] as const;
 export type PinVerdict = (typeof PIN_VERDICTS)[number];
 
+
 /**
  * What a rating says about where the plugin may run, in hostd's words. `suitable` is qualified for a worker that other
- * plugins share. `conditional` loads and is isolated. `unsuitable` is measured to fail and is `refused`. `unknown` is no
- * opinion: no verdict word, and hostd treats the plugin as not qualified.
+ * plugins share. `conditional` loads and is isolated, unless every conditional reason given is a groupable one
+ * (pin-grouping.ts): then it shares a worker. `unsuitable` is measured to fail and is `refused`. `unknown`
+ * is no opinion: no verdict word, and hostd treats the plugin as not qualified.
  */
-export function pinVerdictOf(rating: SuitabilityRating): PinVerdict | undefined {
+export function pinVerdictOf(
+  rating: SuitabilityRating,
+  reasons?: readonly GroupingReason[],
+): PinVerdict | undefined {
   switch (rating) {
     case "suitable":
       return "in-process";
     case "conditional":
-      return "isolated";
+      return sharesAWorker(rating, reasons) ? "in-process" : "isolated";
     case "unsuitable":
       return "refused";
     case "unknown":
@@ -202,11 +208,15 @@ export function pinsFile(entries: readonly PinEntry[], writer = "plugin-qualify 
  * The entries of a CLAP pass for one host: each document of that host's profile with its pin and the verdict its
  * rating says. The documents of other profiles are ignored; a pins file is for one host.
  */
+/** A verdict row that names only its deciding code: that reason, which decides last when groupable (D20) */
+const decidingAsReasons = (v: { readonly rating: string; readonly deciding?: string }): GroupingReason[] =>
+  v.deciding === undefined ? [] : [{ rating: v.rating, code: v.deciding }];
+
 export function clapPinEntries(documents: readonly RtSafetyDocument[], host: string): PinEntry[] {
   return documents
     .filter((d) => d.console === host)
     .map((d) => {
-      const verdict = pinVerdictOf(d.verdict.rating);
+      const verdict = pinVerdictOf(d.verdict.rating, d.verdict.reasons);
       return {
         uri: clapPinUri(d.plugin.binary.path, d.plugin.uri),
         integrity: d.measured.integrity,
@@ -224,7 +234,7 @@ export function judgmentPinEntries(judgment: Judgment, host: string): PinEntry[]
   if (judged === undefined) return [];
   const o = judgment.output;
   const uri = o.plugin.format === "clap" ? clapPinUri(o.binary.path, `urn:clap:${o.plugin.id}`) : o.plugin.id;
-  const verdict = judged.verdict.measured ? pinVerdictOf(judged.verdict.rating) : undefined;
+  const verdict = judged.verdict.measured ? pinVerdictOf(judged.verdict.rating, judged.reasons) : undefined;
   return [{ uri, integrity: integrityOfProbeOutput(o), ...(verdict === undefined ? {} : { verdict }) }];
 }
 
@@ -240,7 +250,7 @@ export function measuredPinEntries(
   return plugins.flatMap((p) => {
     if (p.integrity === undefined) return [];
     const row = verdicts.find((v) => v.uri === p.uri && v.host === host);
-    const verdict = row === undefined || !row.measured ? undefined : pinVerdictOf(row.rating);
+    const verdict = row === undefined || !row.measured ? undefined : pinVerdictOf(row.rating, decidingAsReasons(row));
     return [{ uri: p.uri, integrity: p.integrity, ...(verdict === undefined ? {} : { verdict }) }];
   });
 }

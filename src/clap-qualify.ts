@@ -10,6 +10,7 @@
  * read, a prober that is absent, crashed or timed out, is a {@link ClapQualifyError}: nothing was
  * measured, and nothing is rated.
  */
+import { GROUPABLE_CONDITIONAL_CODES } from "./pin-grouping.js";
 import { existsSync } from "node:fs";
 
 import { CLAP_QUALIFY_TOOL_NAME, RT_INTERPOSE_NAME } from "./qualify-declarations.js";
@@ -216,6 +217,17 @@ function readRtSafety(v: unknown): ClapRtSafetyReading {
     locksInRun: count(v, "locksInRun", "rtSafety"),
     syscallsInRun: count(v, "syscallsInRun", "rtSafety"),
     events: strings(v, "events", "rtSafety"),
+    // D20: optional, an older prober prints neither
+    ...(v["ownThreads"] === undefined ? {} : { ownThreads: count(v, "ownThreads", "rtSafety") }),
+    ...(isRecord(v["otherThreads"])
+      ? {
+          otherThreads: {
+            allocationsInRun: count(v["otherThreads"], "allocationsInRun", "rtSafety.otherThreads"),
+            locksInRun: count(v["otherThreads"], "locksInRun", "rtSafety.otherThreads"),
+            syscallsInRun: count(v["otherThreads"], "syscallsInRun", "rtSafety.otherThreads"),
+          },
+        }
+      : {}),
   };
 }
 
@@ -483,7 +495,9 @@ export function rtSafetyDocument(line: ClapQualifyLine, profile: HostProfile = O
           ];
   const rating = worstRating(reasons.map(contributedHostingRating));
   const deciding = [...reasons]
-    .sort((a, b) => RATING_SEVERITY[contributedHostingRating(b)] - RATING_SEVERITY[contributedHostingRating(a)])
+    // of equally rated reasons, a groupable one decides last (D20)
+    .sort((a, b) => RATING_SEVERITY[contributedHostingRating(b)] - RATING_SEVERITY[contributedHostingRating(a)]
+      || Number(GROUPABLE_CONDITIONAL_CODES.has(a.code)) - Number(GROUPABLE_CONDITIONAL_CODES.has(b.code)))
     .find((r) => contributedHostingRating(r) === rating);
   return {
     schema: RT_SAFETY_DOCUMENT_SCHEMA,
