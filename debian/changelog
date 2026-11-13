@@ -2,8 +2,9 @@ plugin-qualify (0.20.5) unstable; urgency=medium
 
   * Built and run against the 3.18.0 pass's releases: omx-contract >= 3.18.0
     and below 4; omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.32.5 and
-    below 0.33; plugin-hostd >= 0.20.7 and below 0.21; plugin-db >= 0.4.4 and
-    below 0.5 (D30); make deps fetches those tags.
+    below 0.33; plugin-hostd >= 0.20.7 and below 0.21; plugin-hostd-protocol
+    >= 0.5.9 and below 0.6; omx-dsp >= 0.32.1 and below 0.33; plugin-db >=
+    0.4.4 and below 0.5 (D30); make deps fetches those tags.
   * here: the facts of this machine for a plugin-db query, --json by
     plugin-db's keys (#56, #59).
   * lv2-measure sends an integer port integers and a toggled port 0 or 1; the

@@ -21,10 +21,10 @@ BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
 BuildRequires: (pkgconfig(plugin-db) >= 0.4.4 with pkgconfig(plugin-db) < 0.5)
-BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.7 with pkgconfig(plugin-hostd-protocol) < 0.6)
+BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.9 with pkgconfig(plugin-hostd-protocol) < 0.6)
 BuildRequires: (pkgconfig(omx-contract) >= 3.18.0 with pkgconfig(omx-contract) < 4)
 BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.5 with pkgconfig(omx-clap-lv2) < 0.33)
-BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
+BuildRequires: (pkgconfig(omxdsp) >= 0.32.1 with pkgconfig(omxdsp) < 0.33)
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
 BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
 BuildRequires: systemd-rpm-macros
@@ -232,7 +232,8 @@ the English source sentence.
 * Sat Nov 14 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.5-1
 - built and run against the 3.18.0 pass's releases: omx-contract >= 3.18.0 and < 4;
   omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.32.5 and < 0.33; plugin-hostd
-  >= 0.20.7 and < 0.21; plugin-db >= 0.4.4 and < 0.5 (D30); make deps fetches those tags
+  >= 0.20.7 and < 0.21; plugin-hostd-protocol >= 0.5.9 and < 0.6; omx-dsp >= 0.32.1
+  and < 0.33; plugin-db >= 0.4.4 and < 0.5 (D30); make deps fetches those tags
 - here: the facts of this machine for a plugin-db query, --json by plugin-db's keys
   (#56, #59)
 - lv2-measure sends an integer port integers and a toggled port 0 or 1; the LV2

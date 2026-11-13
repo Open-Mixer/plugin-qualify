@@ -37,7 +37,7 @@ BUILD ?= build
 
 CLAP_REF := 1.2.6
 # protocol.h (the pin path codec, phd_pin_path_encode) is plugin-hostd-protocol's: the packages' floor
-PLUGIN_HOSTD_PROTOCOL_REF := v0.5.7
+PLUGIN_HOSTD_PROTOCOL_REF := v0.5.9
 PLUGIN_DB_REF := v0.4.4
 # the omx-contract `make deps` fetches where no omx-contract-devel is installed: the packages' floor, so the build
 # reads the contract the packages do (3.18.0, the floor; 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer
@@ -47,7 +47,7 @@ OMX_CONTRACT_VERSION := 3.18.0
 # packages' floor
 OMX_CLAP_CORE_VERSION := 0.32.5
 # the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap-core's provider read: the packages' floor
-OMX_DSP_VERSION := 0.32.0
+OMX_DSP_VERSION := 0.32.1
 
 ifeq ($(shell $(PKG_CONFIG) --exists clap && echo true),true)
 CLAP_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags clap)

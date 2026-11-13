@@ -10,10 +10,10 @@ Build-Depends: debhelper-compat (= 13),
                liblilv-dev,
                lv2-dev,
                plugin-db-dev (>= 0.4.4~), plugin-db-dev (<< 0.5~),
-               libplugin-hostd-protocol-dev (>= 0.5.7~), libplugin-hostd-protocol-dev (<< 0.6~),
+               libplugin-hostd-protocol-dev (>= 0.5.9~), libplugin-hostd-protocol-dev (<< 0.6~),
                libomx-contract-dev (>= 3.18.0~), libomx-contract-dev (<< 4~),
                libomx-clap-lv2-dev (>= 0.32.5~), libomx-clap-lv2-dev (<< 0.33~),
-               libomxdsp-dev (>= 0.32.0~), libomxdsp-dev (<< 0.33~),
+               libomxdsp-dev (>= 0.32.1~), libomxdsp-dev (<< 0.33~),
                libcjson-dev (>= 1.7.15~), libcjson-dev (<< 2~)
 Standards-Version: 4.6.2
 Homepage: https://github.com/Open-Mixer/plugin-qualify
