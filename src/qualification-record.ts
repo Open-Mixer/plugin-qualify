@@ -13,6 +13,7 @@
  * Not yet in the record: the fingerprint of the descriptor's controls, since the descriptor is
  * written by the scan (stage 5) and plugin-qualify does not read one yet.
  */
+import { sharesAWorker } from "./pin-grouping.js";
 import type { MemoryFootprint } from "./measurement/format.js";
 import { firstInstanceKb, perInstanceKb } from "./memory-budget.js";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -468,7 +469,9 @@ function tierOf(judgment: Judgment, host: string | undefined): TierVerdict | und
 export function tiersOf(judgment: Judgment): RecordTiers {
   const inProcess = tierOf(judgment, IN_PROCESS_TIER_HOST);
   const isolated = tierOf(judgment, ISOLATED_TIER_HOST[judgment.output.plugin.format]);
-  const runsAlone = isolated?.measured === true && isolated.rating === "conditional";
+  // a conditional plugin runs alone unless every conditional reason is groupable (D20): own threads share a worker
+  const isolatedReasons = judgment.hosts.find((h) => h.verdict.host === ISOLATED_TIER_HOST[judgment.output.plugin.format])?.reasons;
+  const runsAlone = isolated?.measured === true && isolated.rating === "conditional" && !sharesAWorker(isolated.rating, isolatedReasons);
   const offeredOn: ("in-process" | "isolated")[] = [];
   if (inProcess?.qualified === true) offeredOn.push("in-process");
   if (isolated?.qualified === true || runsAlone) offeredOn.push("isolated");

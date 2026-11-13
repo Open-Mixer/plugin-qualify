@@ -109,7 +109,7 @@ export function judgedLayerOf(record: QualificationRecord, input: JudgedLayerInp
   const tierHost = ISOLATED_TIER_HOST[record.plugin.format];
   const v = record.verdicts.find((r) => r.host === tierHost);
   if (v === undefined) return { layer: null, reason: `no verdict under ${tierHost ?? `a host for ${record.plugin.format}`}` };
-  const verdict = v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+  const verdict = v.measured ? pinVerdictOf(v.rating as SuitabilityRating, v.reasons) : undefined;
   if (verdict === undefined) return { layer: null, reason: `${tierHost}: not measured (${v.deciding ?? v.rating})` };
   const hostVersion = versionOf(record, "plugin-hostd-probe");
   if (hostVersion === undefined) return { layer: null, reason: "the record names no plugin-hostd-probe version" };

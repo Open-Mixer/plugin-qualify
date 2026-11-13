@@ -276,7 +276,7 @@ export function applyDistributed(qualificationDir: string, item: SyncItem, match
     writeFileWhole(recordPath, `${JSON.stringify({ ...r.record, provenance: r.provenance }, null, 2)}\n`);
     const v = r.record.verdicts.find((x) => x.host === host);
     if (v === undefined) continue;
-    const word = v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+    const word = v.measured ? pinVerdictOf(v.rating as SuitabilityRating, v.reasons) : undefined;
     const pin: PinEntry = { uri: distributedUri(item, r), integrity: integrityOfProbeOutput(output), ...(word === undefined ? {} : { verdict: word }) };
     const outcome = outcomeOfVerdict(v);
     plugins.push({ uri: pin.uri, outcome, ...(v.deciding === undefined ? {} : { code: v.deciding }), pin, record: recordPath });

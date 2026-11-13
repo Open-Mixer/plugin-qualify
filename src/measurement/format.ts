@@ -493,6 +493,14 @@ export interface RtSafetyMeasurement {
   readonly syscallsInRun?: number;
   /** Repeats disagreed. */
   readonly variable?: boolean;
+  /** The threads the plugin started: the process's threads after instantiate, minus before (D20). */
+  readonly ownThreads?: number;
+  /** What threads other than the audio thread did while it was armed: a figure, never a verdict (D20). */
+  readonly otherThreads?: {
+    readonly allocationsInRun?: number;
+    readonly locksInRun?: number;
+    readonly syscallsInRun?: number;
+  };
   /** 1.5: the same counts taken while the plugin was played through its MIDI input. */
   readonly noteSweep?: NoteSweepMeasurement;
   readonly unmeasuredReason?: string;

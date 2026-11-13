@@ -142,7 +142,7 @@ export function historyKeyOf(record: QualificationRecord): { readonly uri: strin
 
 /** The pin verdict of a record's verdict row: `unknown` and an unmeasured row have none. */
 function measuredPinVerdict(v: RecordVerdict): PinVerdict | undefined {
-  return v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+  return v.measured ? pinVerdictOf(v.rating as SuitabilityRating, v.reasons) : undefined;
 }
 
 /** The `history` block of one record for one host class. */
