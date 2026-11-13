@@ -37,8 +37,8 @@ BUILD ?= build
 
 CLAP_REF := 1.2.6
 # protocol.h (the pin path codec, phd_pin_path_encode) is plugin-hostd-protocol's: the packages' floor
-PLUGIN_HOSTD_PROTOCOL_REF := v0.5.3
-PLUGIN_DB_REF := v0.4.0
+PLUGIN_HOSTD_PROTOCOL_REF := v0.5.7
+PLUGIN_DB_REF := v0.4.1
 # the omx-contract `make deps` fetches where no omx-contract-devel is installed: the packages' floor, so the build
 # reads the contract the packages do (3.12.0, the floor; 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer
 # every tool here spells its literals through).

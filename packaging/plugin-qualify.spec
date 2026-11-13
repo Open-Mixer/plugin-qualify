@@ -20,8 +20,8 @@ BuildRequires: pkgconfig
 BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: (pkgconfig(plugin-db) >= 0.4.0 with pkgconfig(plugin-db) < 0.5)
-BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.3 with pkgconfig(plugin-hostd-protocol) < 0.6)
+BuildRequires: (pkgconfig(plugin-db) >= 0.4.1 with pkgconfig(plugin-db) < 0.5)
+BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.7 with pkgconfig(plugin-hostd-protocol) < 0.6)
 BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
 BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.2 with pkgconfig(omx-clap-lv2) < 0.33)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
@@ -232,7 +232,9 @@ the English source sentence.
 * Fri Nov 13 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.4-1
 - built and run against the inner layers' latest releases: omx-clap-host, omx-clap-core
   and omx-clap-lv2 >= 0.32.2 and < 0.33 (0.20.3 stopped below 0.32 and could not be
-  installed beside omx-clap-host 0.32), plugin-hostd >= 0.20.4, plugin-db >= 0.4.0
+  installed beside omx-clap-host 0.32), plugin-hostd >= 0.20.4, plugin-db >= 0.4.1 and
+  plugin-hostd-protocol >= 0.5.7, each below the next minor; make deps fetches the two
+  headers from those tags
 - compare and pin verdicts are codes with catalogs; language packs (#22)
 - a Python reader of a record's figures (#37)
 - refused plugins: the sets are run again with the child's stderr kept, and a refused
