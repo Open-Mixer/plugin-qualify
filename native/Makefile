@@ -45,7 +45,7 @@ PLUGIN_DB_REF := v0.4.1
 OMX_CONTRACT_VERSION := 3.12.0
 # the omx-clap-core whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
 # packages' floor
-OMX_CLAP_CORE_VERSION := 0.32.3
+OMX_CLAP_CORE_VERSION := 0.32.5
 # the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap-core's provider read: the packages' floor
 OMX_DSP_VERSION := 0.32.0
 
