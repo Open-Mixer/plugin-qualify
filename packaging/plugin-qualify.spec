@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.4
+Version:        0.20.5
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -20,10 +20,10 @@ BuildRequires: pkgconfig
 BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: (pkgconfig(plugin-db) >= 0.4.1 with pkgconfig(plugin-db) < 0.5)
+BuildRequires: (pkgconfig(plugin-db) >= 0.4.4 with pkgconfig(plugin-db) < 0.5)
 BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.7 with pkgconfig(plugin-hostd-protocol) < 0.6)
-BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
-BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.3 with pkgconfig(omx-clap-lv2) < 0.33)
+BuildRequires: (pkgconfig(omx-contract) >= 3.18.0 with pkgconfig(omx-contract) < 4)
+BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.5 with pkgconfig(omx-clap-lv2) < 0.33)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
 BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
@@ -39,19 +39,19 @@ Requires: python3-jsonschema
 # plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
 # 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
-Requires: (plugin-hostd >= 0.20.5 with plugin-hostd < 0.21)
+Requires: (plugin-hostd >= 0.20.7 with plugin-hostd < 0.21)
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: (omx-clap-host >= 0.32.3 with omx-clap-host < 0.33)
+Requires: (omx-clap-host >= 0.32.5 with omx-clap-host < 0.33)
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: (omx-clap-core >= 0.32.3 with omx-clap-core < 0.33)
+Requires: (omx-clap-core >= 0.32.5 with omx-clap-core < 0.33)
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
@@ -229,6 +229,19 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Sat Nov 14 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.5-1
+- built and run against the 3.18.0 pass's releases: omx-contract >= 3.18.0 and < 4;
+  omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.32.5 and < 0.33; plugin-hostd
+  >= 0.20.7 and < 0.21; plugin-db >= 0.4.4 and < 0.5 (D30); make deps fetches those tags
+- here: the facts of this machine for a plugin-db query, --json by plugin-db's keys
+  (#56, #59)
+- lv2-measure sends an integer port integers and a toggled port 0 or 1; the LV2
+  fixture set is 28 with a stepped port (#29, #62)
+- the organisation's name is Open-Mixer, the project's OpenMixer (#63)
+- contract files keep the $schema the floor's reader reads
+- CI builds against the channel, never the staging channel, guarded (D25, #64, #65);
+  a release dispatch can catch a served version up (#58)
+
 * Fri Nov 13 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.4-1
 - built and run against the inner layers' latest releases: omx-clap-host, omx-clap-core
   and omx-clap-lv2 >= 0.32.3 and < 0.33 (0.20.3 stopped below 0.32 and could not be
