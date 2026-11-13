@@ -12,8 +12,8 @@
 #                            build/fixtures/{requires-voice-info,requires-timer,requires-thread-pool}.clap,
 #                            build/fixtures/fail-alloc.so, build/fixtures-faulty/hogs-memory.clap (apart, as the faulty ones),
 #                            build/fixtures-faulty/synth-voice-memory.clap (apart, its memory fails any budget),
-#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-input,synth-thru,synth-sweep,latency,activate-reads,needs-display,abi-breaker,eq10q}.lv2,
-#                            build/fixtures-faulty/lv2/{leaks,large-activate}.lv2 (apart, as the faulty ones)
+#                            build/fixtures/lv2/{rt-safe,rt-unsafe,host-faithfulness,synth,synth-alloc,synth-attack,synth-delay,synth-late,synth-crash,synth-input,synth-thru,synth-sweep,latency,activate-reads,needs-display,abi-breaker,eq10q}.lv2,
+#                            build/fixtures-faulty/lv2/{leaks,large-activate,keeps-memory}.lv2 (apart, as the faulty ones)
 #   build/lv2_measure_options_test    the measurer's feature options oracle
 #   build/lv2_measure_path_test       the oracle of the LV2 search path made absolute before lilv reads it
 #   make -C native asan      build/asan/lv2_measure, the measurer under AddressSanitizer, for the tests'
@@ -117,11 +117,11 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
 	$(BUILD)/fixtures/lv2/host-faithfulness.lv2/host-faithfulness.so \
 	$(BUILD)/fixtures/lv2/synth.lv2/synth.so $(BUILD)/fixtures/lv2/synth-alloc.lv2/synth.so $(BUILD)/fixtures/lv2/synth-drum.lv2/synth.so \
-	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so \
+	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-crash.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/latency.lv2/latency.so $(BUILD)/fixtures/lv2/spaced.lv2/manifest.ttl \
 	$(BUILD)/fixtures/lv2/eq10q.lv2/eq10q.so \
 	$(BUILD)/fixtures-faulty/synth-voice-memory.clap \
-	$(BUILD)/fixtures-faulty/lv2/leaks.lv2/gain.so $(BUILD)/fixtures-faulty/lv2/large-activate.lv2/gain.so
+	$(BUILD)/fixtures-faulty/lv2/leaks.lv2/gain.so $(BUILD)/fixtures-faulty/lv2/large-activate.lv2/gain.so $(BUILD)/fixtures-faulty/lv2/keeps-memory.lv2/gain.so
 
 $(BUILD) $(BUILD)/fixtures $(BUILD)/fixtures-faulty:
 	mkdir -p $@
@@ -283,6 +283,12 @@ $(BUILD)/fixtures-faulty/lv2/large-activate.lv2/gain.so: fixtures/lv2-gain.c fix
 	sed 's/lv2-rt-safe/lv2-large-activate/' fixtures/rt-safe.lv2/gain.ttl > $(@D)/gain.ttl
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_ACTIVATE_MB=64 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
 
+$(BUILD)/fixtures-faulty/lv2/keeps-memory.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl
+	mkdir -p $(@D)
+	sed 's/lv2-rt-safe/lv2-keeps-memory/' fixtures/rt-safe.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/lv2-rt-safe/lv2-keeps-memory/' fixtures/rt-safe.lv2/gain.ttl > $(@D)/gain.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_KEEPS_MB=64 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
+
 # a preload failing one chosen allocation, for the prober's out-of-memory paths
 $(BUILD)/fixtures/fail-alloc.so: fixtures/fail-alloc.c | $(BUILD)/fixtures
 	$(CC) $(CPPFLAGS) $(CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
@@ -367,6 +373,13 @@ $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so: fixtures/lv2-synth.c fixtures/sy
 	sed 's/fixture:lv2-synth>/fixture:lv2-synth-sweep>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
 	sed 's/fixture:lv2-synth>/fixture:lv2-synth-sweep>/' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_SWEEP_COST -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+
+# the instrument that dies (SIGSEGV) when one block strikes more than 32 notes (the note sweep's burst is 32): only a voice-curve count past 32 does
+$(BUILD)/fixtures/lv2/synth-crash.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
+	mkdir -p $(@D)
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-crash>/' fixtures/synth.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/fixture:lv2-synth>/fixture:lv2-synth-crash>/' fixtures/synth.lv2/synth.ttl > $(@D)/synth.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_CRASH_ABOVE=32 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
 
 # the instrument that ignores notes for its first 300 ms after activate, as one that builds its sound on a thread does
 $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so: fixtures/lv2-synth.c fixtures/synth.lv2/manifest.ttl fixtures/synth.lv2/synth.ttl
