@@ -1,9 +1,9 @@
 plugin-qualify (0.20.4) unstable; urgency=medium
 
   * Built and run against the inner layers' latest releases: omx-clap-host,
-    omx-clap-core and omx-clap-lv2 >= 0.32.2 and below 0.33 (0.20.3 stopped
+    omx-clap-core and omx-clap-lv2 >= 0.32.3 and below 0.33 (0.20.3 stopped
     below 0.32 and could not be installed beside omx-clap-host 0.32),
-    plugin-hostd >= 0.20.4, plugin-db >= 0.4.1 and plugin-hostd-protocol >=
+    plugin-hostd >= 0.20.5, plugin-db >= 0.4.1 and plugin-hostd-protocol >=
     0.5.7, each below the next minor; make deps fetches the two headers from
     those tags.
   * Compare and pin verdicts are codes with catalogs; language packs (#22).
