@@ -9,6 +9,11 @@ plugin-qualify (0.20.4) unstable; urgency=medium
   * Refused plugins: the sets are run again with the child's stderr kept, and
     a refused row's stderr reads back from its record (#6).
   * A staged run publishes to the staging channel.
+  * The rpm build's CLAP floor is 1.2.10, as here (#30, #44).
+  * describe, the scan that builds a plugin's descriptor from a format's
+    field dump, is taken in from plugin-hostd, in C; the native build takes
+    libcjson >= 1.7.15 and below 2 for it (#31).
+  * The pin and put-judged calls go into plugin-db's store (#38).
 
  -- Pau Aliagas <linuxnow@gmail.com>  Fri, 13 Nov 2026 02:00:00 +0000
 

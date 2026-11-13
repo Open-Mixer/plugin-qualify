@@ -17,7 +17,7 @@ BuildRequires: npm
 BuildRequires: gcc
 BuildRequires: make
 BuildRequires: pkgconfig
-BuildRequires: (pkgconfig(clap) >= 1.2.7 with pkgconfig(clap) < 2)
+BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
 BuildRequires: (pkgconfig(plugin-db) >= 0.4.0 with pkgconfig(plugin-db) < 0.5)
@@ -25,6 +25,8 @@ BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.3 with pkgconfig(plugin-
 BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
 BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.2 with pkgconfig(omx-clap-lv2) < 0.33)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
+# describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
+BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
@@ -236,6 +238,11 @@ the English source sentence.
 - refused plugins: the sets are run again with the child's stderr kept, and a refused
   row's stderr reads back from its record (#6)
 - a staged run publishes to the staging channel
+- the CLAP floor of the build is 1.2.10, as in the Debian packaging (#30, #44)
+- describe, the scan that builds a plugin's descriptor from a format's field dump, is
+  taken in from plugin-hostd, in C; the native build takes libcjson >= 1.7.15 and < 2
+  for it (#31)
+- the pin and put-judged calls go into plugin-db's store (#38)
 
 * Wed Nov 11 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.3-1
 - the directories the sync scans are the ones plugin-hostd --search-path prints
