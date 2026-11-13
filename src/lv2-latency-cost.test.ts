@@ -19,6 +19,7 @@ import { judgeProbeOutput } from "./probe-judge.js";
 import { readProbeOutput } from "./probe-output.js";
 import { probeOutputOfLv2Line, type Lv2MeasureLine } from "./probe-output-fixtures.js";
 import { unmeasuredFigures, writeQualification } from "./qualification-record.js";
+import { timing } from "./timing-proof.support.js";
 
 const BUILD = join(dirname(fileURLToPath(import.meta.url)), "..", "native", "build");
 const MEASURE = join(BUILD, "lv2_measure");
@@ -163,7 +164,7 @@ describe("lv2-measure, live: the cost", () => {
     const late = measure(SYNTH_LATE, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
     const prompt = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16" })["cost"].perRate["48000"];
     expect(late).not.toHaveProperty("unmeasuredReason");
-    expect(late.nsPerSampleMedian).toBeGreaterThan(prompt.nsPerSampleMedian * 0.5);
+    timing("a late voice is timed sounding", () => expect(late.nsPerSampleMedian).toBeGreaterThan(prompt.nsPerSampleMedian * 0.5));
   });
 
   live("an instrument whose notes sounded and died away before the timed blocks is timed, not called silent", () => {
@@ -206,8 +207,10 @@ describe("lv2-measure, live: the cost", () => {
     const plain = measure(SYNTH, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "16" })["cost"].perRate["48000"];
     const curve16 = (swept["voiceCurve"] as { nsPerSampleMedian: number }[])[0]!.nsPerSampleMedian;
     const plain16 = (plain["voiceCurve"] as { nsPerSampleMedian: number }[])[0]!.nsPerSampleMedian;
-    expect(swept.nsPerSampleMedian).toBeGreaterThan(plain.nsPerSampleMedian * 5);
-    expect(curve16).toBeLessThan(plain16 * 2);
+    timing("the LV2 curve is timed with every parameter at its default", () => {
+      expect(swept.nsPerSampleMedian).toBeGreaterThan(plain.nsPerSampleMedian * 5);
+      expect(curve16).toBeLessThan(plain16 * 2);
+    });
   });
 
   live("an instrument is timed at each count of the curve: the cost grows with the notes up to its voices, then stops", () => {
@@ -217,9 +220,12 @@ describe("lv2-measure, live: the cost", () => {
     const curve = at["voiceCurve"] as { held: number; nsPerSampleMedian: number; nsPerSampleP95: number }[];
     expect(curve.map((e) => e.held)).toEqual([1, 8, 32, 48]);
     const [one, eight, thirtyTwo, fortyEight] = curve.map((e) => e.nsPerSampleMedian) as [number, number, number, number];
-    expect(eight).toBeGreaterThan(one);
-    expect(thirtyTwo).toBeGreaterThan(eight);
-    expect(Math.abs(fortyEight - thirtyTwo) / thirtyTwo).toBeLessThan(0.25);
+    // ns per sample at each count: a timing proof (ruling 2026-11-11), a warning on a loaded node, a failure on a quiet one
+    timing("an instrument is timed at each count of the curve", () => {
+      expect(eight).toBeGreaterThan(one);
+      expect(thirtyTwo).toBeGreaterThan(eight);
+      expect(Math.abs(fortyEight - thirtyTwo) / thirtyTwo).toBeLessThan(0.25);
+    });
     for (const e of curve) expect(e.nsPerSampleP95).toBeGreaterThanOrEqual(e.nsPerSampleMedian);
   });
 
@@ -245,7 +251,7 @@ describe("lv2-measure, live: the cost", () => {
     expect(one.voices).toEqual({ held: 1, basis: "probe" });
     expect(many.voices).toEqual({ held: 32, basis: "probe" });
     // a sine per held key per sample: thirty-two keys cost several times one
-    expect(many.nsPerSampleMedian).toBeGreaterThan(2 * one.nsPerSampleMedian);
+    timing("an instrument's cost follows the notes it holds", () => expect(many.nsPerSampleMedian).toBeGreaterThan(2 * one.nsPerSampleMedian));
   });
 });
 
