@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * describe, taken in from plugin-hostd (`native/describe.c`, spec 2026-11-04-plugin-db-one-path-from-install-to-load
- * §10 step 4), run as built (`make -C native`): its oracle maps the format tables' field dump fixtures onto the
+ * describe, taken in from plugin-hostd (`native/describe.c`), run as built (`make -C native`): its oracle maps the format tables' field dump fixtures onto the
  * exact descriptors they must equal. On CI a missing build is a failure; elsewhere the test skips, saying how to build.
  */
 import { spawnSync } from "node:child_process";

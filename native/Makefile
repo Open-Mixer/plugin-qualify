@@ -94,8 +94,7 @@ LILV_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lilv-0)
 LILV_LIBS ?= $(shell $(PKG_CONFIG) --libs lilv-0)
 LV2_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lv2 2>/dev/null)
 
-# describe's JSON reader and writer (plugin-json.c): cJSON, moved from plugin-hostd with it (spec
-# 2026-11-04-plugin-db-one-path-from-install-to-load §10 step 4)
+# describe's JSON reader and writer (plugin-json.c): cJSON, moved from plugin-hostd with it
 CJSON_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags libcjson)
 CJSON_LIBS ?= $(shell $(PKG_CONFIG) --libs libcjson)
 
