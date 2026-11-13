@@ -17,6 +17,8 @@
  *                    and copies its input to its outputs: silent under notes, loud under noise on its input.
  *   synth-sweep.lv2  built with -DFIXTURE_SWEEP_COST, the same, which burns a large fixed load per sample whenever its
  *                    gain is anything but its default 1.0: costly under a parameter sweep, cheap at its defaults.
+ *   synth-decay.lv2  built with -DFIXTURE_DECAY_MS=100, the same, whose every voice ends 100 ms after its note on, on
+ *                    any key: a decaying patch (a pluck, a piano let ring), held down and silent before a timed run ends.
  *   synth-late.lv2   built with -DFIXTURE_LATE_MS=300, the same, which ignores every note for its first 300 ms after
  *                    activate, as an instrument that builds its sound on a thread of its own (Yoshimi) does.
  *
@@ -45,6 +47,8 @@ static void (*volatile fixture_free)(void *) = free;
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-delay"
 #elif defined FIXTURE_LATE_MS
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-late"
+#elif defined FIXTURE_DECAY_MS
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-decay"
 #elif defined FIXTURE_INPUT
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-input"
 #elif defined FIXTURE_INPUT_THRU
@@ -167,6 +171,8 @@ static void note_on(struct synth *s, int key) {
       s->voice[v].step = 2.0 * M_PI * 440.0 * pow(2.0, (key - 69) / 12.0) / s->rate;
 #ifdef FIXTURE_DRUM
       s->voice[v].left = (long)(s->rate * FIXTURE_DRUM_HIT_S);
+#elif defined FIXTURE_DECAY_MS
+      s->voice[v].left = (long)(s->rate * FIXTURE_DECAY_MS / 1000.0);
 #endif
       return;
     }
@@ -199,7 +205,7 @@ static void render(struct synth *s, uint32_t from, uint32_t to) {
     for (int v = 0; v < VOICES; v++)
       if (s->voice[v].key >= 0) {
         y += voice_sample(&s->voice[v], s->rate);
-#ifdef FIXTURE_DRUM
+#if defined FIXTURE_DRUM || defined FIXTURE_DECAY_MS
         if (--s->voice[v].left <= 0) s->voice[v].key = -1;
 #endif
       }

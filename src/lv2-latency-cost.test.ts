@@ -30,6 +30,7 @@ const SYNTH = "urn:plugin-qualify:fixture:lv2-synth";
 const SYNTH_ATTACK = "urn:plugin-qualify:fixture:lv2-synth-attack";
 const SYNTH_DELAY = "urn:plugin-qualify:fixture:lv2-synth-delay";
 const SYNTH_LATE = "urn:plugin-qualify:fixture:lv2-synth-late";
+const SYNTH_DECAY = "urn:plugin-qualify:fixture:lv2-synth-decay";
 const SYNTH_DRUM = "urn:plugin-qualify:fixture:lv2-synth-drum";
 const SYNTH_INPUT = "urn:plugin-qualify:fixture:lv2-synth-input";
 const SYNTH_THRU = "urn:plugin-qualify:fixture:lv2-synth-thru";
@@ -220,6 +221,18 @@ describe("lv2-measure, live: the cost", () => {
     expect(thirtyTwo).toBeGreaterThan(eight);
     expect(Math.abs(fortyEight - thirtyTwo) / thirtyTwo).toBeLessThan(0.25);
     for (const e of curve) expect(e.nsPerSampleP95).toBeGreaterThanOrEqual(e.nsPerSampleMedian);
+  });
+
+  live("a decaying patch is timed while its voices sound: its curve rises with the notes held (#26)", () => {
+    // every voice of the fixture ends 100 ms after its note on: struck once before a 64-block warm-up, the held notes
+    // are gone before the first timed block and every count reads the idle cost; struck again as the run goes on, it
+    // is timed playing them
+    const at = measure(SYNTH_DECAY, 48000, { OMX_PROBE_NOTES: "16", OMX_PROBE_NOTES_CURVE: "1,8,32" })["cost"].perRate["48000"];
+    const curve = at["voiceCurve"] as { held: number; nsPerSampleMedian: number }[];
+    expect(curve.map((e) => e.held)).toEqual([1, 8, 32]);
+    const [one, eight, thirtyTwo] = curve.map((e) => e.nsPerSampleMedian) as [number, number, number];
+    expect(eight).toBeGreaterThan(one * 1.5);
+    expect(thirtyTwo).toBeGreaterThan(eight * 1.5);
   });
 
   live("an effect has no curve: only an instrument holds notes", () => {
