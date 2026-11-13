@@ -26,6 +26,8 @@ export * from "./probe-judge.js";
 export * from "./qualification-record.js";
 export * from "./record-figures.js";
 export * from "./judgement-line.js";
+export * from "./here.js";
+export { HOSTD_ENV } from "./hostd-pin-files.js";
 export * from "./judged-layer.js";
 export * from "./probe-runner.js";
 export * from "./measurement-grid.js";
