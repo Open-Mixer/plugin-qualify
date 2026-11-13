@@ -360,9 +360,10 @@ class Lv2RoundTrip(unittest.TestCase):
         # activate-reads, needs-display and abi-breaker joined the 16, synth-attack and synth-delay the 19,
         # eq10qm and eq10qs (plugin-qualify#27) the 21, and synth-late, synth-input, synth-thru and synth-sweep
         # (plugin-qualify#21, the instruments' notes) the 27, and stepped (host-faithfulness.lv2, plugin-qualify#29: an
-        # integer port and a toggled port, never sent a value between) and synth-decay (plugin-qualify#26: a voice that
-        # ends 100 ms after its note on) the 29
-        self.assertEqual(len(self.rows), 29)
+        # integer port and a toggled port, never sent a value between) the 28, synth-crash (plugin-qualify#28: an
+        # instrument that dies past 32 notes in a block) the 29, and synth-decay (plugin-qualify#26: a voice that ends
+        # 100 ms after its note on) the 30
+        self.assertEqual(len(self.rows), 30)
 
     def test_a_duplicate_port_symbol_refuses_the_descriptor_by_its_code_naming_the_symbol(self):
         """eq10qs's TTL names both output meters out_2_vu_ctl (EQ10Q's eq1qs..eq10qs): not drawn, refused."""

@@ -21,8 +21,13 @@
  * abi-breaker.lv2: built with -DFIXTURE_ABI_BREAKER, its third run() returns with callee-saved registers changed, as the
  * LSP limiters' did on a Raspberry Pi 5 (d15): in assembly, after the C run has returned, since no C function can.
  * needs-display.lv2: built with -DFIXTURE_NEEDS_DISPLAY, instantiate() aborts when no display and no Qt platform is
- * named, as a Qt plugin does (synthv1, samplv1, padthv1, drumkv1: "no Qt platform plugin could be initialized"). */
-#if defined FIXTURE_LEAKS_KB
+ * named, as a Qt plugin does (synthv1, samplv1, padthv1, drumkv1: "no Qt platform plugin could be initialized").
+ * keeps-memory.lv2: built with -DFIXTURE_KEEPS_MB, instantiate() takes that many MiB, touched, and NEVER gives them
+ * back, not at cleanup either: what Surge XT's loaded content does to a process that makes instance after instance
+ * (plugin-qualify#28), so a measurer that runs every pass in one process grows by that much per instance. */
+#if defined FIXTURE_KEEPS_MB
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-keeps-memory"
+#elif defined FIXTURE_LEAKS_KB
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-leaks"
 #elif defined FIXTURE_ACTIVATE_MB
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-large-activate"
@@ -58,6 +63,19 @@ static LV2_Handle instantiate(const LV2_Descriptor *d, double rate, const char *
   (void)d; (void)rate; (void)path; (void)features;
 #ifdef FIXTURE_NEEDS_DISPLAY
   if (getenv("QT_QPA_PLATFORM") == NULL && getenv("DISPLAY") == NULL && getenv("WAYLAND_DISPLAY") == NULL) abort();
+#endif
+#ifdef FIXTURE_KEEPS_MB
+  {
+    /* kept on a list no one frees: the memory stays the process's after the instance is gone */
+    /* volatile, so the compiler cannot see the list is never read and drop the allocation with it */
+    static void *volatile kept[4096];
+    static volatile unsigned n_kept;
+    const size_t bytes = (size_t)FIXTURE_KEEPS_MB << 20;
+    volatile char *k = malloc(bytes);
+    if (k == NULL) return NULL;
+    for (size_t i = 0; i < bytes; i += 4096) k[i] = 1;
+    if (n_kept < sizeof kept / sizeof kept[0]) kept[n_kept++] = (void *)k;
+  }
 #endif
   return calloc(1, sizeof(struct gain));
 }

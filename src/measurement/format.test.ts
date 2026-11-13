@@ -24,6 +24,7 @@ import {
   readMeasurementDocument,
   serialiseMeasurementDocument,
   readAbi,
+  readLifecycle,
 } from "./format.js";
 import { fixtureDocument, fixturePlugin, fixtureRun, fixtureUnmeasurable } from "./fixtures.js";
 import { UNMEASURED_TERMS, unmeasuredKind } from "./vocabulary.js";
@@ -305,5 +306,18 @@ describe("the measurer's abi field", () => {
     expect(readAbi({ clobbered: false, registers: ["x19"] })).toEqual({ clobbered: false });
     expect(readAbi({ registers: ["x19"] })).toBeUndefined();
     expect(readAbi("run")).toBeUndefined();
+  });
+});
+
+describe("readLifecycle (#28)", () => {
+  it("keeps the code of lifecycles the run's memory bound ended, with the counts taken before it", () => {
+    expect(
+      readLifecycle({ cycles: 3, instantiated: 2, failed: 0, unmeasuredReason: "memory-bound", unmeasuredDetail: "after 2 of 3" }),
+    ).toEqual({ cycles: 3, instantiated: 2, failed: 0, unmeasuredReason: "memory-bound", unmeasuredDetail: "after 2 of 3" });
+  });
+
+  it("a whole lifecycle carries no reason, and one missing a count is no reading", () => {
+    expect(readLifecycle({ cycles: 3, instantiated: 3, failed: 0 })).toEqual({ cycles: 3, instantiated: 3, failed: 0 });
+    expect(readLifecycle({ cycles: 3, instantiated: 3, unmeasuredReason: "memory-bound" })).toBeUndefined();
   });
 });
