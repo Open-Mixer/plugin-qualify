@@ -469,12 +469,16 @@ function tierOf(judgment: Judgment, host: string | undefined): TierVerdict | und
 export function tiersOf(judgment: Judgment): RecordTiers {
   const inProcess = tierOf(judgment, IN_PROCESS_TIER_HOST);
   const isolated = tierOf(judgment, ISOLATED_TIER_HOST[judgment.output.plugin.format]);
-  // a conditional plugin runs alone unless every conditional reason is groupable (D20): own threads share a worker
-  const isolatedReasons = judgment.hosts.find((h) => h.verdict.host === ISOLATED_TIER_HOST[judgment.output.plugin.format])?.reasons;
-  const runsAlone = isolated?.measured === true && isolated.rating === "conditional" && !sharesAWorker(isolated.rating, isolatedReasons);
+  // a conditional plugin runs alone unless every conditional reason is groupable (D20): own threads share a worker, and
+  // a tier offers a plugin whose measured verdict shares one as it offers a qualified one
+  const reasonsOf = (host: string | undefined) => judgment.hosts.find((h) => h.verdict.host === host)?.reasons;
+  const shares = (t: TierVerdict | undefined, host: string | undefined): boolean =>
+    t !== undefined && t.measured && sharesAWorker(t.rating, reasonsOf(host));
+  const isolatedHost = ISOLATED_TIER_HOST[judgment.output.plugin.format];
+  const runsAlone = isolated?.measured === true && isolated.rating === "conditional" && !shares(isolated, isolatedHost);
   const offeredOn: ("in-process" | "isolated")[] = [];
-  if (inProcess?.qualified === true) offeredOn.push("in-process");
-  if (isolated?.qualified === true || runsAlone) offeredOn.push("isolated");
+  if (inProcess?.qualified === true || shares(inProcess, IN_PROCESS_TIER_HOST)) offeredOn.push("in-process");
+  if (isolated?.qualified === true || runsAlone || shares(isolated, isolatedHost)) offeredOn.push("isolated");
   const why = [inProcess, isolated].flatMap((t) => (t === undefined ? [] : [`${t.host}: ${t.deciding ?? t.rating}`]));
   return {
     ...(inProcess === undefined ? {} : { inProcess }),
