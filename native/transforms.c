@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /*
- * This file is part of plugin-qualify, moved from plugin-hostd (spec 2026-11-04-plugin-db-one-path-from-install-to-load §10 step 4).
+ * This file is part of plugin-qualify, moved from plugin-hostd, where the scan was written first.
  *
  * Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
  */
