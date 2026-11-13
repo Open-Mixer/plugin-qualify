@@ -1371,11 +1371,22 @@ static void pass_progress(const void *ctx, size_t size) {
   }
 }
 
+/* What a pass changes beyond its own context, carried back from its child to the run (carry_out, carry_in below). */
+static void carry_out(int fd);
+static void carry_in(int fd);
+
 static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) {
-  int fds[2];
+  int fds[2], carry[2];
   fflush(NULL);
   void *got = malloc(size);
   if (got == NULL || pipe(fds) != 0) { /* no child to be had: the pass in this process, as before */
+    free(got);
+    fn(ctx);
+    return PASS_DONE;
+  }
+  if (pipe(carry) != 0) {
+    close(fds[0]);
+    close(fds[1]);
     free(got);
     fn(ctx);
     return PASS_DONE;
@@ -1384,19 +1395,24 @@ static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) {
   if (child < 0) {
     close(fds[0]);
     close(fds[1]);
+    close(carry[0]);
+    close(carry[1]);
     free(got);
     fn(ctx);
     return PASS_DONE;
   }
   if (child == 0) {
     close(fds[0]);
+    close(carry[0]);
     g_pass_fd = fds[1];
     fn(ctx);
     pass_progress(ctx, size);
+    carry_out(carry[1]);
     fflush(NULL);
     _exit(0);
   }
   close(fds[1]);
+  close(carry[1]);
   size_t have = 0;
   for (;;) { /* every whole context the child sent, the last one kept */
     const ssize_t n = read(fds[0], (char *)got + have, size - have);
@@ -1406,6 +1422,8 @@ static enum pass_end in_child(void (*fn)(void *), void *ctx, size_t size) {
   }
   close(fds[0]);
   free(got);
+  carry_in(carry[0]);
+  close(carry[0]);
   int status = 0;
   while (waitpid(child, &status, 0) < 0 && errno == EINTR) {
   }
@@ -1427,6 +1445,52 @@ static struct {
   int use_noise, warmup_blocks, measured_blocks;
   uint32_t n_audio_out;
 } g_run;
+
+/* What a pass changes beyond its own context: the host's worker and patch counters, the feature a strict host refused
+ * it for (a pointer into the required list made before the fork, so the same in the parent), and the ABI guard's
+ * record of a clobber. Without it a pass in a child measures and the run forgets: no worker jobs, no refusal named, no
+ * clobber named (#28). */
+struct pass_carry {
+  long worker_jobs, worker_responses, worker_dropped, patch_sets, note_events;
+  int worker_interface;
+  const char *refused;
+  struct omx_abi_guard abi;
+};
+
+static void carry_out(int fd) {
+  struct pass_carry c;
+  memset(&c, 0, sizeof c);
+  const struct host *h = g_run.H;
+  if (h != NULL) {
+    c.worker_jobs = h->worker_jobs, c.worker_responses = h->worker_responses, c.worker_dropped = h->worker_dropped;
+    c.patch_sets = h->patch_sets, c.note_events = h->note_events, c.worker_interface = h->worker_interface;
+    c.refused = h->refused;
+  }
+  memcpy(&c.abi, &g_abi, sizeof c.abi);
+  const char *p = (const char *)&c;
+  for (size_t done = 0; done < sizeof c;) {
+    const ssize_t n = write(fd, p + done, sizeof c - done);
+    if (n <= 0) return;
+    done += (size_t)n;
+  }
+}
+
+static void carry_in(int fd) {
+  struct pass_carry c;
+  size_t have = 0;
+  while (have < sizeof c) {
+    const ssize_t n = read(fd, (char *)&c + have, sizeof c - have);
+    if (n <= 0) return; /* the child died before it said: what it changed is gone with it */
+    have += (size_t)n;
+  }
+  struct host *h = g_run.H;
+  if (h != NULL) {
+    h->worker_jobs = c.worker_jobs, h->worker_responses = c.worker_responses, h->worker_dropped = c.worker_dropped;
+    h->patch_sets = c.patch_sets, h->note_events = c.note_events, h->worker_interface = c.worker_interface;
+    h->refused = c.refused;
+  }
+  memcpy(&g_abi, &c.abi, sizeof g_abi);
+}
 
 /* lifecycle: instantiate and destroy, counting what does not come back; the counts sent after every cycle */
 struct lifecycle_pass {
