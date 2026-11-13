@@ -116,7 +116,7 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
     const c = figure(l!.cost?.perRate[String(RATE)]);
     expect(c.voiceCurve?.map((e) => e.held)).toEqual([1, 16]);
     const [one, sixteen] = c.voiceCurve!.map((e) => e.nsPerSampleMedian!);
-    expect(sixteen!).toBeGreaterThan(3 * one!);
+    timing("a decaying patch's CLAP curve rises with the notes held", () => expect(sixteen!).toBeGreaterThan(3 * one!));
   });
 
   live("the voice curve is timed at each count with every parameter at its default; the main cost keeps the sweep", () => {

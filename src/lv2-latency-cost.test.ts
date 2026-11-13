@@ -237,8 +237,10 @@ describe("lv2-measure, live: the cost", () => {
     const curve = at["voiceCurve"] as { held: number; nsPerSampleMedian: number }[];
     expect(curve.map((e) => e.held)).toEqual([1, 8, 32]);
     const [one, eight, thirtyTwo] = curve.map((e) => e.nsPerSampleMedian) as [number, number, number];
-    expect(eight).toBeGreaterThan(one * 1.5);
-    expect(thirtyTwo).toBeGreaterThan(eight * 1.5);
+    timing("a decaying patch's LV2 curve rises with the notes held", () => {
+      expect(eight).toBeGreaterThan(one * 1.5);
+      expect(thirtyTwo).toBeGreaterThan(eight * 1.5);
+    });
   });
 
   live("an effect has no curve: only an instrument holds notes", () => {
