@@ -19,10 +19,14 @@
  *                    gain is anything but its default 1.0: costly under a parameter sweep, cheap at its defaults.
  *   synth-late.lv2   built with -DFIXTURE_LATE_MS=300, the same, which ignores every note for its first 300 ms after
  *                    activate, as an instrument that builds its sound on a thread of its own (Yoshimi) does.
+ *   synth-crash.lv2  built with -DFIXTURE_CRASH_ABOVE=32, the same, which raises SIGSEGV when one block strikes more
+ *                    than 32 notes (the note sweep's burst is 32): it dies only at a voice-curve count past 32, as Surge XT's
+ *                    LV2 did on a Pi in the voice curve (plugin-qualify#28), after every earlier pass was measured.
  *
  * Nothing else differs but the URI, so a verdict that tells them apart is what the note sweep counted.
  */
 #include <math.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -45,6 +49,8 @@ static void (*volatile fixture_free)(void *) = free;
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-delay"
 #elif defined FIXTURE_LATE_MS
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-late"
+#elif defined FIXTURE_CRASH_ABOVE
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-crash"
 #elif defined FIXTURE_INPUT
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-synth-input"
 #elif defined FIXTURE_INPUT_THRU
@@ -145,6 +151,11 @@ static void activate(LV2_Handle h) {
   s->since_activate = 0;
 }
 
+#ifdef FIXTURE_CRASH_ABOVE
+/* the notes struck in the block run() is rendering */
+static int crash_struck_in_block;
+#endif
+
 static void note_on(struct synth *s, int key) {
 #ifdef FIXTURE_INPUT_THRU
   (void)s; (void)key;
@@ -158,6 +169,9 @@ static void note_on(struct synth *s, int key) {
 #endif
 #ifdef FIXTURE_ALLOCATES_ON_NOTE
   fixture_free(fixture_malloc(256 * sizeof(double)));
+#endif
+#ifdef FIXTURE_CRASH_ABOVE
+  if (++crash_struck_in_block > FIXTURE_CRASH_ABOVE) raise(SIGSEGV);
 #endif
   for (int v = 0; v < VOICES; v++)
     if (s->voice[v].key < 0) {
@@ -213,6 +227,9 @@ static void render(struct synth *s, uint32_t from, uint32_t to) {
 static void run(LV2_Handle h, uint32_t frames) {
   struct synth *s = h;
   uint32_t done = 0;
+#ifdef FIXTURE_CRASH_ABOVE
+  crash_struck_in_block = 0;
+#endif
   if (s->midi) {
     LV2_ATOM_SEQUENCE_FOREACH (s->midi, ev) {
       const uint32_t at = ev->time.frames < 0 ? 0 : ev->time.frames > frames ? frames : (uint32_t)ev->time.frames;
