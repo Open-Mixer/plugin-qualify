@@ -110,7 +110,7 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures-faulty/crashes-at-load.clap $(BUILD)/fixtures-faulty/hangs.clap $(BUILD)/fixtures-faulty/rate-pinned.clap \
 	$(BUILD)/fixtures/synth.clap $(BUILD)/fixtures/synth-alloc.clap $(BUILD)/fixtures/synth-midi.clap \
 	$(BUILD)/fixtures/synth-voices.clap $(BUILD)/fixtures/synth-no-voices.clap $(BUILD)/fixtures/synth-input.clap \
-	$(BUILD)/fixtures/synth-strict.clap $(BUILD)/fixtures/synth-drum.clap $(BUILD)/fixtures/synth-attack.clap $(BUILD)/fixtures/synth-delay.clap $(BUILD)/fixtures/synth-sweep.clap \
+	$(BUILD)/fixtures/synth-strict.clap $(BUILD)/fixtures/synth-drum.clap $(BUILD)/fixtures/synth-attack.clap $(BUILD)/fixtures/synth-decay.clap $(BUILD)/fixtures/synth-delay.clap $(BUILD)/fixtures/synth-sweep.clap \
 	$(BUILD)/fixtures/pool-synth.clap $(BUILD)/fixtures/pool-synth-slow.clap $(BUILD)/fixtures/pool-synth-quiet.clap $(BUILD)/fixtures/pool-synth-serial.clap $(BUILD)/fixtures/pool-synth-helper.clap \
 	$(BUILD)/fixtures/requires-voice-info.clap $(BUILD)/fixtures/requires-timer.clap $(BUILD)/fixtures/requires-thread-pool.clap \
 	$(BUILD)/fixtures/fail-alloc.so $(BUILD)/fixtures-faulty/hogs-memory.clap \
@@ -228,6 +228,9 @@ $(BUILD)/fixtures/synth-sweep.clap: fixtures/synth.c | $(BUILD)/fixtures
 # an instrument's latency, known: a 50 ms linear attack and no delay, and a real 64-frame processing delay (note-onset.h)
 $(BUILD)/fixtures/synth-attack.clap: fixtures/synth.c | $(BUILD)/fixtures
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_ATTACK_MS=50 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
+# the same whose every voice ends 100 ms after its note on: a decaying patch, held and silent before the timed run (#26)
+$(BUILD)/fixtures/synth-decay.clap: fixtures/synth.c | $(BUILD)/fixtures
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_DECAY_MS=100 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
 $(BUILD)/fixtures/synth-delay.clap: fixtures/synth.c | $(BUILD)/fixtures
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_DELAY_FRAMES=64 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lm
 # the same declaring its voice capacity through voice-info, at 8 and at 0: what the cost arm holds

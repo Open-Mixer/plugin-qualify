@@ -39,6 +39,7 @@ const SYNTH_MIDI = join(FIXTURES, "synth-midi.clap");
 const SYNTH_INPUT = join(FIXTURES, "synth-input.clap");
 const SYNTH_ALLOC = join(FIXTURES, "synth-alloc.clap");
 const SYNTH_SWEEP = join(FIXTURES, "synth-sweep.clap");
+const SYNTH_DECAY = join(FIXTURES, "synth-decay.clap");
 const SAFE = join(FIXTURES, "rt-safe.clap");
 const BUILT = [clapQualifyToolPath(), rtInterposePath(), SYNTH, SYNTH_VOICES, SYNTH_NO_VOICES, SYNTH_MIDI, SYNTH_INPUT, SYNTH_ALLOC, SYNTH_SWEEP, SAFE].every((p) => existsSync(p));
 
@@ -103,6 +104,16 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
     expect(l!.clap.mainInputChannels).toBe(2);
     expect(l!.cost?.stimulus).toBe("notes-held");
     expect(figure(l!.cost?.perRate[String(RATE)]).voices).toEqual({ held: 16, basis: "probe" });
+  });
+
+  live("a decaying patch is timed while its voices sound: its curve rises with the notes held (#26)", () => {
+    // every voice ends 100 ms after its note on: struck once before the warm-up, the notes are gone before the timed
+    // blocks and both counts read idle; struck again as the run goes on, 16 notes cost what the plain synth's do
+    const [l] = qualifyClap(SYNTH_DECAY, undefined, { rates: [RATE], probeNotes: 16, curve: [1, 16] });
+    const c = figure(l!.cost?.perRate[String(RATE)]);
+    expect(c.voiceCurve?.map((e) => e.held)).toEqual([1, 16]);
+    const [one, sixteen] = c.voiceCurve!.map((e) => e.nsPerSampleMedian!);
+    expect(sixteen!).toBeGreaterThan(3 * one!);
   });
 
   live("the voice curve is timed at each count with every parameter at its default; the main cost keeps the sweep", () => {
