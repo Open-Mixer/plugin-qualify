@@ -99,8 +99,17 @@ jobs:
       contents: write
     container:
       image: fedora:44
+      # on the organisation's runners the job's container sits in the runner's own Docker, whose resolver does not know
+      # the cluster's services: it is handed the cluster DNS so the router's name resolves (a GitHub-hosted run gets none)
+      options: ${{ !github.event.pull_request.head.repo.fork && !((startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && github.event.repository.private == false) && vars.OMX_RUNNER && '--dns 10.43.0.10 --dns-search llm-router.svc.cluster.local --dns-search svc.cluster.local --dns-search cluster.local' || '' }}
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs gnupg2
+      # say whether this container reaches the router before the fill needs it
+      - name: The router from this container
+        run: |
+          echo "resolve: $(getent hosts llm-router.llm-router.svc.cluster.local || echo 'does not resolve')"
+          echo "health/liveliness: $(curl -sS -m 10 -o /dev/null -w '%{http_code}' http://llm-router.llm-router.svc.cluster.local:4000/health/liveliness 2>&1 || true)"
+          echo "health: $(curl -sS -m 10 -o /dev/null -w '%{http_code}' http://llm-router.llm-router.svc.cluster.local:4000/health 2>&1 || true)"
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
