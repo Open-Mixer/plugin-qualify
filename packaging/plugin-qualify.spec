@@ -245,6 +245,7 @@ the English source sentence.
   taken in from plugin-hostd, in C; the native build takes libcjson >= 1.7.15 and < 2
   for it (#31)
 - the pin and put-judged calls go into plugin-db's store (#38)
+- test: pin-refresh's live arm has an LV2 directory of its own (#50, #52)
 
 * Wed Nov 11 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.3-1
 - the directories the sync scans are the ones plugin-hostd --search-path prints
