@@ -88,16 +88,22 @@ jobs:
 
   # one pack per listed language from the spec and debian/control, and the catalogs through omx-contract's release
   # gate (translate --check, tools/catalogs-gate.sh): a listed language with no catalog, a missing key or a stale entry
-  # is red
+  # is red. On a pull request of this repository the job runs on the organisation's own runners (vars.OMX_RUNNER), where
+  # the router answers, and the gaps fill themselves: the langpacks action makes the missing entries through the router
+  # (draft-prose), signs them and pushes them to the branch (Open-Mixer/.github#46); a fork, or a run elsewhere, names them
   catalogs:
     name: language packs and catalogs
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || (startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && github.event.repository.private == false && 'ubuntu-latest' || vars.OMX_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
+    permissions:
+      contents: write
     container:
       image: fedora:44
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs
+      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs gnupg2
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
       - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.16.0' 'omx-contract < 4' 'omx-contract-data >= 3.16.0'
@@ -114,6 +120,10 @@ jobs:
           owner: plugin-qualify
           spec: packaging/plugin-qualify.spec
           gate: tools/catalogs-gate.sh
+          # the codes are a bare item file: the gate script hands translate a vocabulary holding it, for a language too
+          fill-command: tools/catalogs-gate.sh
+          router-key: ${{ secrets.OMX_ROUTER_KEY }}
+          signing-key: ${{ secrets.OPENMIXER_CI_SIGNING_KEY }}
 
   # the RPM and the DEB are built, linted and assembled into unsigned trees; nothing is published
   packages:
