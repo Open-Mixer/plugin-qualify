@@ -113,10 +113,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { image: 'fedora:44', artifact: plugin-qualify-rpms-fc44-x86_64 }
-          - { image: 'debian:bookworm', artifact: plugin-qualify-debs-bookworm-amd64 }
-          - { image: 'debian:trixie', artifact: plugin-qualify-debs-trixie-amd64 }
+        # ruling D25: the cells the rpm and deb jobs built for this run, chosen as Open-Mixer/.github's release-matrix
+        # chooses them (matrix.sh): a release (a tag, or source-ref) and a manual run build what OMX_RELEASE_MATRIX
+        # says, a release the full matrix without it and a manual run the quick set; the dry run of a pull request or
+        # a push builds the full matrix. bookworm, a full cell, joins only when the deb job built it.
+        include: ${{ fromJSON((vars.OMX_RELEASE_MATRIX == 'quick' && (github.ref_type == 'tag' || github.event_name == 'workflow_dispatch') || !vars.OMX_RELEASE_MATRIX && github.event_name == 'workflow_dispatch' && github.ref_type != 'tag' && !inputs.source-ref) && '[{"image":"fedora:44", "artifact":"plugin-qualify-rpms-fc44-x86_64"}, {"image":"debian:trixie", "artifact":"plugin-qualify-debs-trixie-amd64"}]' || '[{"image":"fedora:44", "artifact":"plugin-qualify-rpms-fc44-x86_64"}, {"image":"debian:bookworm", "artifact":"plugin-qualify-debs-bookworm-amd64"}, {"image":"debian:trixie", "artifact":"plugin-qualify-debs-trixie-amd64"}]') }}
     steps:
       - uses: actions/checkout@v4
         with:
