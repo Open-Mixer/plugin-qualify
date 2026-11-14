@@ -371,6 +371,9 @@ export interface LifecycleReading {
   readonly cycles: number;
   readonly instantiated: number;
   readonly failed: number;
+  /** Set when the cycles were ended before `cycles` (`memory-bound`, #28): the counts are those taken before it. */
+  readonly unmeasuredReason?: string;
+  readonly unmeasuredDetail?: string;
 }
 
 /** The process's thread count around the plugin's first instance. */
@@ -1040,7 +1043,7 @@ export function readLifecycle(value: unknown): LifecycleReading | undefined {
   const instantiated = finiteNumber(value.instantiated);
   const failed = finiteNumber(value.failed);
   if (cycles === undefined || instantiated === undefined || failed === undefined) return undefined;
-  return { cycles, instantiated, failed };
+  return { cycles, instantiated, failed, ...reasonOf(value) };
 }
 
 /** A thread reading, or `undefined` without its before/after pair. */
