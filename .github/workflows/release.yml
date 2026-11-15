@@ -34,6 +34,10 @@ on:
         description: 'Build fc44 x86_64 and trixie amd64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
         type: boolean
         default: false
+      catch-up:
+        description: 'With source-ref: build and publish only the cells of the set the served version lacks; never rewrites a file the channel serves'
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       publish:
@@ -61,6 +65,7 @@ jobs:
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
       republish: ${{ github.event_name == 'workflow_dispatch' && inputs.republish == true }}
+      catch-up: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
       needs-mod-host: false
       # plugin-db-devel, whose pin.h the CLAP prober builds against, plugin-hostd-protocol-devel, and omx-clap-lv2-devel, the
       # LV2 measurer's host features
@@ -78,6 +83,7 @@ jobs:
       publish: ${{ github.event_name == 'push' || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
       republish: ${{ github.event_name == 'workflow_dispatch' && inputs.republish == true }}
+      catch-up: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
       # the CLAP headers from the pin, plugin-db-dev (pin.h) and libplugin-hostd-protocol-dev from the channel: the CLAP prober's build;
       # libomx-clap-lv2-dev from the channel: the LV2 measurer's host features
       dependencies: 'clap-headers'
@@ -116,21 +122,32 @@ jobs:
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref && format('refs/tags/{0}', inputs.source-ref) || '' }}
 
-      - uses: actions/download-artifact@v4
+      # a catch-up builds only the cells the channel lacks: an image whose cell it did not build has no artifact and is
+      # skipped, saying so; the new cell is installed and qualified
+      - id: pkgs
+        uses: actions/download-artifact@v4
+        continue-on-error: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
         with:
           name: ${{ matrix.artifact }}
           path: pkgs
+
+      - name: Say a cell the catch-up did not build is skipped
+        if: steps.pkgs.outcome != 'success'
+        env:
+          ARTIFACT: ${{ matrix.artifact }}
+        run: |
+          echo "::notice::catch-up: $ARTIFACT was not built by this run (the channel serves that cell), so it is not installed here"
 
       # the OpenMixer channel serves omx-clap-host (omx-clap-scan) and omx-clap-core (the hosting codes'
       # TypeScript modules), which the package depends on, and the CLAP headers the fixtures build
       # against on Debian. The package alone pulls no development package; the fixtures' build tools
       # come after that check.
       - name: Add the OpenMixer channel (Fedora)
-        if: startsWith(matrix.image, 'fedora')
+        if: startsWith(matrix.image, 'fedora') && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Fedora)
-        if: startsWith(matrix.image, 'fedora')
+        if: startsWith(matrix.image, 'fedora') && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           # a mirror that fails in mid-transfer (curl 56, zchunk checksums) is tried again; a real install error fails the
@@ -155,18 +172,18 @@ jobs:
           dnf_retry --setopt=install_weak_deps=False gcc make pkgconf-pkg-config clap-devel lv2-devel
 
       - name: Prepare the container (Debian)
-        if: startsWith(matrix.image, 'debian')
+        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           apt-get update -qq
           apt-get install -y --no-install-recommends ca-certificates curl
 
       - name: Add the OpenMixer channel (Debian)
-        if: startsWith(matrix.image, 'debian')
+        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Debian)
-        if: startsWith(matrix.image, 'debian')
+        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           suite=${IMAGE#debian:}
@@ -183,11 +200,13 @@ jobs:
           IMAGE: ${{ matrix.image }}
 
       - name: Build the fixture plugins
+        if: steps.pkgs.outcome == 'success'
         run: |
           make -C native BUILD="$RUNNER_TEMP/fixture" "$RUNNER_TEMP/fixture/fixtures/rt-safe.clap" "$RUNNER_TEMP/fixture/fixtures/rt-unsafe.clap" \
             "$RUNNER_TEMP/fixture/fixtures/lv2/rt-safe.lv2/gain.so" "$RUNNER_TEMP/fixture/fixtures/lv2/rt-unsafe.lv2/gain.so"
 
       - name: Qualify them with nothing set
+        if: steps.pkgs.outcome == 'success'
         run: |
           packaging/check-installed.sh "$RUNNER_TEMP/fixture/fixtures/rt-safe.clap" "$RUNNER_TEMP/fixture/fixtures/rt-unsafe.clap" \
             "$RUNNER_TEMP/fixture/fixtures/lv2"

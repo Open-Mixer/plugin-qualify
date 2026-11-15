@@ -52,12 +52,17 @@ const spawnVersion: VersionRun = (tool) => {
   return { status: r.status, stdout: `${r.stdout ?? ""}\n${r.stderr ?? ""}` };
 };
 
+/** The version a program installed now answers to `--version`, or `undefined` when it names none. */
+export function toolVersion(tool: string, run: VersionRun = spawnVersion): string | undefined {
+  const r = run(tool);
+  return r.status === 0 ? parseVersion(r.stdout) : undefined;
+}
+
 /** The versions of the hosts as installed now, or which of them could not say. */
 export function hostVersions(env: Readonly<Record<string, string | undefined>>, run: VersionRun = spawnVersion): { ok: true; versions: Readonly<Record<string, string>> } | { ok: false; error: string } {
   const versions: Record<string, string> = {};
   for (const [name, tool] of [[ADAPTER_HOST, ADAPTER_HOST], ["plugin-hostd", env[HOSTD_ENV] ?? "plugin-hostd"]] as const) {
-    const r = run(tool);
-    const version = r.status === 0 ? parseVersion(r.stdout) : undefined;
+    const version = toolVersion(tool, run);
     if (version === undefined) return { ok: false, error: `${tool} --version names no version, so a run could not say which host it was under` };
     versions[name] = version;
   }

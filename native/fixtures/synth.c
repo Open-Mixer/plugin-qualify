@@ -29,6 +29,8 @@
  *                          at its defaults.
  *   synth-attack.clap      built with -DFIXTURE_ATTACK_MS=50, and synth-delay.clap with -DFIXTURE_DELAY_FRAMES=64: see
  *                          voice_sample.
+ *   synth-decay.clap       built with -DFIXTURE_DECAY_MS=100, the safe one, whose every voice ends 100 ms after its note
+ *                          on, on any key: a decaying patch, held down and silent before a timed run ends (#26).
  *   synth-voice-memory.clap  built with -DFIXTURE_VOICE_MB=4, the safe one taking that many MiB for each note struck,
  *                          touched and never given back, as a sampler's voice would.
  * Each voice costs a sine per sample, so the cost grows with the notes held.
@@ -78,6 +80,9 @@ static volatile double fixture_sink;
 #elif defined FIXTURE_DELAY_FRAMES
 #define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.synth-delay"
 #define FIXTURE_NAME "synth with a processing delay"
+#elif defined FIXTURE_DECAY_MS
+#define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.synth-decay"
+#define FIXTURE_NAME "synth whose voices decay"
 #else
 #define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.synth"
 #define FIXTURE_NAME "synth"
@@ -201,6 +206,8 @@ static void note_on(struct synth *s, int key) {
       s->voice[v].step = 2.0 * M_PI * 440.0 * pow(2.0, (key - 69) / 12.0) / s->rate;
 #ifdef FIXTURE_DRUM
       s->voice[v].left = (long)(s->rate * FIXTURE_DRUM_HIT_S);
+#elif defined FIXTURE_DECAY_MS
+      s->voice[v].left = (long)(s->rate * FIXTURE_DECAY_MS / 1000.0);
 #endif
       return;
     }
@@ -265,7 +272,7 @@ static clap_process_status synth_process(const clap_plugin_t *p, const clap_proc
     for (int v = 0; v < VOICES; v++)
       if (s->voice[v].key >= 0) {
         y += voice_sample(&s->voice[v], s->rate);
-#ifdef FIXTURE_DRUM
+#if defined FIXTURE_DRUM || defined FIXTURE_DECAY_MS
         if (--s->voice[v].left <= 0) s->voice[v].key = -1;
 #endif
       }

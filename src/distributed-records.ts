@@ -76,6 +76,18 @@ export function hostClassOfMachine(arch: string | undefined): string | undefined
   return arch?.trim() === "x86_64" ? "x86-64" : undefined;
 }
 
+/**
+ * The host class of this machine: the one a setting names, else the board's, else the machine's; `undefined` for a
+ * machine of no class. The sync reads distributed records by it, and plugin-qualify here prints it (#56).
+ */
+export function hostClassOf(
+  named: string | undefined,
+  boardModel: () => string | undefined = readBoardModel,
+  machineArch: () => string | undefined = readMachine,
+): string | undefined {
+  return named !== undefined && named !== "" ? named : hostClassOfBoard(boardModel()) ?? hostClassOfMachine(machineArch());
+}
+
 /** One distributed record, read: where it is, what it says, and the set it came with. */
 export interface DistributedRecord {
   readonly path: string;

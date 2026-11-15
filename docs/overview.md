@@ -292,6 +292,16 @@ latency line those figures stand against, `latencyLineMs` (5 ms, declared once i
 rules it was judged by, `rules` (`plugin-qualify-rules/<major>.<minor>`: a rule changes only in a minor). Over the
 line is information: the plugin still loads.
 
+### The facts of here
+
+`plugin-qualify here [--json] [--config <file>]` prints the facts of this machine a plugin-db query is asked with,
+by plugin-db's own keys (#56): `machineClass`, the host class the sync reads distributed records by (`host_class` in
+the settings file, else the board's from the device tree, `rpi5`, else the machine's, `x86-64`); `hostName` and
+`hostVersion`, plugin-hostd and the version it answers installed; `hostingEpoch`, plugin-hostd's; `rules`, this
+plugin-qualify's; and `recordSchema`. A fact that cannot be read is left out, never guessed. `--json` prints them as
+one object, which a client hands to plugin-db's query as its `here` with the audio server's rate and quantum (the
+Zynthian integration's `here_facts`); without it, one `<key> <value>` line each.
+
 ### The judged layer of plugin-db
 
 plugin-qualify is the one writer of plugin-db's judged layer. `plugin-qualify judged-layer <record> --machine-class

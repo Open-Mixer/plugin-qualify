@@ -5,7 +5,7 @@
 // Check package.json's repository.url against the repository a workflow runs in. npm's provenance
 // check refuses a publish when they differ (E422: "repository.url" expected to match the repository
 // named by provenance) — this catches the mismatch on a pull request, before a tag ever reaches npm
-// (openmixer/plugin-qualify#34: v0.20.2 named FreeMixer and npm refused it).
+// (openmixer/plugin-qualify#34: v0.20.2 named OpenMixer and npm refused it).
 //
 //   GITHUB_REPOSITORY=<owner>/<repo> node packaging/check-repository.mjs
 import { readFileSync } from "node:fs";
