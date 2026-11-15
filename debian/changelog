@@ -1,3 +1,20 @@
+plugin-qualify (0.20.6) unstable; urgency=medium
+
+  * Built and run against the 3.19.0 pass's releases: omx-contract >= 3.19.0
+    and below 4, plugin-hostd-protocol >= 0.5.10, plugin-db >= 0.4.5, omx-dsp
+    >= 0.32.2, plugin-hostd >= 0.20.8, and omx-clap-host, omx-clap-core and
+    omx-clap-lv2 >= 0.33.0 and below 0.34, the wave's one omx-clap-core minor;
+    each below the next minor (D30). make deps fetches from the same tags.
+  * probers: an instrument's held notes are struck again as its cost is timed
+    (#66, #26).
+  * lv2-measure: every pass that makes an instance runs in a child of its own
+    (#61, #28).
+  * tests: a cost test's timing proofs read the load, warning on a loaded node
+    and failing on a quiet one (#68).
+  * The Catalan catalog translates qualify.compare.load-resp (#76).
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Sun, 15 Nov 2026 16:30:00 +0100
+
 plugin-qualify (0.20.4) unstable; urgency=medium
 
   * Built and run against the inner layers' latest releases: omx-clap-host,
