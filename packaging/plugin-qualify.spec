@@ -235,6 +235,21 @@ the English source sentence.
   0.32.2, plugin-hostd >= 0.20.8, and omx-clap-host, omx-clap-core and omx-clap-
   lv2 >= 0.33.0 and below 0.34, the wave's one omx-clap-core minor; each below
   the next minor (D30). make deps fetches from the same tags.
+- here: the facts of this machine for a plugin-db query, --json by plugin-db's
+  keys (#56, #59).
+- lv2-measure sends an integer port integers and a toggled port 0 or 1; the LV2
+  fixture set is 28 with a stepped port (#29, #62).
+- ZamVerb: its integer room port is no longer swept as a float, so it no longer
+  reloads its impulse response for every value; 30 lifecycles at 192 kHz in
+  512-frame blocks take 55 s instead of 272 s, inside the wall clock (#62).
+- A pass that hits the memory bound or crashes ends on its own and later passes
+  are still measured; Surge XT no longer loses its document (#61).
+- The organisation's name is Open-Mixer, the project's OpenMixer (#63).
+- Contract files keep the $schema the floor's reader reads.
+- CI builds against the channel, never the staging channel, guarded (D25, #64,
+  #65); a release dispatch can catch a served version up (#58).
+- The commit-msg hook takes the current stub from the checker's release line
+  (#75).
 - probers: an instrument's held notes are struck again as its cost is timed
   (#66, #26).
 - lv2-measure: every pass that makes an instance runs in a child of its own
