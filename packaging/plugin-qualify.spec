@@ -23,7 +23,7 @@ BuildRequires: pkgconfig(lv2)
 BuildRequires: (pkgconfig(plugin-db) >= 0.4.1 with pkgconfig(plugin-db) < 0.5)
 BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.7 with pkgconfig(plugin-hostd-protocol) < 0.6)
 BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
-BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.3 with pkgconfig(omx-clap-lv2) < 0.33)
+BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.33.0 with pkgconfig(omx-clap-lv2) < 0.34)
 BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
 BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
@@ -46,12 +46,12 @@ Requires: (plugin-hostd >= 0.20.5 with plugin-hostd < 0.21)
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: (omx-clap-host >= 0.32.3 with omx-clap-host < 0.33)
+Requires: (omx-clap-host >= 0.33.0 with omx-clap-host < 0.34)
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: (omx-clap-core >= 0.32.3 with omx-clap-core < 0.33)
+Requires: (omx-clap-core >= 0.33.0 with omx-clap-core < 0.34)
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
