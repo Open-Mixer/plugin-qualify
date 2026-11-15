@@ -114,7 +114,7 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures/pool-synth.clap $(BUILD)/fixtures/pool-synth-slow.clap $(BUILD)/fixtures/pool-synth-quiet.clap $(BUILD)/fixtures/pool-synth-serial.clap $(BUILD)/fixtures/pool-synth-helper.clap \
 	$(BUILD)/fixtures/requires-voice-info.clap $(BUILD)/fixtures/requires-timer.clap $(BUILD)/fixtures/requires-thread-pool.clap \
 	$(BUILD)/fixtures/fail-alloc.so $(BUILD)/fixtures-faulty/hogs-memory.clap \
-	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
+	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/worker-allocates.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
 	$(BUILD)/fixtures/lv2/host-faithfulness.lv2/host-faithfulness.so \
 	$(BUILD)/fixtures/lv2/synth.lv2/synth.so $(BUILD)/fixtures/lv2/synth-alloc.lv2/synth.so $(BUILD)/fixtures/lv2/synth-drum.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-decay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-crash.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so \
@@ -311,6 +311,13 @@ $(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.
 	mkdir -p $(@D)
 	cp fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl $(@D)/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
+
+# the rt-safe bundle under another uri, with a thread of its own that allocates while run() spins (D20, #53)
+$(BUILD)/fixtures/lv2/worker-allocates.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl
+	mkdir -p $(@D)
+	sed 's/lv2-rt-safe/lv2-worker-allocates/' fixtures/rt-safe.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/lv2-rt-safe/lv2-worker-allocates/' fixtures/rt-safe.lv2/gain.ttl > $(@D)/gain.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_WORKER -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lpthread
 
 # the rt-safe bundle under another uri, reading its control at activate: every host connects the ports before it
 $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl
