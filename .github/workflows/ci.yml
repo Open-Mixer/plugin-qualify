@@ -1,12 +1,11 @@
 name: ci
 
-# Type-check, the TypeScript and Python tests, and the generated Python declarations, on every
-# pull request and every push to main.
+# Type-check, the TypeScript and Python tests, the catalogs and the packages, by workflow_dispatch.
 
+# Delivery pipeline §12: no heavy Action on a push or a pull request. This workflow runs by workflow_dispatch only;
+# a pull request's head is dispatched before it merges (gh workflow run ci.yml --ref <branch>), and its fast checks
+# are lint.yml's, the one lint.
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -129,7 +128,3 @@ jobs:
       publish: false
       arm: false  # aarch64/arm64 build at release only
 
-  # the checks every OpenMixer repository runs on what it publishes: commit messages, private references, and no
-  # local copy of either (Open-Mixer/.github's public-sources-check)
-  public-sources:
-    uses: Open-Mixer/.github/.github/workflows/public-sources-check.yml@openmixer-v1
