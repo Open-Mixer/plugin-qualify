@@ -180,8 +180,8 @@ describe("the CLAP fixture set through clap-qualify and descriptors.py", () => {
     const doc = parseClapScan(text);
     const rows = clapScanDescriptors(doc);
     const written = readDir(dir);
-    // the fixture set: 27, and worker-allocates and worker-idle (D20, #53)
-    expect(rows.length).toBe(29);
+    // the fixture set: 27, worker-allocates and worker-idle (D20, #53), and synth-decay.clap (#26)
+    expect(rows.length).toBe(30);
     expect([...written.keys()].sort()).toEqual(rows.map((r) => r.uri.replace(/^urn:clap:/, "")).sort());
     for (const row of rows) {
       const id = row.uri.replace(/^urn:clap:/, "");
