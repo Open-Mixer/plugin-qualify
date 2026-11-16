@@ -922,7 +922,7 @@ does not hold its set's cell is left out and named. A sync applies a set only at
 It writes `plugin-db-qualification-<host class>-<set>-<rate>-<quantum>_<version>_all.deb` per cell, a package of plugin-db's qualification
 layer, the version the build date (`2026.10.29`) unless `--version` names one. The package installs the records under
 `/usr/share/omx/qualification/<host class>/<set>-<rate>-<quantum>/` with `provenance.json`, depends on the minor of the plugin-qualify
-that wrote it up to the next minor (`plugin-qualify (>= 0.19.0~), plugin-qualify (<< 0.20~)`), and is `Architecture: all`. `--provenance` names a JSON file (or holds the JSON itself) with what the tool
+that wrote it as a floor with no ceiling (`plugin-qualify (>= 0.19.0~)`), and is `Architecture: all`. `--provenance` names a JSON file (or holds the JSON itself) with what the tool
 cannot know: the image, the package versions and the source revisions of the device. The tool adds the set, the host
 class, the package and the date. A record whose probe output is missing or does not match its SHA-256 is left out
 and named; a record of a plugin that could not be measured (`*.unmeasured.json`) is left out, since it never

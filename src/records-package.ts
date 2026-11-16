@@ -178,13 +178,13 @@ export function recordsSources(args: readonly string[]): RecordsSource[] {
 /** The package of a class and a set. */
 export const recordsPackageName = (hostClass: string, set: string): string => `plugin-db-qualification-${hostClass}-${set}`;
 
-/** The plugin-qualify a package of records depends on: the minor that wrote them, up to the next minor. */
-export function recordsDependsRange(version: string): { floor: string; ceiling: string } | undefined {
+/** The plugin-qualify a package of records depends on: the minor that wrote them, as a floor with no ceiling. */
+export function recordsDependsRange(version: string): { floor: string } | undefined {
   const m = /^(\d+)\.(\d+)\.\d+/.exec(version);
   if (m === null) return undefined;
   const major = Number(m[1]);
   const minor = Number(m[2]);
-  return { floor: `${String(major)}.${String(minor)}.0`, ceiling: `${String(major)}.${String(minor + 1)}` };
+  return { floor: `${String(major)}.${String(minor)}.0` };
 }
 
 /** This plugin-qualify's own version, read where it is installed. */
@@ -385,7 +385,7 @@ function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: str
         "Architecture: all",
         `Maintainer: ${args.maintainer}`,
         `Installed-Size: ${String(kib)}`,
-        `Depends: plugin-qualify (>= ${range.floor}~), plugin-qualify (<< ${range.ceiling}~)`,
+        `Depends: plugin-qualify (>= ${range.floor}~)`,
         "Section: sound",
         "Priority: optional",
         "Multi-Arch: foreign",
