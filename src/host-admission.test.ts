@@ -33,7 +33,7 @@ import { JALV_PROFILE, MOD_HOST_PROFILE, OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOL
 import { pinVerdictOf } from "./pins-file.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { fixtureJson, readFixture, withoutMemoryBudget } from "./probe-output-fixtures.js";
 import { buildQualificationRecord, tiersOf } from "./qualification-record.js";
 
@@ -139,6 +139,28 @@ describe("the jalv run ends at its deadline (#187)", () => {
       expect(took).toBeLessThan(JALV_HOSTED_MS + 2000);
     } finally {
       rmSync(bin, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  // jalv 1.8.0 makes its state directory with mkdtemp("jalvXXXXXX") (src/jalv.c:872): relative, so in its working
+  // directory, and removed only at a clean exit. Killed at the deadline it never gets one, so a run started from a
+  // user's home left one jalvXXXXXX there per hosted plugin. jalv must start in the run's scratch directory instead.
+  it("a jalv killed at the deadline leaves no state directory where the caller stands", () => {
+    const bin = mkdtempSync(join(tmpdir(), "jalv-mkdtemp-"));
+    const caller = mkdtempSync(join(tmpdir(), "jalv-caller-home-"));
+    const before = process.cwd();
+    try {
+      // what jalv does first, then hosted until killed: a relative mkdtemp, removed only at a clean exit
+      writeFileSync(join(bin, "jalv"), `#!/bin/sh\nmktemp -d jalvXXXXXX >/dev/null || exit 9\ntrap '' TERM\nwhile :; do sleep 1; done\n`);
+      chmodSync(join(bin, "jalv"), 0o755);
+      process.chdir(caller);
+      const run = SPAWNED_ADMISSIONS.jalv("urn:x", { ...process.env, HOME: caller, PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      expect(run).toMatchObject({ installed: true, stillRunning: true });
+      expect(readdirSync(caller).filter((n) => n.startsWith("jalv"))).toEqual([]);
+    } finally {
+      process.chdir(before);
+      rmSync(bin, { recursive: true, force: true });
+      rmSync(caller, { recursive: true, force: true });
     }
   }, 15_000);
 });

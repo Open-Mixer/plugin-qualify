@@ -74,7 +74,7 @@
       "source": "a783d279261ede5c3b93a75502b0e1c38e0c852a5635bf5f8ec0d1494cc987ff"
     },
     "qualify.compare.load-resp": {
-      "text": "resp {resp}",
+      "text": "resposta {resp}",
       "by": "machine",
       "model": "claude-sonnet-5-5",
       "source": "4a47f0e978bb97eb8e0b144abdc9198a7f32eaddb6b7a63d7a120b2a44a004ba"
