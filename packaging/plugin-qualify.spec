@@ -23,7 +23,7 @@ BuildRequires: pkgconfig(lv2)
 BuildRequires: pkgconfig(plugin-db) >= 0.4.5
 BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.10
 BuildRequires: pkgconfig(omx-contract) >= 3.19.0
-BuildRequires: pkgconfig(omx-clap-lv2) >= 0.33.0
+BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
 BuildRequires: pkgconfig(omxdsp) >= 0.32.2
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
 BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
@@ -46,12 +46,12 @@ Requires: plugin-hostd >= 0.20.8
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: omx-clap-host >= 0.33.0
+Requires: omx-clap-host >= 0.32.5
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: omx-clap-core >= 0.33.0
+Requires: omx-clap-core >= 0.32.5
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
@@ -233,7 +233,7 @@ the English source sentence.
 - Built and run against the 3.19.0 pass's releases: omx-contract >= 3.19.0 and
   below 4, plugin-hostd-protocol >= 0.5.10, plugin-db >= 0.4.5, omx-dsp >=
   0.32.2, plugin-hostd >= 0.20.8, and omx-clap-host, omx-clap-core and omx-clap-
-  lv2 >= 0.33.0 and below 0.34, the wave's one omx-clap-core minor; each below
+  lv2 >= 0.32.5 (the property work shipped there); each below
   the next minor (D30). make deps fetches from the same tags.
 - here: the facts of this machine for a plugin-db query, --json by plugin-db's
   keys (#56, #59).
