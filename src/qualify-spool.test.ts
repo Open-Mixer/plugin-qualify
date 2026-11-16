@@ -22,7 +22,7 @@ import {
   runSpoolOnce,
   spawnIsolated,
   writeAtomic,
-  type ProbeEnd,
+  type SpoolProbeEnd,
   type SpoolConfig,
   type SpoolDeps,
 } from "./qualify-spool.js";
@@ -48,7 +48,7 @@ function desk(opts: { stored?: boolean } = {}): { cfg: SpoolConfig; files: { spo
   return { cfg: { spoolDir: spool, pinsDir: pins, storePath: store, budgetMs: 1000, quick: ["plugin-qualify"] }, files: { spool, pins, store, accepted: `${store}.accepted` } };
 }
 
-const deps = (end: ProbeEnd, extra: Partial<SpoolDeps> = {}): SpoolDeps => ({
+const deps = (end: SpoolProbeEnd, extra: Partial<SpoolDeps> = {}): SpoolDeps => ({
   audioCpus: () => [0],
   onlineCpus: () => [0, 1, 2, 3],
   probe: async () => end,
@@ -106,9 +106,9 @@ describe("a spool request is qualified and its verdict is always recorded", () =
   });
 
   it.each([
-    ["a prober killed by a signal", { kind: "signaled", signal: "SIGSEGV" } as ProbeEnd, "probe.crashed"],
-    ["an OOM kill", { kind: "memory-limit" } as ProbeEnd, "probe.memory-limit"],
-    ["the budget passing", { kind: "timeout" } as ProbeEnd, "probe.timeout"],
+    ["a prober killed by a signal", { kind: "signaled", signal: "SIGSEGV" } as SpoolProbeEnd, "probe.crashed"],
+    ["an OOM kill", { kind: "memory-limit" } as SpoolProbeEnd, "probe.memory-limit"],
+    ["the budget passing", { kind: "timeout" } as SpoolProbeEnd, "probe.timeout"],
   ])("%s is recorded as verdict=refused with %s", async (_n, end, reason) => {
     const { cfg, files } = desk();
     const out = await runSpoolOnce(cfg, deps(end));
