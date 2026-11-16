@@ -36,6 +36,7 @@ export * from "./probe-merge.js";
 export * from "./judge-cli.js";
 export * from "./whole-file.js";
 export * from "./qualify-sync.js";
+export * from "./qualify-spool.js";
 export * from "./qualify-rejudge.js";
 export * from "./qualify-adapter-pass.js";
 export * from "./distributed-records.js";
