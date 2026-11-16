@@ -3,7 +3,7 @@
 """What descriptors.py writes is read by omx-contract's own loader.
 
 The `$schema` of a descriptor is the one address the loader accepts,
-https://openmixer.org/schema/omx-contract/v<major>/omx-contract.schema.json: a literal here, never the constant of
+https://openmixer.org/schema/omx-contract/omx-contract.schema.json: a literal here, never the constant of
 descriptors.py, so a moved address is a red test. The descriptor is also put in a contract directory and read by
 loadContractDir when OMX_CONTRACT_LOADER names omx-contract's built contract-dir.mjs. A scanned descriptor is never
 installed, so the copy the loader reads says origin "authored": the loader must get past its `$schema` check, and any
@@ -19,7 +19,7 @@ import unittest
 import descriptors as d
 import test_descriptors as t
 
-SCHEMA = "https://openmixer.org/schema/omx-contract/v3/omx-contract.schema.json"
+SCHEMA = "https://openmixer.org/schema/omx-contract/omx-contract.schema.json"
 LOADER = os.environ.get("OMX_CONTRACT_LOADER")
 
 
