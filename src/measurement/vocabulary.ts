@@ -14,7 +14,7 @@
  * must be able to fall back on the `kind`, which is why the readers below return a term record
  * rather than a bare string.
  *
- * The WORDS are omx-contract's (`data/measurement.json` and `data/resource-profile.json`, rendered
+ * The WORDS are this package's (its `qualification` domain, contract.d/qualification/, rendered
  * as `<ITEM>_WORDS`), in its order: a word is added there, once, and every consumer reads it. What
  * stays here is the prose, keyed by the contract's word type, so a word the contract adds without
  * a description here, or a description for a word it lacks, is a type error.
@@ -34,7 +34,7 @@ import {
   MEASUREMENT_VOICE_BASES_WORDS,
   RESOURCE_HOST_ISOLATIONS_WORDS,
   RESOURCE_HOST_LATENCY_HANDLING_WORDS,
-} from "@openmixer/omx-contract";
+} from "../qualification-vocabulary.generated.js";
 import { nonEmptyString } from "./guards.js";
 
 /** Pairs each word, in the contract's order, with its description here. */
@@ -89,6 +89,8 @@ const UNMEASURED_DESCRIPTIONS: Readonly<Record<UnmeasuredCode, string>> = {
   "silent-output":
     "Instantiated and driven, but emitted nothing under a stimulus that should have passed. " +
       "A convolver with no impulse response, a vocoder with no carrier, a gate that never opened.",
+  "needs-content":
+    "An instrument that is silent under notes until a sample, a sound font or an instrument file is loaded, which the prober did not load.",
   "needs-carrier":
     "Requires a second audio input (a carrier or side-chain) the prober did not supply.",
   "needs-impulse-response":

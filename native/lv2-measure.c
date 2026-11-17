@@ -1380,12 +1380,9 @@ static void emit_cost(double rate, const struct cost_at *C, uint32_t block, int 
  * refused, OMX_RT_OOM_EXIT_STATUS) a child that reaches it ends that pass alone: the record carries memory-bound for
  * it and the run goes on. A child that dies any other way takes this process with it, by the same signal or exit
  * status, as a pass in this process always did. */
-#include <omxcontract/omx_vocabulary.h>
-#ifdef OMX_MEASUREMENT_UNMEASURED_REASONS_MEMORY_BOUND
-#define MEMORY_BOUND_REASON OMX_MEASUREMENT_UNMEASURED_REASONS_MEMORY_BOUND
-#else /* an omx-contract before the word (omx-contract#32): the same word, until the floor reaches its release */
+/* the reason a memory-bound pass carries: a word of the measurement format (src/memory-bound.ts), not yet of the
+ * qualification domain, so it is spelled here as the TypeScript reader spells it */
 #define MEMORY_BOUND_REASON "memory-bound"
-#endif
 
 enum pass_end { PASS_DONE, PASS_MEMORY_BOUND, PASS_CRASHED };
 

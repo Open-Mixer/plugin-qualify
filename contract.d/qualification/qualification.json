@@ -1,0 +1,582 @@
+{
+  "$id": "https://openmixer.org/contract/qualification",
+  "info": {
+    "title": "What a qualification measures and records",
+    "version": "1.0.0",
+    "x-owner": "plugin-qualify"
+  },
+  "components": {
+    "schemas": {
+      "MEASUREMENT_DIMENSIONS": {
+        "description": "The measurable dimensions a measurement document declares it covers: latency and cost since the format's 1.0, stability, RT safety and features since 1.1, for the hosting verdict.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "latency",
+            "title": "latency",
+            "x-code": 0,
+            "x-text": "How long a plugin takes to produce its first sound after it is driven or played."
+          },
+          {
+            "const": "cost",
+            "title": "cost",
+            "x-code": 1,
+            "x-text": "How much CPU time a plugin spends per block under a sustained stimulus."
+          },
+          {
+            "const": "stability",
+            "title": "stability",
+            "x-code": 2,
+            "x-text": "Whether a plugin instantiates, processes and tears down without crashing or producing non-finite output."
+          },
+          {
+            "const": "rtSafety",
+            "title": "rtSafety",
+            "x-code": 3,
+            "x-text": "Whether a plugin's audio thread avoids locks, allocation and other calls a real-time thread must not make."
+          },
+          {
+            "const": "features",
+            "title": "features",
+            "x-code": 4,
+            "x-text": "What capabilities a plugin declares and a prober can confirm, beside latency, cost, stability and RT safety."
+          }
+        ]
+      },
+      "MEASUREMENT_UNMEASURED_KINDS": {
+        "description": "What an absent figure means for a merge, the one distinction that changes behaviour: a property of the plugin, a failure of this run, or a dimension the run did not cover.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "nothing-to-measure",
+            "title": "nothingToMeasure",
+            "x-code": 0,
+            "description": "A property of the plugin: any prober on any machine reaches it, so it may override a figure.",
+            "x-text": "A property of the plugin: any prober on any machine reaches it, so it may override a figure."
+          },
+          {
+            "const": "probe-failed",
+            "title": "probeFailed",
+            "x-code": 1,
+            "description": "A property of this run: it says nothing about the plugin and never overrides a figure.",
+            "x-text": "A property of this run: it says nothing about the plugin and never overrides a figure."
+          },
+          {
+            "const": "not-attempted",
+            "title": "notAttempted",
+            "x-code": 2,
+            "description": "The run did not cover this plugin or this dimension: a partial run, not a finding.",
+            "x-text": "The run did not cover this plugin or this dimension: a partial run, not a finding."
+          }
+        ]
+      },
+      "MEASUREMENT_UNMEASURED_REASONS": {
+        "description": "Every reason a figure may be absent, each of its kind: an outcome a sweep produced, never a hypothetical. A reader that meets a reason it does not know treats it as probe-failed.",
+        "x-since": "2.18.0",
+        "x-groups": "MEASUREMENT_UNMEASURED_KINDS",
+        "oneOf": [
+          {
+            "const": "no-audio-in",
+            "title": "noAudioIn",
+            "x-code": 0,
+            "description": "No audio input port: nothing to drive.",
+            "x-text": "No audio input port: nothing to drive.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "no-audio-out",
+            "title": "noAudioOut",
+            "x-code": 1,
+            "description": "No audio output port: nothing to read.",
+            "x-text": "No audio output port: nothing to read.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "silent-output",
+            "title": "silentOutput",
+            "x-code": 2,
+            "description": "Driven, and silent under a stimulus that should have passed.",
+            "x-text": "Driven, and silent under a stimulus that should have passed.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "needs-carrier",
+            "title": "needsCarrier",
+            "x-code": 3,
+            "description": "Needs a second audio input the prober did not supply.",
+            "x-text": "Needs a second audio input the prober did not supply.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "needs-impulse-response",
+            "title": "needsImpulseResponse",
+            "x-code": 4,
+            "description": "A convolver needing an impulse response the prober did not load.",
+            "x-text": "A convolver needing an impulse response the prober did not load.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "needs-content",
+            "title": "needsContent",
+            "x-code": 5,
+            "description": "An instrument that is silent under notes until a sample, a sound font or an instrument file is loaded, which the prober did not load.",
+            "x-text": "An instrument that is silent under notes until a sample, a sound font or an instrument file is loaded, which the prober did not load.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "unpinnable",
+            "title": "unpinnable",
+            "x-code": 6,
+            "description": "The files the host loads cannot be pinned.",
+            "x-text": "The files the host loads cannot be pinned.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "no-voices",
+            "title": "noVoices",
+            "x-code": 7,
+            "description": "An instrument whose voice-info declares a capacity of 0.",
+            "x-text": "An instrument whose voice-info declares a capacity of 0.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "notes-unplayable",
+            "title": "notesUnplayable",
+            "x-code": 8,
+            "description": "An instrument whose note input reads no dialect the prober speaks.",
+            "x-text": "An instrument whose note input reads no dialect the prober speaks.",
+            "x-group": "nothing-to-measure"
+          },
+          {
+            "const": "voices-unknown",
+            "title": "voicesUnknown",
+            "x-code": 9,
+            "description": "An instrument that declares no voice capacity, run with no probe count.",
+            "x-text": "An instrument that declares no voice capacity, run with no probe count.",
+            "x-group": "not-attempted"
+          },
+          {
+            "const": "refused-instantiation",
+            "title": "refusedInstantiation",
+            "x-code": 10,
+            "description": "The plugin would not instantiate at this rate or block size.",
+            "x-text": "The plugin would not instantiate at this rate or block size.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "probe-crashed",
+            "title": "probeCrashed",
+            "x-code": 11,
+            "description": "The probe worker died while hosting the plugin.",
+            "x-text": "The probe worker died while hosting the plugin.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "probe-timeout",
+            "title": "probeTimeout",
+            "x-code": 12,
+            "description": "The probe passed its per-plugin time limit.",
+            "x-text": "The probe passed its per-plugin time limit.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "non-finite-output",
+            "title": "nonFiniteOutput",
+            "x-code": 13,
+            "description": "The output held NaN or infinity.",
+            "x-text": "The output held NaN or infinity.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "not-installed",
+            "title": "notInstalled",
+            "x-code": 14,
+            "description": "The plugin is not installed on this machine.",
+            "x-text": "The plugin is not installed on this machine.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "worker-nonconforming",
+            "title": "workerNonconforming",
+            "x-code": 15,
+            "description": "An LV2 worker interface with work or work_response NULL.",
+            "x-text": "An LV2 worker interface with work or work_response NULL.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "probe-error",
+            "title": "probeError",
+            "x-code": 16,
+            "description": "A failure with no more specific reason; its own words are kept beside it.",
+            "x-text": "A failure with no more specific reason; its own words are kept beside it.",
+            "x-group": "probe-failed"
+          },
+          {
+            "const": "not-attempted",
+            "title": "notAttempted",
+            "x-code": 17,
+            "description": "The run did not cover this plugin for this dimension.",
+            "x-text": "The run did not cover this plugin for this dimension.",
+            "x-group": "not-attempted"
+          }
+        ]
+      },
+      "MEASUREMENT_LATENCY_METHODS": {
+        "description": "How a latency figure was taken. note-onset is an instrument's: a held note's first sound.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "impulse-onset",
+            "title": "impulseOnset",
+            "x-code": 0,
+            "description": "The delay from a unit impulse to the first output sample above the residual floor: what the plugin does.",
+            "x-text": "The delay from a unit impulse to the first output sample above the residual floor: what the plugin does.",
+            "x-from": [
+              {
+                "$ref": "https://openmixer.org/contract/omx-contract#/components/schemas/LV2_CORE_TERMS",
+                "x-term": "latency"
+              },
+              {
+                "$ref": "https://openmixer.org/contract/omx-contract#/components/schemas/CLAP_EXT_LATENCY_TERMS",
+                "x-term": "latency"
+              }
+            ]
+          },
+          {
+            "const": "declared-port",
+            "title": "declaredPort",
+            "x-code": 1,
+            "description": "Read from the plugin's own latency report: what it claims.",
+            "x-text": "Read from the plugin's own latency report: what it claims.",
+            "x-from": [
+              {
+                "$ref": "https://openmixer.org/contract/omx-contract#/components/schemas/LV2_CORE_TERMS",
+                "x-term": "latency"
+              },
+              {
+                "$ref": "https://openmixer.org/contract/omx-contract#/components/schemas/CLAP_EXT_LATENCY_TERMS",
+                "x-term": "latency"
+              }
+            ]
+          },
+          {
+            "const": "note-onset",
+            "title": "noteOnset",
+            "x-code": 2,
+            "description": "The delay from a note on to the first output sample above the floor.",
+            "x-text": "The delay from a note on to the first output sample above the floor."
+          }
+        ]
+      },
+      "MEASUREMENT_COST_METHODS": {
+        "description": "How a cost figure was taken.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "block-time-percentile",
+            "title": "blockTimePercentile",
+            "x-code": 0,
+            "description": "A percentile of per-block wall time under a sustained stimulus, warm-up discarded, in nanoseconds per sample.",
+            "x-text": "A percentile of per-block wall time under a sustained stimulus, warm-up discarded, in nanoseconds per sample."
+          }
+        ]
+      },
+      "MEASUREMENT_LATENCY_SCALING": {
+        "description": "How latency moves with the sample rate, derived from readings at several rates, never assumed from a plugin's name.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "fixed-frame",
+            "title": "fixedFrame",
+            "x-code": 0,
+            "description": "The same frame count at every rate.",
+            "x-text": "The same frame count at every rate."
+          },
+          {
+            "const": "fixed-time",
+            "title": "fixedTime",
+            "x-code": 1,
+            "description": "The same milliseconds at every rate.",
+            "x-text": "The same milliseconds at every rate."
+          },
+          {
+            "const": "zero",
+            "title": "zero",
+            "x-code": 2,
+            "description": "No latency a mix can notice at any measured rate.",
+            "x-text": "No latency a mix can notice at any measured rate."
+          },
+          {
+            "const": "nonconforming",
+            "title": "nonconforming",
+            "x-code": 3,
+            "description": "Fits neither law at a magnitude that reaches a mix: flagged, never averaged.",
+            "x-text": "Fits neither law at a magnitude that reaches a mix: flagged, never averaged."
+          },
+          {
+            "const": "single-rate",
+            "title": "singleRate",
+            "x-code": 4,
+            "description": "One usable reading: no law can be fitted.",
+            "x-text": "One usable reading: no law can be fitted."
+          },
+          {
+            "const": "unmeasured",
+            "title": "unmeasured",
+            "x-code": 5,
+            "description": "No rate produced a figure.",
+            "x-text": "No rate produced a figure."
+          }
+        ]
+      },
+      "MEASUREMENT_LATENCY_SCALING_NOTES": {
+        "description": "Why a derived scaling class is not the naive fit over every reading.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "below-budget",
+            "title": "belowBudget",
+            "x-code": 0,
+            "description": "The readings fit no law but every one is inside the latency budget: the detector's noise.",
+            "x-text": "The readings fit no law but every one is inside the latency budget: the detector's noise."
+          },
+          {
+            "const": "informational-rate",
+            "title": "informationalRate",
+            "x-code": 1,
+            "description": "Only a reading below the operational rates breaks the law; it stays as information.",
+            "x-text": "Only a reading below the operational rates breaks the law; it stays as information."
+          }
+        ]
+      },
+      "MEASUREMENT_LATENCY_EXCLUSIONS": {
+        "description": "Why one rate's reading was left out of the fit and of every rate resolution.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "impossible-zero",
+            "title": "impossibleZero",
+            "x-code": 0,
+            "description": "Zero frames at this rate while another rate measured non-zero.",
+            "x-text": "Zero frames at this rate while another rate measured non-zero."
+          }
+        ]
+      },
+      "MEASUREMENT_VOICE_BASES": {
+        "description": "Where the number of notes an instrument's cost was measured with came from: the voice capacity the plugin declares (CLAP voice-info), or a count the caller gave.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "declared",
+            "title": "declared",
+            "x-code": 0,
+            "x-text": "The voice capacity the plugin declares through CLAP's voice-info extension.",
+            "x-from": [
+              {
+                "$ref": "https://openmixer.org/contract/omx-contract#/components/schemas/CLAP_EXT_VOICE_INFO_TERMS",
+                "x-term": "voice-info"
+              }
+            ]
+          },
+          {
+            "const": "probe",
+            "title": "probe",
+            "x-code": 1,
+            "x-text": "A note count the caller gave the prober, not read from the plugin."
+          }
+        ]
+      },
+      "MEASUREMENT_VERDICT_RATINGS": {
+        "description": "The four ratings a verdict speaks, in order from the best.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "suitable",
+            "title": "suitable",
+            "x-code": 0,
+            "x-text": "The plugin meets the host profile's budget on every measured dimension."
+          },
+          {
+            "const": "conditional",
+            "title": "conditional",
+            "x-code": 1,
+            "x-text": "The plugin meets the host profile's budget only under a stated condition."
+          },
+          {
+            "const": "unknown",
+            "title": "unknown",
+            "x-code": 2,
+            "x-text": "Not enough was measured to rate the plugin against the host profile."
+          },
+          {
+            "const": "unsuitable",
+            "title": "unsuitable",
+            "x-code": 3,
+            "x-text": "The plugin does not meet the host profile's budget on at least one measured dimension."
+          }
+        ]
+      },
+      "RESOURCE_MEMORY_PHASES": {
+        "description": "When a plugin's memory is read, per instance (plugin-qualify#114): after instantiate, after activate, at rest after processing, with notes held, and for a second instance, so a shared one-time load is told apart from the per-instance cost.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "after-instantiate",
+            "title": "afterInstantiate",
+            "x-code": 0,
+            "x-text": "Memory read right after the plugin instantiates."
+          },
+          {
+            "const": "after-activate",
+            "title": "afterActivate",
+            "x-code": 1,
+            "x-text": "Memory read right after the plugin activates."
+          },
+          {
+            "const": "at-rest",
+            "title": "atRest",
+            "x-code": 2,
+            "x-text": "Memory read at rest, after processing, with no note playing."
+          },
+          {
+            "const": "notes-held",
+            "title": "notesHeld",
+            "x-code": 3,
+            "x-text": "Memory read while notes are held."
+          },
+          {
+            "const": "second-instance",
+            "title": "secondInstance",
+            "x-code": 4,
+            "x-text": "Memory read for a second instance, so a shared one-time load is told apart from the per-instance cost."
+          }
+        ]
+      },
+      "RESOURCE_UNMEASURED_REASONS": {
+        "description": "Why a resource has no figure a host profile can read, beside the measurement's own reasons (MEASUREMENT_UNMEASURED_REASONS).",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "unmeasured-on-class",
+            "title": "unmeasuredOnClass",
+            "x-code": 0,
+            "description": "The only figure was taken on another machine class: never read as a pass, never scaled.",
+            "x-text": "The only figure was taken on another machine class: never read as a pass, never scaled."
+          },
+          {
+            "const": "limit-exceeded",
+            "title": "limitExceeded",
+            "x-code": 1,
+            "description": "The run hit the limit probe isolation set for the resource; the limit is recorded beside it.",
+            "x-text": "The run hit the limit probe isolation set for the resource; the limit is recorded beside it."
+          }
+        ]
+      },
+      "RESOURCE_BUDGET_SCOPES": {
+        "description": "What a host profile's budget for a resource is counted over (plugin-qualify#114, #115): one plugin instance, or the whole console.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "per-instance",
+            "title": "perInstance",
+            "x-code": 0,
+            "x-text": "Counted over one plugin instance."
+          },
+          {
+            "const": "per-console",
+            "title": "perConsole",
+            "x-code": 1,
+            "x-text": "Counted over the whole console."
+          }
+        ]
+      },
+      "RESOURCE_HOST_ISOLATIONS": {
+        "description": "How a host runs its plugins.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "in-process",
+            "title": "inProcess",
+            "x-code": 0,
+            "x-text": "The host runs its plugins in its own process."
+          },
+          {
+            "const": "per-process",
+            "title": "perProcess",
+            "x-code": 1,
+            "x-text": "The host runs each plugin in its own process."
+          },
+          {
+            "const": "shared-process",
+            "title": "sharedProcess",
+            "x-code": 2,
+            "x-text": "The host runs its plugins together in one process apart from its own."
+          }
+        ]
+      },
+      "RESOURCE_HOST_LATENCY_HANDLING": {
+        "description": "Whether a host aligns on a plugin's reported latency or only passes it on.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "compensated",
+            "title": "compensated",
+            "x-code": 0,
+            "x-text": "The host delays every other path to align on this plugin's reported latency."
+          },
+          {
+            "const": "uncompensated",
+            "title": "uncompensated",
+            "x-code": 1,
+            "x-text": "The host passes the plugin's reported latency on, without aligning other paths to it."
+          }
+        ]
+      },
+      "RESOURCE_THREAD_SCHEDULING": {
+        "description": "The scheduling class a host gives its plugin's threads, as the probe output records it.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "none",
+            "title": "none",
+            "x-code": 0,
+            "x-text": "No particular scheduling class: the thread runs as any other."
+          },
+          {
+            "const": "fifo",
+            "title": "fifo",
+            "x-code": 1,
+            "x-text": "The real-time FIFO scheduling class."
+          }
+        ]
+      },
+      "MACHINE_CLASSES": {
+        "description": "The machine classes a host profile budgets for (plugin-qualify#114, #115): the desk, and the Raspberry Pi 4 and 5 a small console runs on.",
+        "x-since": "2.18.0",
+        "oneOf": [
+          {
+            "const": "desk",
+            "title": "desk",
+            "x-code": 0,
+            "description": "An x86-64 desk.",
+            "x-text": "An x86-64 desk."
+          },
+          {
+            "const": "raspberry-pi-4",
+            "title": "raspberryPi4",
+            "x-code": 1,
+            "description": "A Raspberry Pi 4, aarch64.",
+            "x-text": "A Raspberry Pi 4, aarch64."
+          },
+          {
+            "const": "raspberry-pi-5",
+            "title": "raspberryPi5",
+            "x-code": 2,
+            "description": "A Raspberry Pi 5, aarch64.",
+            "x-text": "A Raspberry Pi 5, aarch64."
+          }
+        ]
+      }
+    }
+  }
+}

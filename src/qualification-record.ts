@@ -24,7 +24,7 @@ import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type Pro
 import type { VoicesHeld } from "./measurement/format.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
-import { MEASUREMENT_UNMEASURED_REASONS } from "@openmixer/omx-contract";
+import { MEASUREMENT_UNMEASURED_REASONS } from "./qualification-vocabulary.generated.js";
 import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
 
 export const QUALIFICATION_RECORD_SCHEMA = "plugin-qualify.qualification-record/1";

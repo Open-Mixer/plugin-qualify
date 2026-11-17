@@ -13,7 +13,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as contract from "@openmixer/omx-contract";
+import * as contract from "./qualification-vocabulary.generated.js";
 import { describe, expect, it } from "vitest";
 import { clapCoreTsDirCandidates, isHostingTableName } from "../tools/clap-core-tsdir.mjs";
 import { OUT as GENERATED_HOSTING_CODES, hostingCodesFileFrom } from "../tools/gen-hosting-codes.mjs";
