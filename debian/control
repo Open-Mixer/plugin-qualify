@@ -11,7 +11,7 @@ Build-Depends: debhelper-compat (= 13),
                lv2-dev,
                plugin-db-dev (>= 0.4.5~),
                libplugin-hostd-protocol-dev (>= 0.5.10~),
-               libomx-contract-dev (>= 3.19.0~),
+               libomx-contract-dev (>= 3.20.0~),
                libomx-clap-lv2-dev (>= 0.32.5~),
                libomxdsp-dev (>= 0.32.2~),
                libcjson-dev (>= 1.7.15~), libcjson-dev (<< 2~)
