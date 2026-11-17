@@ -215,6 +215,14 @@ export const MEASUREMENT_UNMEASURED_REASONS = {
     "text": {
       "en": "The run did not cover this plugin for this dimension."
     }
+  },
+  "memoryBound": {
+    "word": "memory-bound",
+    "group": "probe-failed",
+    "doc": "A measurement pass did not fit the memory bound the run set: that pass alone is unmeasured, and the passes after it are measured.",
+    "text": {
+      "en": "A measurement pass did not fit the memory bound the run set: that pass alone is unmeasured, and the passes after it are measured."
+    }
   }
 } as const;
 
@@ -617,7 +625,8 @@ export const MEASUREMENT_UNMEASURED_REASONS_WORDS = [
   "not-installed",
   "worker-nonconforming",
   "probe-error",
-  "not-attempted"
+  "not-attempted",
+  "memory-bound"
 ] as const;
 
 /**

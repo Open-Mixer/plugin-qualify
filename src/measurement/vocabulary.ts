@@ -89,6 +89,8 @@ const UNMEASURED_DESCRIPTIONS: Readonly<Record<UnmeasuredCode, string>> = {
   "silent-output":
     "Instantiated and driven, but emitted nothing under a stimulus that should have passed. " +
       "A convolver with no impulse response, a vocoder with no carrier, a gate that never opened.",
+  "memory-bound":
+    "A pass did not fit the memory bound the run set: that pass alone is unmeasured, the passes after it are measured.",
   "needs-content":
     "An instrument that is silent under notes until a sample, a sound font or an instrument file is loaded, which the prober did not load.",
   "needs-carrier":

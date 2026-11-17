@@ -67,6 +67,7 @@
     "RESOURCE_THREAD_SCHEDULING.fifo": {"text": "La classe d'horari FIFO en temps real.", "by": "machine", "model": "draft-prose", "source": "89e8cfb5b8301c09a37259e244b0e6aacdfc8c6c8069d386234281242a7ef066"},
     "RESOURCE_THREAD_SCHEDULING.none": {"text": "Sense cap classe d'horari particular: el fil s'executa com qualsevol altre.", "by": "machine", "model": "draft-prose", "source": "b6fae2c3d4c747774d40b5523c6b870e5d4dcd1f28d253f6ce76ef80911dd13b"},
     "RESOURCE_UNMEASURED_REASONS.limit-exceeded": {"text": "L'execució va arribar al límit que es va establir per a l'aïllament del recurs; el límit es registra al costat.", "by": "machine", "model": "draft-prose", "source": "bd0cc1d28c213ac084e066cfc03bb4514d30b5faf255adc05f2e39a3860656df"},
-    "RESOURCE_UNMEASURED_REASONS.unmeasured-on-class": {"text": "L'única xifra es va obtenir en una altra classe de màquina: mai es va llegir com a pas, mai es va escalar.", "by": "machine", "model": "draft-prose", "source": "e0c56a9614f54a003cb88fd2fd641fe1ebef4baec7b644a2c0d6c424b3230b7f"}
+    "RESOURCE_UNMEASURED_REASONS.unmeasured-on-class": {"text": "L'única xifra es va obtenir en una altra classe de màquina: mai es va llegir com a pas, mai es va escalar.", "by": "machine", "model": "draft-prose", "source": "e0c56a9614f54a003cb88fd2fd641fe1ebef4baec7b644a2c0d6c424b3230b7f"},
+    "MEASUREMENT_UNMEASURED_REASONS.memory-bound": {"text": "Un pas de mesura no ha cabut dins del límit de memòria de l'execució: només aquest pas queda sense mesurar, i els passos següents es mesuren.", "by": "machine", "model": "draft-prose", "source": "8eb155bc7db5271e37fbe52be0802e798c74b6f7da1cda52acd563b4e692ad0f"}
   }
 }

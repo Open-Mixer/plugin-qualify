@@ -2,7 +2,7 @@
   "$id": "https://openmixer.org/contract/qualification",
   "info": {
     "title": "What a qualification measures and records",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "x-owner": "plugin-qualify"
   },
   "components": {
@@ -218,6 +218,14 @@
             "description": "The run did not cover this plugin for this dimension.",
             "x-text": "The run did not cover this plugin for this dimension.",
             "x-group": "not-attempted"
+          },
+          {
+            "const": "memory-bound",
+            "title": "memoryBound",
+            "description": "A measurement pass did not fit the memory bound the run set: that pass alone is unmeasured, and the passes after it are measured.",
+            "x-code": 18,
+            "x-text": "A measurement pass did not fit the memory bound the run set: that pass alone is unmeasured, and the passes after it are measured.",
+            "x-group": "probe-failed"
           }
         ]
       },
