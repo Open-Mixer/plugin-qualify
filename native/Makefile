@@ -40,9 +40,9 @@ CLAP_REF := 1.2.6
 PLUGIN_HOSTD_PROTOCOL_REF := v0.5.10
 PLUGIN_DB_REF := v0.4.5
 # the omx-contract `make deps` fetches where no omx-contract-devel is installed: the packages' floor, so the build
-# reads the contract the packages do (3.20.0, the floor; 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer
+# reads the contract the packages do (3.19.0, the floor; 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer
 # every tool here spells its literals through).
-OMX_CONTRACT_VERSION := 3.20.0
+OMX_CONTRACT_VERSION := 3.19.0
 # the omx-clap-core whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
 # packages' floor
 OMX_CLAP_CORE_VERSION := 0.32.5

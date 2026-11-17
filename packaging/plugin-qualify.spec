@@ -22,7 +22,7 @@ BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
 BuildRequires: pkgconfig(plugin-db) >= 0.4.5
 BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.10
-BuildRequires: pkgconfig(omx-contract) >= 3.20.0
+BuildRequires: pkgconfig(omx-contract) >= 3.19.0
 BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
 BuildRequires: pkgconfig(omxdsp) >= 0.32.2
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
@@ -230,7 +230,7 @@ the English source sentence.
 
 %changelog
 * Sun Nov 15 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.6-1
-- Built and run against the 3.19.0 pass's releases: omx-contract >= 3.20.0 and
+- Built and run against the 3.19.0 pass's releases: omx-contract >= 3.19.0 and
   below 4, plugin-hostd-protocol >= 0.5.10, plugin-db >= 0.4.5, omx-dsp >=
   0.32.2, plugin-hostd >= 0.20.8, and omx-clap-host, omx-clap-core and omx-clap-
   lv2 >= 0.32.5 (the property work shipped there); each below
