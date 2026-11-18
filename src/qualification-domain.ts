@@ -30,8 +30,12 @@ const DOMAIN_DOCUMENT_SCHEMA = {
     $id: { type: "string" },
     info: {
       type: "object",
-      required: ["title", "version"],
-      properties: { title: { type: "string" }, version: { type: "string", pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" } },
+      required: ["title", "version", "x-stability"],
+      properties: {
+        title: { type: "string" },
+        version: { type: "string", pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "x-stability": { enum: ["experimental", "stable"] },
+      },
     },
     components: {
       type: "object",

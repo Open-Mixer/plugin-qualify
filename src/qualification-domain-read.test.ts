@@ -90,6 +90,27 @@ describe("a page hands the document", () => {
     expect(() => init({ ...doc, $schema: undefined })).toThrow(/\$schema/);
     expect(() => init({ ...doc, info: { ...doc.info, version: "0.0.1" } })).toThrow(/floor/);
   });
+  it("refuses a document without info.x-stability, or with a value outside experimental|stable, by name", async () => {
+    vi.resetModules();
+    const { init } = await import("./qualification-domain.js");
+    const doc = JSON.parse(readFileSync(join(CONTRACT_DIR, "qualification", "qualification.json"), "utf8"));
+    const { "x-stability": _dropped, ...info } = doc.info;
+    expect(() => init({ ...doc, info })).toThrow(/x-stability/);
+    expect(() => init({ ...doc, info: { ...info, "x-stability": "beta" } })).toThrow(/x-stability/);
+    expect(() => init({ ...doc, info: { ...info, "x-stability": "stable" } })).not.toThrow();
+  });
+  it("the node reader refuses the same", () => {
+    const bad = withWord();
+    try {
+      const file = join(bad, "qualification", "qualification.json");
+      const d = JSON.parse(readFileSync(file, "utf8"));
+      d.info["x-stability"] = "beta";
+      writeFileSync(file, JSON.stringify(d));
+      expect(() => openQualificationDomainAt(bad)).toThrow(/x-stability/);
+    } finally {
+      rmSync(bad, { recursive: true, force: true });
+    }
+  });
   it("no browser-reachable module imports the Node reader", () => {
     for (const f of ["qualification-domain.ts", "measurement/vocabulary.ts", "qualification-record.ts"]) {
       expect(readFileSync(join(CONTRACT_DIR, "..", "src", f), "utf8"), f).not.toContain("qualification-domain-node");

@@ -15,6 +15,7 @@ const CONTRACT_DIR = join(PKG, "contract.d");
 const DOC = join(CONTRACT_DIR, "qualification", "qualification.json");
 const doc = JSON.parse(readFileSync(DOC, "utf8")) as {
   $schema?: string;
+  info?: { "x-stability"?: string };
   components: { schemas: Record<string, { oneOf: { const: string }[] }> };
 };
 
@@ -30,6 +31,9 @@ describe("the qualification domain document", () => {
       const keys = Object.keys((JSON.parse(readFileSync(join(dir, file), "utf8")) as { messages: Record<string, string> }).messages);
       for (const key of keys) expect(key.startsWith("QUALIFICATION_"), `${file}: ${key}`).toBe(true);
     }
+  });
+  it("states info.x-stability as experimental", () => {
+    expect(doc.info?.["x-stability"]).toBe("experimental");
   });
   it("states $schema as JSON Schema 2020-12", () => {
     expect(doc.$schema).toBe("https://json-schema.org/draft/2020-12/schema");
