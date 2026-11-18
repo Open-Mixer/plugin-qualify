@@ -151,3 +151,76 @@ describe("OMX_CONTRACT_PATH belongs to the CLI entry, never to the library", () 
     }
   });
 });
+
+describe("OMX_CONTRACT_PATH is a ':' list, the first directory holding the domain wins", () => {
+  const start = async (list: string) => {
+    vi.resetModules();
+    const node = await import("./qualification-domain-node.js");
+    const { qualificationDomain } = await import("./qualification-domain.js");
+    node.initFromEnv({ OMX_CONTRACT_PATH: list });
+    return qualificationDomain().words("QUALIFICATION_MEASUREMENT_VOICE_BASES");
+  };
+  it("reads the second entry when the first lacks the domain, ignoring empty entries", async () => {
+    const empty = mkdtempSync(join(tmpdir(), "qualification-empty-"));
+    try {
+      expect(await start(`${empty}::${CONTRACT_DIR}:`)).not.toContain("fixture-word");
+      const other = withWord();
+      try {
+        expect(await start(`${empty}:${other}`)).toContain("fixture-word");
+      } finally {
+        rmSync(other, { recursive: true, force: true });
+      }
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+  it("the first of two entries that both hold it wins", async () => {
+    const other = withWord();
+    try {
+      expect(await start(`${other}:${CONTRACT_DIR}`)).toContain("fixture-word");
+      expect(await start(`${CONTRACT_DIR}:${other}`)).not.toContain("fixture-word");
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  });
+  it("no entry holding it is refused by name, listing the directories tried", async () => {
+    const a = mkdtempSync(join(tmpdir(), "qualification-empty-"));
+    const b = mkdtempSync(join(tmpdir(), "qualification-empty-"));
+    try {
+      await expect(start(`${a}:${b}`)).rejects.toThrow(new RegExp(`qualification[^]*${a}[^]*${b}`));
+    } finally {
+      rmSync(a, { recursive: true, force: true });
+      rmSync(b, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("$id must be exactly the domain's", () => {
+  const doc = () => JSON.parse(readFileSync(join(CONTRACT_DIR, "qualification", "qualification.json"), "utf8"));
+  const dirWith = (edit: (d: Record<string, unknown>) => void): string => {
+    const dir = mkdtempSync(join(tmpdir(), "qualification-id-"));
+    cpSync(CONTRACT_DIR, dir, { recursive: true });
+    const d = doc();
+    edit(d);
+    writeFileSync(join(dir, "qualification", "qualification.json"), JSON.stringify(d));
+    return dir;
+  };
+  it("init(doc) refuses a wrong and a missing $id by name", async () => {
+    vi.resetModules();
+    const { init } = await import("./qualification-domain.js");
+    expect(() => init({ ...doc(), $id: "https://openmixer.org/contract/panel" })).toThrow(/\$id/);
+    const { $id: _gone, ...without } = doc();
+    expect(() => init(without)).toThrow(/\$id/);
+  });
+  it("the node reader refuses a wrong and a missing $id by name", () => {
+    const wrong = dirWith((d) => void (d.$id = "https://openmixer.org/contract/panel"));
+    const missing = dirWith((d) => void delete d.$id);
+    try {
+      expect(() => openQualificationDomainAt(wrong)).toThrow(/\$id/);
+      expect(() => openQualificationDomainAt(missing)).toThrow(/\$id/);
+    } finally {
+      rmSync(wrong, { recursive: true, force: true });
+      rmSync(missing, { recursive: true, force: true });
+    }
+  });
+});

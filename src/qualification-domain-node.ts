@@ -6,7 +6,7 @@
  * explicitly. Importing this module registers the installed reader, so a Node program that never calls `init` reads the
  * installed document at its first use. A browser-reachable module never imports this one (it has `node:fs`).
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   init,
@@ -47,10 +47,17 @@ export function openInstalledQualificationDomain(): QualificationDomain {
 registerInstalledReader(openInstalledQualificationDomain);
 
 /**
- * The start-up of a CLI entry point: when OMX_CONTRACT_PATH is set (a test and development override; production reads the
- * installed path), the domain is read from that directory, else it stays the installed one. Library code never calls it.
+ * The start-up of a CLI entry point: OMX_CONTRACT_PATH, when set, is a ':' list of directories each standing where the
+ * contract directory stands (omx-contract docs/contract-dir.md); empty entries are dropped and the first directory that holds
+ * the domain wins. None holding it is a refusal naming the directories tried. Unset, the domain stays the installed one.
+ * Production reads the installed path; library code never calls this.
  */
 export function initFromEnv(env: NodeJS.ProcessEnv = process.env): void {
-  const dir = env.OMX_CONTRACT_PATH;
-  if (dir !== undefined && dir !== "") init(read(join(dir, QUALIFICATION_DOMAIN, `${QUALIFICATION_DOMAIN}.json`)));
+  const list = (env.OMX_CONTRACT_PATH ?? "").split(":").filter((d) => d !== "");
+  if (list.length === 0) return;
+  const holder = list.find((d) => existsSync(join(d, QUALIFICATION_DOMAIN, `${QUALIFICATION_DOMAIN}.json`)));
+  if (holder === undefined) {
+    throw new QualificationDomainError(`OMX_CONTRACT_PATH`, `absent from every directory tried: ${list.join(", ")}`);
+  }
+  init(read(join(holder, QUALIFICATION_DOMAIN, `${QUALIFICATION_DOMAIN}.json`)));
 }
