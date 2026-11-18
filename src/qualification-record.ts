@@ -24,7 +24,7 @@ import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type Pro
 import type { VoicesHeld } from "./measurement/format.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
-import { MEASUREMENT_UNMEASURED_REASONS } from "@openmixer/omx-contract";
+import { qualificationDomain } from "./qualification-domain.js";
 import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
 
 export const QUALIFICATION_RECORD_SCHEMA = "plugin-qualify.qualification-record/1";
@@ -206,14 +206,27 @@ export type RecordGridPoint = Omit<ProbeGridPoint, "latency" | "memory"> & {
   readonly latencyMs?: number;
 };
 
-const UNMEASURED_WORDS: ReadonlySet<string> = new Set(Object.values(MEASUREMENT_UNMEASURED_REASONS).map((r) => r.word));
-const word = (key: keyof typeof MEASUREMENT_UNMEASURED_REASONS): string => MEASUREMENT_UNMEASURED_REASONS[key].word;
+/** The reasons the document declares, read at the first use and kept for the domain in use. */
+let unmeasured: { readonly domain: ReturnType<typeof qualificationDomain>; readonly entries: readonly { word: string; title: string }[]; readonly words: ReadonlySet<string> } | undefined;
+function unmeasuredReasons() {
+  const domain = qualificationDomain();
+  if (unmeasured?.domain !== domain) {
+    const entries = domain.entries("QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS");
+    unmeasured = { domain, entries, words: new Set(entries.map((r) => r.word)) };
+  }
+  return unmeasured;
+}
+const word = (title: string): string => {
+  const entry = unmeasuredReasons().entries.find((r) => r.title === title);
+  if (entry === undefined) throw new Error(`QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS: the document has no word titled ${title}`);
+  return entry.word;
+};
 
 /** The same, for the test. */
 export const memoryOfCellForTest = (p: ProbeGridPoint): Pick<RecordGridPoint, "memory"> => memoryOfCell(p);
 
 /** The contract's word for a cell whose run ended with this outcome, `probe-error` for one it has no word of. */
-export const unmeasuredWordOf = (outcome: string): string => OUTCOME_WORD[outcome] ?? word("probeError");
+export const unmeasuredWordOf = (outcome: string): string => outcomeWords()[outcome] ?? word("probeError");
 
 /** A cell's footprint with what it comes to; only a footprint with no reason beside it comes to anything a client may add up. */
 export function memoryOfCell(p: ProbeGridPoint): Pick<RecordGridPoint, "memory"> {
@@ -231,13 +244,13 @@ export function gridPointOf(output: ProbeOutput, p: ProbeGridPoint): RecordGridP
 }
 
 /** The unmeasured word of a cell whose run did not end well, by its outcome code. */
-const OUTCOME_WORD: Readonly<Record<string, string>> = {
+const outcomeWords = (): Readonly<Record<string, string>> => ({
   "probe.crashed": word("probeCrashed"),
   "probe.timeout": word("probeTimeout"),
   "probe.refused-instantiation": word("refusedInstantiation"),
   "probe.non-finite-output": word("nonFiniteOutput"),
   [PROBE_NOT_ATTEMPTED]: word("notAttempted"),
-};
+});
 
 /**
  * Why a cell has no latency figure. A cell whose run failed: its outcome's word. A latency step at the cell that did not
@@ -254,11 +267,11 @@ export function latencyOfCell(output: ProbeOutput, point: ProbeGridPoint): Recor
 
 function unmeasuredOfCell(output: ProbeOutput, point: ProbeGridPoint): UnmeasuredLatency {
   const code = HOSTING_CODE.latencyUnmeasured;
-  if (point.outcome !== PROBE_OK) return { unmeasuredReason: OUTCOME_WORD[point.outcome] ?? word("probeError"), code };
+  if (point.outcome !== PROBE_OK) return { unmeasuredReason: outcomeWords()[point.outcome] ?? word("probeError"), code };
   const step = output.steps.find((st) => st.step === "latency" && st.rate === point.rate && (st.quantum === undefined || st.quantum === point.quantum));
   if (step === undefined) return { unmeasuredReason: word("notAttempted"), code };
   const said = step.detail?.split(":")[0]?.trim() ?? "";
-  return { unmeasuredReason: UNMEASURED_WORDS.has(said) ? said : word("probeError"), code: step.hostingCode ?? code };
+  return { unmeasuredReason: unmeasuredReasons().words.has(said) ? said : word("probeError"), code: step.hostingCode ?? code };
 }
 
 /**

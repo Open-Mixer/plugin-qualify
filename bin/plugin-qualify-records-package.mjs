@@ -6,6 +6,7 @@
  * cell (rate and quantum). Every decision is in `src/records-package.ts`; this file reads argv, builds the packages,
  * names what stayed out of each on stderr and each package on a line of stdout, in cell order.
  */
+import "../dist/qualification-cli-start.js";
 import { buildRecordsPackages, parseRecordsPackageArgs, recordsPackageHelp } from "../dist/index.js";
 
 const log = (line) => process.stderr.write(`plugin-qualify-records-package: ${line}\n`);

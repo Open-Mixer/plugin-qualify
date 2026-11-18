@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 
 import { TEXT_CODE, type ReasonText } from "./text-codes.js";
 import { reasonText } from "./text-catalog.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 export const COMPARISON_RECORD_SCHEMA = "plugin-qualify.comparison-record/1";
 export const COMPARISON_SUMMARY_SCHEMA = "plugin-qualify.comparison-summary/1";
@@ -201,6 +202,10 @@ export function parseCompareArgs(argv: readonly string[]): ParseCompare {
 }
 
 export function compareHelpText(): string {
+  return withContractPathHelp(compareHelpTextBody());
+}
+
+function compareHelpTextBody(): string {
   return [
     "usage: plugin-qualify compare [options] (--all | <LV2 URI | bundle | .clap> ...)",
     "",
@@ -289,6 +294,10 @@ export function parseSummaryArgs(argv: readonly string[]): ParseSummary {
 }
 
 export function summaryHelpText(): string {
+  return withContractPathHelp(summaryHelpTextBody());
+}
+
+function summaryHelpTextBody(): string {
   return [
     "usage: plugin-qualify compare summary <dir> [--host-class <c> --set <s> --publish]",
     "",

@@ -6,6 +6,7 @@
  * settings file, runs one sync, prints its summary line and exits. The exit is 0 whenever the run went through,
  * whatever the plugins' verdicts: a refused plugin is a result, not a failure of the service.
  */
+import "../dist/qualification-cli-start.js";
 import { readFileSync } from "node:fs";
 
 import { SYNC_CONF, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText } from "../dist/index.js";

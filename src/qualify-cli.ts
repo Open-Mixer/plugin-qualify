@@ -22,6 +22,7 @@ import type { PluginLoader, PluginTarget } from "./loader.js";
 import { EXIT_CODE, OUTPUT_FORMATS, QUALIFY_OPTIONS, type OutputFormat } from "./qualify-options.js";
 import { GRID_FULL, parseGridSpec, type GridSpec } from "./measurement-grid.js";
 import { parseMemoryLimit } from "./memory-bound.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 export interface QualifyArgs {
   readonly all: boolean;
@@ -136,6 +137,10 @@ export function parseQualifyArgs(argv: readonly string[]): ParseResult {
 }
 
 export function helpText(): string {
+  return withContractPathHelp(helpTextBody());
+}
+
+function helpTextBody(): string {
   const rows = QUALIFY_OPTIONS.map((o) => {
     const left = o.value === undefined ? o.flag : `${o.flag} <${o.value}>`;
     const def = o.default === undefined ? "" : ` (default: ${o.default})`;

@@ -24,6 +24,7 @@ import { cellKey, type GridCell } from "./measurement-grid.js";
 import { DISTRIBUTED_DIR_SYSTEM, recordCells, DISTRIBUTED_PROVENANCE_FILE, DISTRIBUTED_PROVENANCE_SCHEMA, type DistributedProvenance } from "./distributed-records.js";
 import { sha256Hex } from "./probe-output.js";
 import { QUALIFICATION_RECORD_SCHEMA } from "./qualification-record.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 export interface RecordsPackageArgs {
   /** Qualification directories, or run roots holding `b<rate>-<quantum>/qualification`: one set per cell. */
@@ -48,6 +49,10 @@ const KIB = 2 ** 10;
 const DEB_VERSION = /^[0-9][A-Za-z0-9.+~]*$/;
 
 export function recordsPackageHelp(): string {
+  return withContractPathHelp(recordsPackageHelpBody());
+}
+
+function recordsPackageHelpBody(): string {
   return [
     "plugin-qualify-records-package: the Debian package of a device's qualification records, for the distributed layer",
     "",

@@ -13,6 +13,7 @@
  * `--all` finds the LV2 plugins of the bundles on the LV2 path, then the CLAP plugins on the standard CLAP search path (`CLAP_PATH`, then `~/.clap`, then
  * `/usr/lib/clap`). `plugin-qualify judge` judges probe outputs already written.
  */
+import "../dist/qualification-cli-start.js";
 import { readFileSync } from "node:fs";
 
 import {

@@ -49,6 +49,7 @@ import { QUALIFICATION_RECORD_SCHEMA, descriptorNamePart, latencyNeverTaken, rew
 import { ADMIT_STEP_MS_ENV, DESCRIPTOR_DIR_STATE_SUBDIR, DESCRIPTOR_DIR_SYSTEM, MEMORY_PASS_PROBE_NOTES, QUALIFY_QUANTA, QUALIFY_RATES } from "./qualify-declarations.js";
 import { toolsDir } from "./tool-paths.js";
 import { writeFileWhole } from "./whole-file.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 // --- the settings -----------------------------------------------------------------------------------------------------
 
@@ -201,6 +202,10 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
 }
 
 export function syncHelpText(): string {
+  return withContractPathHelp(syncHelpTextBody());
+}
+
+function syncHelpTextBody(): string {
   const rows = SYNC_SETTINGS.map((s) => `  ${`${flagOf(s.key)} <value>`.padEnd(36)}${s.meaning}${s.default === "" ? "" : ` (default: ${s.default})`}`);
   return [
     "plugin-qualify-sync: qualify every plugin on the search paths once, and again when its files change",

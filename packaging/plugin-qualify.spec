@@ -91,6 +91,10 @@ install -m 0755 packaging/trigger-scan.sh %{buildroot}%{_libexecdir}/%{name}/tri
 install -d %{buildroot}%{_datadir}/%{name}/catalogs
 install -m 0644 catalogs/*.json %{buildroot}%{_datadir}/%{name}/catalogs/
 rm -r %{buildroot}%{_prefix}/lib/node_modules/@openmixer/plugin-qualify/catalogs
+# the qualification domain, into omx-contract's contract directory (docs/contract-dir.md, "Domains"), with its catalogs
+install -D -m 0644 contract.d/qualification/qualification.json %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/qualification.json
+install -d %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/catalogs
+install -m 0644 contract.d/qualification/catalogs/*.json %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/catalogs/
 
 # the preset enables the timer and the path unit; nothing here runs a sweep: the timer fires at the next boot,
 # and the path unit, armed once the transaction is over, waits for a minute of quiet before its first run
@@ -126,6 +130,9 @@ fi
 %{_bindir}/plugin-qualify
 %{_bindir}/plugin-qualify-sync
 %{_bindir}/plugin-qualify-records-package
+%dir %{_datadir}/omx-contract/contract.d/qualification
+%{_datadir}/omx-contract/contract.d/qualification/qualification.json
+%{_datadir}/omx-contract/contract.d/qualification/catalogs/
 %{_mandir}/man1/plugin-qualify.1*
 %{_mandir}/man1/plugin-qualify-sync.1*
 %{_mandir}/man1/plugin-qualify-records-package.1*

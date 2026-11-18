@@ -12,6 +12,7 @@ import { hostClassOf, readBoardModel, readMachine } from "./distributed-records.
 import { HOSTING_EPOCH, JUDGED_HOST } from "./judged-layer.js";
 import { judgementRules } from "./judgement-line.js";
 import { QUALIFICATION_RECORD_SCHEMA } from "./qualification-record.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 /** The facts of here, by plugin-db's keys. */
 export interface HereFacts {
@@ -69,6 +70,10 @@ export function parseHereArgs(argv: readonly string[]): { ok: true; args: HereAr
 }
 
 export function hereHelpText(): string {
+  return withContractPathHelp(hereHelpTextBody());
+}
+
+function hereHelpTextBody(): string {
   return [
     "usage: plugin-qualify here [--json] [--config <file>]",
     "",
