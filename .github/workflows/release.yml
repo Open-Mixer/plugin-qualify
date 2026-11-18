@@ -203,6 +203,21 @@ jobs:
         env:
           IMAGE: ${{ matrix.image }}
 
+      # a module the installed program imports at run time that the package does not carry (ajv, for the qualification
+      # domain's reader) fails here by name, before any plugin is measured; the domain itself opens from the contract
+      # directory the contract package installed
+      - name: The installed program loads its run-time modules and its domain
+        if: steps.pkgs.outcome == 'success'
+        run: |
+          set -euo pipefail
+          dir=/usr/lib/node_modules/@openmixer/plugin-qualify
+          node --input-type=module -e "
+            const { openQualificationDomainAt } = await import('$dir/dist/qualification-domain-node.js');
+            await import('$dir/dist/index.js');
+            const d = openQualificationDomainAt('/usr/share/omx-contract/contract.d');
+            if (!d) throw new Error('the qualification domain did not open');
+          "
+
       - name: Build the fixture plugins
         if: steps.pkgs.outcome == 'success'
         run: |
