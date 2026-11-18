@@ -37,6 +37,12 @@ cp -rL node_modules/@openmixer/omx-contract/. "$dep"/
 mods=$target/node_modules
 mkdir -p "$mods"
 cp -rL "$(dirname "$(readlink -f node_modules/ajv)")"/. "$mods"/
+# only what each package publishes: no dotfile (lint configs, version-control files), no spec, test or benchmark
+# directory, no lint or compiler configuration (lintian refuses them); the same list omx-contract's install prunes
+# bundled-prune begin
+find "$mods" -mindepth 2 -maxdepth 2 \( -name '.*' -o -name test -o -name spec -o -name benchmark \
+  -o -name 'eslint.config.*' -o -name 'tsconfig*.json' \) -exec rm -rf {} +
+# bundled-prune end
 # the package's one document is its README in the doc directory: no page rides along inside node_modules
 find "$target" "$dep" -name '*.md' -delete
 install -m 0644 packaging/plugin-qualify.1 packaging/plugin-qualify-sync.1 packaging/plugin-qualify-records-package.1 "$dest/usr/share/man/man1/"
