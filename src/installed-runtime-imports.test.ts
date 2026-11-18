@@ -6,7 +6,9 @@
  * A bare import in the shipped code (a type-only import is erased) that neither names would fail at start-up on an
  * installed machine, as ajv did for the qualification domain's reader.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -35,6 +37,26 @@ describe("the installed package carries what it imports", () => {
     for (const n of wanted) {
       expect(deps, `${n} is imported at run time, so it is a dependency`).toContain(n);
       expect(build, `packaging/build.sh copies ${n} into the installed tree`).toContain(n === "@openmixer/omx-contract" ? n : `node_modules/${n}`);
+    }
+  });
+});
+
+describe("the bundled dependency trees carry only what the packages publish", () => {
+  it("build.sh's pruning step removes dotfiles, spec and test directories from every bundled package", () => {
+    const build = readFileSync(join(PKG, "packaging/build.sh"), "utf8");
+    const step = /^# bundled-prune begin\n([\s\S]*?)^# bundled-prune end$/m.exec(build)?.[1];
+    expect(step, "build.sh marks its pruning step (bundled-prune begin/end)").toBeDefined();
+    const mods = mkdtempSync(join(tmpdir(), "bundled-"));
+    try {
+      for (const f of ["lib/index.js", "package.json", ".eslintrc.yml", ".gitattributes", ".github/ci.yml", "spec/.eslintrc.yml", "spec/a.spec.js", "test/a.js"]) {
+        mkdirSync(dirname(join(mods, "pkg", f)), { recursive: true });
+        writeFileSync(join(mods, "pkg", f), "x\n");
+      }
+      execFileSync("bash", ["-c", `set -euo pipefail\nmods=${JSON.stringify(mods)}\n${step}`]);
+      const left = execFileSync("find", [mods, "-type", "f"], { encoding: "utf8" }).split("\n").filter(Boolean).map((f) => f.slice(mods.length + 1)).sort();
+      expect(left).toEqual(["pkg/lib/index.js", "pkg/package.json"]);
+    } finally {
+      rmSync(mods, { recursive: true, force: true });
     }
   });
 });
