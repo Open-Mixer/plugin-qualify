@@ -3,7 +3,7 @@
 /**
  * The qualification domain (contract.d/qualification/) ships in the plugin-qualify-contract subpackage (noarch data in
  * the rpm, an Architecture: all binary package in the deb), never in the main package, and is installed by ONE
- * implementation: omx-contract's installer in its domain mode (`make install-contract`). The installed tree opens with
+ * implementation: omx-contract's installer in its domain mode (`install-contract-dir.sh --domain`, called from the spec's %install and debian/rules). The installed tree opens with
  * the reader, and the tree is in omx-contract's one formatting. Needs omx-contract (pkg-config omx-contract) with the
  * installer's domain mode and `omx-contract fmt` (3.20.0).
  */
@@ -38,11 +38,12 @@ describe("the qualification domain's installation", () => {
   beforeAll(() => {
     dest = mkdtempSync(join(tmpdir(), "pq-contract-"));
     contractdir = pc("contractdir");
-    execFileSync("make", ["install-contract", `DESTDIR=${dest}`], { cwd: PKG, stdio: "pipe" });
+    // the one-line call the spec and debian/rules make, into a temporary root
+    execFileSync("sh", [join(pc("datadir"), "install-contract-dir.sh"), "--domain", "contract.d/qualification", join(dest, contractdir)], { cwd: PKG, stdio: "pipe" });
   });
   afterAll(() => rmSync(dest, { recursive: true, force: true }));
 
-  it("make install-contract puts the document and its catalogs, byte for byte, in the contract directory and nowhere else", () => {
+  it("the installer's domain mode puts the document and its catalogs, byte for byte, in the contract directory and nowhere else", () => {
     const want = files(join(PKG, "contract.d", "qualification"));
     expect(want).toContain("qualification.json");
     expect(want.filter((f) => f.startsWith("catalogs/")).length).toBeGreaterThan(0);
@@ -60,10 +61,16 @@ describe("the qualification domain's installation", () => {
     expect(d).toBeDefined();
   });
 
-  it("the Makefile installs through the installer's domain mode and types no install line for the domain", () => {
-    const mk = read("Makefile");
-    expect(mk).toMatch(/install-contract-dir\.sh" --domain contract\.d\/qualification/);
-    expect(mk).not.toMatch(/^\s*(@)?install .*qualification/m);
+  it("the spec and debian/rules each call the installer's domain mode and type no install line for the domain", () => {
+    const spec = read("packaging/plugin-qualify.spec");
+    const install = spec.slice(spec.indexOf("\n%install\n"), spec.indexOf("\n%post\n"));
+    const call = /install-contract-dir\.sh" --domain contract\.d\/qualification\b.*contractdir omx-contract\)/;
+    expect(install).toMatch(call);
+    expect(install).toContain("%{buildroot}");
+    const rules = read("debian/rules");
+    expect(rules).toMatch(call);
+    expect(rules).toMatch(/--domain contract\.d\/qualification[^\n]*debian\/tmp/);
+    for (const t of [install, rules]) expect(t).not.toMatch(/^\s*install .*contract\.d\/qualification/m);
   });
 });
 
@@ -90,7 +97,6 @@ describe("the qualification domain's packages", () => {
     expect(stanza(control, "Package: plugin-qualify\n")).toMatch(/^Depends: .*plugin-qualify-contract \(= \$\{source:Version\}\)/m);
     const rules = read("debian/rules");
     expect(rules).not.toMatch(/install .*contract\.d\/qualification/);
-    expect(rules).toMatch(/make install-contract DESTDIR=\$\(CURDIR\)\/debian\/tmp/i);
     expect(existsMainInstall()).toBe(false);
   });
 });
@@ -105,6 +111,7 @@ function existsMainInstall(): boolean {
 
 describe("the qualification document's formatting", () => {
   it("omx-contract fmt --check --contract-dir contract.d passes", () => {
-    execFileSync("omx-contract", ["fmt", "--check", "--contract-dir", "contract.d"], { cwd: PKG, stdio: "pipe" });
+    // the installed command (npx puts an older one first on PATH)
+    execFileSync(join(pc("prefix"), "bin", "omx-contract"), ["fmt", "--check", "--contract-dir", "contract.d"], { cwd: PKG, stdio: "pipe" });
   });
 });
