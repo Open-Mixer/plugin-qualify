@@ -13,8 +13,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import * as contract from "./qualification-vocabulary.generated.js";
 import { describe, expect, it } from "vitest";
+import { openQualificationDomainAt } from "./qualification-domain.js";
 import { clapCoreTsDirCandidates, isHostingTableName } from "../tools/clap-core-tsdir.mjs";
 import { OUT as GENERATED_HOSTING_CODES, hostingCodesFileFrom } from "../tools/gen-hosting-codes.mjs";
 import { HOSTING_CODE } from "./hosting-codes.js";
@@ -161,25 +161,26 @@ describe("HOSTING_CODE is omx-clap-core's hosting tables, in full", () => {
 });
 
 /** The words of a contract item, in its order. */
-const words = (name: string): readonly string[] => (contract as unknown as Record<string, readonly string[]>)[`${name}_WORDS`]!;
+const domain = openQualificationDomainAt(join(PKG, "contract.d"));
+const words = (name: string): readonly string[] => domain.words(name);
 const codes = (terms: readonly { readonly code: string }[]): string[] => terms.map((t) => t.code);
 
 describe("every measurement word list is the contract's, in its order", () => {
   it.each([
-    ["UNMEASURED_TERMS", () => codes(UNMEASURED_TERMS), words("MEASUREMENT_UNMEASURED_REASONS")],
-    ["SCALING_TERMS", () => codes(SCALING_TERMS), words("MEASUREMENT_LATENCY_SCALING")],
-    ["SCALING_NOTE_TERMS", () => codes(SCALING_NOTE_TERMS), words("MEASUREMENT_LATENCY_SCALING_NOTES")],
-    ["EXCLUSION_TERMS", () => codes(EXCLUSION_TERMS), words("MEASUREMENT_LATENCY_EXCLUSIONS")],
+    ["UNMEASURED_TERMS", () => codes(UNMEASURED_TERMS), words("QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS")],
+    ["SCALING_TERMS", () => codes(SCALING_TERMS), words("QUALIFICATION_MEASUREMENT_LATENCY_SCALING")],
+    ["SCALING_NOTE_TERMS", () => codes(SCALING_NOTE_TERMS), words("QUALIFICATION_MEASUREMENT_LATENCY_SCALING_NOTES")],
+    ["EXCLUSION_TERMS", () => codes(EXCLUSION_TERMS), words("QUALIFICATION_MEASUREMENT_LATENCY_EXCLUSIONS")],
     [
       "METHOD_TERMS",
       () => codes(METHOD_TERMS),
-      [...words("MEASUREMENT_LATENCY_METHODS"), ...words("MEASUREMENT_COST_METHODS")],
+      [...words("QUALIFICATION_MEASUREMENT_LATENCY_METHODS"), ...words("QUALIFICATION_MEASUREMENT_COST_METHODS")],
     ],
-    ["MEASUREMENT_DIMENSIONS", () => [...MEASUREMENT_DIMENSIONS], words("MEASUREMENT_DIMENSIONS")],
-    ["VERDICT_RATINGS", () => [...VERDICT_RATINGS], words("MEASUREMENT_VERDICT_RATINGS")],
-    ["VOICE_BASES", () => [...VOICE_BASES], words("MEASUREMENT_VOICE_BASES")],
-    ["HOST_ISOLATIONS", () => [...HOST_ISOLATIONS], words("RESOURCE_HOST_ISOLATIONS")],
-    ["HOST_LATENCY_HANDLING", () => [...HOST_LATENCY_HANDLING], words("RESOURCE_HOST_LATENCY_HANDLING")],
+    ["MEASUREMENT_DIMENSIONS", () => [...MEASUREMENT_DIMENSIONS], words("QUALIFICATION_MEASUREMENT_DIMENSIONS")],
+    ["VERDICT_RATINGS", () => [...VERDICT_RATINGS], words("QUALIFICATION_MEASUREMENT_VERDICT_RATINGS")],
+    ["VOICE_BASES", () => [...VOICE_BASES], words("QUALIFICATION_MEASUREMENT_VOICE_BASES")],
+    ["HOST_ISOLATIONS", () => [...HOST_ISOLATIONS], words("QUALIFICATION_RESOURCE_HOST_ISOLATIONS")],
+    ["HOST_LATENCY_HANDLING", () => [...HOST_LATENCY_HANDLING], words("QUALIFICATION_RESOURCE_HOST_LATENCY_HANDLING")],
   ] as const)("%s", (_name, ours, theirs) => {
     expect(theirs.length).toBeGreaterThan(0);
     expect(ours()).toEqual([...theirs]);
@@ -187,7 +188,7 @@ describe("every measurement word list is the contract's, in its order", () => {
 
   it("each unmeasured reason's kind is the contract's group", () => {
     const groups = Object.fromEntries(
-      Object.values(contract.MEASUREMENT_UNMEASURED_REASONS).map((r) => [r.word, r.group as string]),
+      domain.entries("QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS").map((r) => [r.word, r.group as string]),
     );
     for (const term of UNMEASURED_TERMS) expect(term.kind, term.code).toBe(groups[term.code]);
   });
@@ -237,25 +238,25 @@ const WRITERS: readonly Writer[] = [
     files: isSource,
     // unmeasuredReason: "x" (TS), c->unmeasured = "x" / pin->reason = "x" (C), "unmeasurable": "x" (Python)
     words: captured(/(?:\bunmeasured(?:Reason)?|->reason|"unmeasurable")\s*[:=]\s*"([^"]+)"/g),
-    vocabulary: words("MEASUREMENT_UNMEASURED_REASONS"),
+    vocabulary: words("QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS"),
   },
   {
     what: "unmeasured reason a probe line maps to",
     files: (rel) => rel === "src/measurement/probe-json.ts",
     words: captured(/\{\s*match:\s*\/[^\n]*\/,\s*code:\s*"([^"]+)"\s*\}/g),
-    vocabulary: words("MEASUREMENT_UNMEASURED_REASONS"),
+    vocabulary: words("QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS"),
   },
   {
     what: "method",
     files: isSource,
     words: captured(/\bmethod:\s*"([^"]+)"/g),
-    vocabulary: [...words("MEASUREMENT_LATENCY_METHODS"), ...words("MEASUREMENT_COST_METHODS")],
+    vocabulary: [...words("QUALIFICATION_MEASUREMENT_LATENCY_METHODS"), ...words("QUALIFICATION_MEASUREMENT_COST_METHODS")],
   },
   {
     what: "scaling law benchmark.py fits",
     files: (rel) => rel === "tools/benchmark.py",
     words: pythonReturns("_fit_scaling"),
-    vocabulary: words("MEASUREMENT_LATENCY_SCALING"),
+    vocabulary: words("QUALIFICATION_MEASUREMENT_LATENCY_SCALING"),
   },
 ];
 

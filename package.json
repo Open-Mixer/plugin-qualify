@@ -86,7 +86,7 @@
     "test": "vitest run src",
     "lint": "tsc -p tsconfig.lint.json",
     "test:py": "python3 -m pytest tools -q",
-    "check:generated": "node tools/gen-python-declarations.mjs --check && node tools/gen-hosting-codes.mjs --check && node tools/gen-text-codes.mjs --check && node tools/gen-qualification-words.mjs --check",
+    "check:generated": "node tools/gen-python-declarations.mjs --check && node tools/gen-hosting-codes.mjs --check && node tools/gen-text-codes.mjs --check",
     "check:private-refs": "${FREEMIXER_DOTGITHUB:-../freemixer-dotgithub}/.github/actions/private-refs-check/check.sh ."
   },
   "devDependencies": {
@@ -100,6 +100,8 @@
     "provenance": true
   },
   "dependencies": {
-    "@openmixer/omx-contract": "^3.12.0"
+    "@openmixer/omx-contract": "^3.12.0",
+    "ajv": "8.20.0",
+    "json-schema-to-ts": "3.1.1"
   }
 }

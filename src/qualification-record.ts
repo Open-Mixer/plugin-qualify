@@ -24,7 +24,7 @@ import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type Pro
 import type { VoicesHeld } from "./measurement/format.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
-import { MEASUREMENT_UNMEASURED_REASONS } from "./qualification-vocabulary.generated.js";
+import { qualificationDomain } from "./qualification-domain.js";
 import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
 
 export const QUALIFICATION_RECORD_SCHEMA = "plugin-qualify.qualification-record/1";
@@ -206,8 +206,14 @@ export type RecordGridPoint = Omit<ProbeGridPoint, "latency" | "memory"> & {
   readonly latencyMs?: number;
 };
 
-const UNMEASURED_WORDS: ReadonlySet<string> = new Set(Object.values(MEASUREMENT_UNMEASURED_REASONS).map((r) => r.word));
-const word = (key: keyof typeof MEASUREMENT_UNMEASURED_REASONS): string => MEASUREMENT_UNMEASURED_REASONS[key].word;
+/** The reasons the document declares, read once at start-up, and the word a name of the code stands for. */
+const UNMEASURED_ENTRIES = qualificationDomain().entries("QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS");
+const UNMEASURED_WORDS: ReadonlySet<string> = new Set(UNMEASURED_ENTRIES.map((r) => r.word));
+const word = (title: string): string => {
+  const entry = UNMEASURED_ENTRIES.find((r) => r.title === title);
+  if (entry === undefined) throw new Error(`QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS: the document has no word titled ${title}`);
+  return entry.word;
+};
 
 /** The same, for the test. */
 export const memoryOfCellForTest = (p: ProbeGridPoint): Pick<RecordGridPoint, "memory"> => memoryOfCell(p);

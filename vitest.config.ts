@@ -11,6 +11,7 @@ const HANG_GUARD_MS = 900_000;
 
 export default defineConfig({
   test: {
+    setupFiles: ['./src/test-setup.ts'],
     testTimeout: HANG_GUARD_MS,
     hookTimeout: HANG_GUARD_MS,
     expect: { poll: { timeout: HANG_GUARD_MS } },
