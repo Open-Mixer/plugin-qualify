@@ -91,10 +91,10 @@ install -m 0755 packaging/trigger-scan.sh %{buildroot}%{_libexecdir}/%{name}/tri
 install -d %{buildroot}%{_datadir}/%{name}/catalogs
 install -m 0644 catalogs/*.json %{buildroot}%{_datadir}/%{name}/catalogs/
 rm -r %{buildroot}%{_prefix}/lib/node_modules/@openmixer/plugin-qualify/catalogs
-# the qualification domain, into omx-contract's contract directory (docs/contract-dir.md, "Domains"), with its catalogs
-install -D -m 0644 contract.d/qualification/qualification.json %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/qualification.json
-install -d %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/catalogs
-install -m 0644 contract.d/qualification/catalogs/*.json %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/catalogs/
+# the qualification domain, into omx-contract's contract directory (docs/contract-dir.md, "Domains") by the installer's
+# domain mode, catalogs included: the one implementation, no install line of its own
+sh "$(pkg-config --variable=datadir omx-contract)/install-contract-dir.sh" --domain contract.d/qualification \
+  "%{buildroot}$(pkg-config --variable=contractdir omx-contract)"
 
 # the preset enables the timer and the path unit; nothing here runs a sweep: the timer fires at the next boot,
 # and the path unit, armed once the transaction is over, waits for a minute of quiet before its first run
