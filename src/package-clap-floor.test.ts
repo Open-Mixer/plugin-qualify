@@ -28,6 +28,22 @@ describe("the spec and debian/control agree on the CLAP floor (#30)", () => {
     );
   });
 
+  it("refuses a ceiling on the spec's pkgconfig(clap) by name (red arm: floor-only, #107)", () => {
+    const withCeiling = SPEC.replace("BuildRequires: pkgconfig(clap) >= 1.2.10", "BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)");
+    expect(withCeiling).not.toBe(SPEC);
+    expect(checkClapFloor(withCeiling, CONTROL)).toBe(
+      "packaging/plugin-qualify.spec: a pkgconfig(clap) ceiling is refused (floors only), found: pkgconfig(clap) < 2",
+    );
+  });
+
+  it("refuses a ceiling on debian/control's clap-headers by name (red arm: floor-only, #107)", () => {
+    const withCeiling = CONTROL.replace("clap-headers (>= 1.2.10~),", "clap-headers (>= 1.2.10~), clap-headers (<< 2~),");
+    expect(withCeiling).not.toBe(CONTROL);
+    expect(checkClapFloor(SPEC, withCeiling)).toBe(
+      "debian/control: a clap-headers ceiling is refused (floors only), found: clap-headers (<< 2~)",
+    );
+  });
+
   it("a missing pkgconfig(clap) constraint in the spec fails rather than throwing", () => {
     expect(checkClapFloor("", CONTROL)).toBe("packaging/plugin-qualify.spec: no pkgconfig(clap) constraint found");
   });
