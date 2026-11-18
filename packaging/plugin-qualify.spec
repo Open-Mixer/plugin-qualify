@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.5
+Version:        0.20.6
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -246,6 +246,15 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Wed Nov 18 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.6-1
+- the qualification domain ships in the new plugin-qualify-contract package and is
+  read at run time (#105, #109)
+- ajv now ships in the package; the installed program failed to start since #105 (#109)
+- dependencies state floors only, no upper bound (#109)
+- the sync fills plugin-db's store, in plugin-db's grammar (#73, #77)
+- schema addresses in the descriptor writers and their field fixtures name
+  https://openmixer.org/schema/omx-contract/v3/ (#108)
+
 * Sat Nov 14 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.5-1
 - built and run against the 3.18.0 pass's releases: omx-contract >= 3.18.0 and < 4;
   omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.32.5 and < 0.33; plugin-hostd
