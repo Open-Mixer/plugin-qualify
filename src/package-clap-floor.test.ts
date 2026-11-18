@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The RPM spec and `debian/control` each declare a CLAP floor and ceiling independently; nothing
+ * The RPM spec and `debian/control` each declare a CLAP floor independently; nothing
  * ties them together, and they drifted (the spec stayed at 1.2.7 after `debian/control` moved to
- * 1.2.10, #30). This holds them to the same floor and ceiling.
+ * 1.2.10, #30). This holds them to the same floor.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -15,16 +15,21 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SPEC = readFileSync(join(ROOT, "packaging/plugin-qualify.spec"), "utf8");
 const CONTROL = readFileSync(join(ROOT, "debian/control"), "utf8");
 
-describe("the spec and debian/control agree on the CLAP floor and ceiling (#30)", () => {
+describe("the spec and debian/control agree on the CLAP floor (#30)", () => {
   it("passes for this tree", () => {
     expect(checkClapFloor(SPEC, CONTROL)).toBeNull();
+  });
+
+  it("neither file states a ceiling for CLAP", () => {
+    expect(SPEC).not.toMatch(/pkgconfig\(clap\)\s*</);
+    expect(CONTROL).not.toMatch(/clap-headers \(<</);
   });
 
   it("sabotage: the spec's old 1.2.7 floor against debian/control's 1.2.10 fails", () => {
     const sabotaged = SPEC.replace("pkgconfig(clap) >= 1.2.10", "pkgconfig(clap) >= 1.2.7");
     expect(sabotaged).not.toBe(SPEC);
     expect(checkClapFloor(sabotaged, CONTROL)).toBe(
-      "the CLAP floor/ceiling differ: packaging/plugin-qualify.spec has >= 1.2.7, < 2; debian/control has >= 1.2.10, << 2",
+      "the CLAP floor differs: packaging/plugin-qualify.spec has >= 1.2.7; debian/control has >= 1.2.10",
     );
   });
 

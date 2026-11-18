@@ -162,7 +162,8 @@ jobs:
             done
             return 1
           }
-          dnf_retry ./pkgs/plugin-qualify-[0-9]*.x86_64.rpm
+          # the main package requires plugin-qualify-contract of the same version: both files, from the same build
+          dnf_retry ./pkgs/plugin-qualify-[0-9]*.x86_64.rpm ./pkgs/plugin-qualify-contract-[0-9]*.noarch.rpm
           rpm -q omx-clap-host
           rpm -qf /usr/share/omx-clap-core/ts | grep -q '^omx-clap-core-[0-9]'
           if rpm -qa --qf '%{NAME}\n' | grep -E -- '-devel$'; then echo "plugin-qualify pulled a -devel package"; exit 1; fi
@@ -189,7 +190,8 @@ jobs:
         run: |
           set -euo pipefail
           suite=${IMAGE#debian:}
-          apt-get install -y ./pkgs/"$suite"/plugin-qualify_*.deb
+          # the main package depends on plugin-qualify-contract of the same version: both files, from the same build
+          apt-get install -y ./pkgs/"$suite"/plugin-qualify_*.deb ./pkgs/"$suite"/plugin-qualify-contract_*.deb
           dpkg -s omx-clap-host >/dev/null
           dpkg -S /usr/share/omx-clap-core/ts | grep -q '^libomx-clap-core1'
           if dpkg-query -W -f '${Package}\n' | grep -E -- '-dev$'; then echo "plugin-qualify pulled a -dev package"; exit 1; fi
@@ -200,6 +202,21 @@ jobs:
           apt-get install -y --no-install-recommends gcc libc6-dev make pkgconf clap-headers lv2-dev
         env:
           IMAGE: ${{ matrix.image }}
+
+      # a module the installed program imports at run time that the package does not carry (ajv, for the qualification
+      # domain's reader) fails here by name, before any plugin is measured; the domain itself opens from the contract
+      # directory the contract package installed
+      - name: The installed program loads its run-time modules and its domain
+        if: steps.pkgs.outcome == 'success'
+        run: |
+          set -euo pipefail
+          dir=/usr/lib/node_modules/@openmixer/plugin-qualify
+          node --input-type=module -e "
+            const { openQualificationDomainAt } = await import('$dir/dist/qualification-domain-node.js');
+            await import('$dir/dist/index.js');
+            const d = openQualificationDomainAt('/usr/share/omx-contract/contract.d');
+            if (!d) throw new Error('the qualification domain did not open');
+          "
 
       - name: Build the fixture plugins
         if: steps.pkgs.outcome == 'success'

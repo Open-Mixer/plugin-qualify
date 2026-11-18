@@ -17,20 +17,22 @@ BuildRequires: npm
 BuildRequires: gcc
 BuildRequires: make
 BuildRequires: pkgconfig
-BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
+BuildRequires: pkgconfig(clap) >= 1.2.10
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: (pkgconfig(plugin-db) >= 0.4.4 with pkgconfig(plugin-db) < 0.5)
-BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.9 with pkgconfig(plugin-hostd-protocol) < 0.6)
-BuildRequires: (pkgconfig(omx-contract) >= 3.18.0 with pkgconfig(omx-contract) < 4)
-BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.5 with pkgconfig(omx-clap-lv2) < 0.33)
-BuildRequires: (pkgconfig(omxdsp) >= 0.32.1 with pkgconfig(omxdsp) < 0.33)
+BuildRequires: pkgconfig(plugin-db) >= 0.4.4
+BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.9
+BuildRequires: pkgconfig(omx-contract) >= 3.20.0
+BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
+BuildRequires: pkgconfig(omxdsp) >= 0.32.1
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
-BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
+BuildRequires: pkgconfig(libcjson) >= 1.7.15
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
 Requires: python3
+# the program reads its own domain at start-up
+Requires: plugin-qualify-contract = %{version}-%{release}
 # the measurer and the LV2 host probe link lilv, and the descriptors read it through python3-lilv
 Requires: lilv-libs
 Requires: python3-lilv
@@ -39,19 +41,19 @@ Requires: python3-jsonschema
 # plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
 # 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
-Requires: (plugin-hostd >= 0.20.7 with plugin-hostd < 0.21)
+Requires: plugin-hostd >= 0.20.7
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: (omx-clap-host >= 0.32.5 with omx-clap-host < 0.33)
+Requires: omx-clap-host >= 0.32.5
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: (omx-clap-core >= 0.32.5 with omx-clap-core < 0.33)
+Requires: omx-clap-core >= 0.32.5
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
@@ -91,10 +93,10 @@ install -m 0755 packaging/trigger-scan.sh %{buildroot}%{_libexecdir}/%{name}/tri
 install -d %{buildroot}%{_datadir}/%{name}/catalogs
 install -m 0644 catalogs/*.json %{buildroot}%{_datadir}/%{name}/catalogs/
 rm -r %{buildroot}%{_prefix}/lib/node_modules/@openmixer/plugin-qualify/catalogs
-# the qualification domain, into omx-contract's contract directory (docs/contract-dir.md, "Domains"), with its catalogs
-install -D -m 0644 contract.d/qualification/qualification.json %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/qualification.json
-install -d %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/catalogs
-install -m 0644 contract.d/qualification/catalogs/*.json %{buildroot}%{_datadir}/omx-contract/contract.d/qualification/catalogs/
+# the qualification domain, into omx-contract's contract directory (docs/contract-dir.md, "Domains") by the installer's
+# domain mode, catalogs included: the one implementation, no install line of its own
+sh "$(pkg-config --variable=datadir omx-contract)/install-contract-dir.sh" --domain contract.d/qualification \
+  "%{buildroot}$(pkg-config --variable=contractdir omx-contract)"
 
 # the preset enables the timer and the path unit; nothing here runs a sweep: the timer fires at the next boot,
 # and the path unit, armed once the transaction is over, waits for a minute of quiet before its first run
@@ -130,9 +132,6 @@ fi
 %{_bindir}/plugin-qualify
 %{_bindir}/plugin-qualify-sync
 %{_bindir}/plugin-qualify-records-package
-%dir %{_datadir}/omx-contract/contract.d/qualification
-%{_datadir}/omx-contract/contract.d/qualification/qualification.json
-%{_datadir}/omx-contract/contract.d/qualification/catalogs/
 %{_mandir}/man1/plugin-qualify.1*
 %{_mandir}/man1/plugin-qualify-sync.1*
 %{_mandir}/man1/plugin-qualify-records-package.1*
@@ -148,6 +147,17 @@ fi
 %{_libexecdir}/%{name}/
 %dir %{_datadir}/%{name}
 %dir %{_datadir}/%{name}/catalogs
+
+%package contract
+Summary: Qualification domain of plugin-qualify, as data
+BuildArch: noarch
+
+%description contract
+The qualification domain (its words, verdict ratings and catalogs) in omx-contract's contract directory, read at run
+time by plugin-qualify and by the programs that name its words.
+
+%files contract
+%{omx_contract_domain_dir}/qualification/
 
 # BEGIN langpacks: generated by langpacks.py, do not edit
 %package langpack-ca
