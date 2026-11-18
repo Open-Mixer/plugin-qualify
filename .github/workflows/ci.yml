@@ -154,6 +154,17 @@ jobs:
       publish: false
       arm: false  # aarch64/arm64 build at release only
 
+  # the dependency floors: the spec, debian/control and the workflows' install lines state floors and no ceiling. This
+  # repository has no packaging/deps.txt, so the shared deps-render action only refuses ceilings (Open-Mixer/.github's
+  # deps-render, at the same openmixer-v1 ref every shared action of this repository uses)
+  deps-render:
+    name: the packaging states floors only
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Open-Mixer/.github/.github/actions/deps-render@openmixer-v1
+
   # the checks every OpenMixer repository runs on what it publishes: commit messages, private references, and no
   # local copy of either (Open-Mixer/.github's public-sources-check)
   public-sources:
