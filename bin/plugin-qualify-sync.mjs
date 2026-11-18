@@ -52,7 +52,7 @@ log(
     `memory ${s.memory === undefined ? "unbounded" : `${String(s.memory.bytes)} bytes`}`,
 );
 try {
-  const summary = await runSync(s, { force: parsed.args.force, wait: !parsed.args.noWait, refreshOnly: parsed.args.refreshPins, rejudge: parsed.args.rejudge, memoryOnly: parsed.args.memoryOnly, adapterOnly: parsed.args.adapterOnly, isolatedOnly: parsed.args.isolatedOnly, poolOnly: parsed.args.poolOnly, log });
+  const summary = await runSync(s, { force: parsed.args.force, wait: !parsed.args.noWait, refreshOnly: parsed.args.refreshPins, rejudge: parsed.args.rejudge, memoryOnly: parsed.args.memoryOnly, adapterOnly: parsed.args.adapterOnly, isolatedOnly: parsed.args.isolatedOnly, poolOnly: parsed.args.poolOnly, store: { system: parsed.args.system }, log });
   if (summary !== undefined) {
     process.stdout.write(`${summaryLine(summary)}\n`);
     // the records counted per plugin over its offers: a CLAP plugin has a record per offer

@@ -342,7 +342,8 @@ function sync(flags: readonly string[]): SyncRun {
   const hostd = join(mkdtempSync(join(scratch, "hostd-")), "plugin-hostd");
   writeFileSync(hostd, `#!/bin/sh\n${searchPathClause(lv2, clap)}\n${HOSTD === undefined ? "exit 127" : `exec ${JSON.stringify(HOSTD)} "$@"`}\n`);
   chmodSync(hostd, 0o755);
-  const r = spawnSync(process.execPath, [SYNC, ...argv], { encoding: "utf8", env: { ...process.env, PLUGIN_HOSTD: hostd, ...(RUNNER === undefined ? {} : { OMX_PROBE_RUNNER: RUNNER }), ...(jack === undefined ? {} : { JACK_DEFAULT_SERVER: jack, JACK_NO_START_SERVER: "1" }) } });
+  // the sync fills plugin-db's store (#73): a store of the run's own, never the store of whoever runs the tests
+  const r = spawnSync(process.execPath, [SYNC, ...argv], { encoding: "utf8", env: { ...process.env, PLUGIN_HOSTD: hostd, PLUGIN_DB_STORE: mkdtempSync(join(scratch, "plugin-db-")), ...(RUNNER === undefined ? {} : { OMX_PROBE_RUNNER: RUNNER }), ...(jack === undefined ? {} : { JACK_DEFAULT_SERVER: jack, JACK_NO_START_SERVER: "1" }) } });
   const summary: Record<string, number> = {};
   for (const m of r.stdout.matchAll(/(qualified|skipped|refused|crashed|hung|unmeasured) (\d+)/g)) summary[m[1]!] = Number(m[2]);
   return { status: r.status, summary, stderr: r.stderr, ms: Date.now() - started };

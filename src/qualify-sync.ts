@@ -32,6 +32,8 @@ import { HOSTING_CODE } from "./hosting-codes.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
 import { NO_JACK_SERVER } from "./host-admission.js";
 import { iriPath, lv2BundlesOnPath, manifestPlugins } from "./lv2-loader.js";
+import type { PluginDbRun } from "./plugin-db-cli.js";
+import { storeJudgedLayers } from "./plugin-db-store.js";
 import { judgmentPinEntries, pinClearLine, pinLineUri, pinsFile, type PinEntry } from "./pins-file.js";
 import { POOL_RESULT, completePool, judgePoolRun, pinAfterPool, pinFromRecordWithPool, poolEnv, spawnedPoolRunner, type PoolRunner } from "./qualify-pool.js";
 import { hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
@@ -1451,6 +1453,8 @@ const againMarker = (stateFile: string): string => `${stateFile}.again`;
 export const pendingMarker = (stateFile: string): string => join(dirname(stateFile), "qualify-pending");
 
 export interface SyncRunOptions {
+  /** After a full run, write each recorded, pinned plugin into plugin-db's store (#73); `system` names the service's store. */
+  readonly store?: { readonly system: boolean; readonly run?: PluginDbRun };
   readonly force?: boolean;
   /** `--refresh-pins`: only refresh the pins' files from plugin-hostd and send the changed ones; measure nothing. */
   readonly refreshOnly?: boolean;
@@ -1694,6 +1698,10 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     if (after !== before) writeFileWhole(settings.pinFile, after);
     writeLv2Descriptors(ctx, lv2Pinned);
     for (const line of descriptorAccessProblems(settings.descriptorDir)) log(line);
+    if (options.store !== undefined) {
+      const stored = storeJudgedLayers(state, { machineClass: settings.hostClass, system: options.store.system, lv2Path: settings.lv2Dirs.join(":"), stampFile: `${settings.stateFile}.stored`, env: ctx.env, ...(options.store.run === undefined ? {} : { run: options.store.run }) });
+      for (const line of stored.lines) log(line);
+    }
     // the files of a plugin that is gone, or was replaced by other bytes: only when every directory could be read, so
     // an unreadable one is never taken for an uninstall
     if (unreadable) log("a plugin directory could not be read; no record or descriptor is removed this run");
