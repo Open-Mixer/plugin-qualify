@@ -21,7 +21,7 @@ export const QUALIFICATION_DOMAIN = "qualification";
 export const QUALIFICATION_DOMAIN_FLOOR = "1.1.0";
 
 /** The shape of a domain document that this reader relies on (omx-contract docs/contract-dir.md, "Domains"). */
-// TODO: read the domain-document schema from @openmixer/omx-contract (schema/domain.schema.json, omx-contract 3.20.0) once its PR lands, and drop this const
+// TODO: read the domain-document schema from @openmixer/omx-contract (schema/domain.schema.json, omx-contract 3.20.0) once its PR (omx-contract#113) lands: FromSchema over `domainSchema` of @openmixer/omx-contract/domain-schema; drop this const
 const DOMAIN_DOCUMENT_SCHEMA = {
   type: "object",
   required: ["$schema", "$id", "info", "components"],
