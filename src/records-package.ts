@@ -183,13 +183,10 @@ export function recordsSources(args: readonly string[]): RecordsSource[] {
 /** The package of a class and a set. */
 export const recordsPackageName = (hostClass: string, set: string): string => `plugin-db-qualification-${hostClass}-${set}`;
 
-/** The plugin-qualify a package of records depends on: the minor that wrote them, up to the next minor. */
-export function recordsDependsRange(version: string): { floor: string; ceiling: string } | undefined {
+/** The plugin-qualify a package of records depends on: the minor that wrote them, as a floor and no ceiling. */
+export function recordsDependsFloor(version: string): string | undefined {
   const m = /^(\d+)\.(\d+)\.\d+/.exec(version);
-  if (m === null) return undefined;
-  const major = Number(m[1]);
-  const minor = Number(m[2]);
-  return { floor: `${String(major)}.${String(minor)}.0`, ceiling: `${String(major)}.${String(minor + 1)}` };
+  return m === null ? undefined : `${String(Number(m[1]))}.${String(Number(m[2]))}.0`;
 }
 
 /** This plugin-qualify's own version, read where it is installed. */
@@ -348,8 +345,8 @@ export function buildRecordsPackages(args: RecordsPackageArgs, now = new Date())
 function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: string; readonly cell: GridCell }, now: Date): BuiltRecordsPackage {
   const set = recordsSetName(args.set, args.cell);
   const name = recordsPackageName(args.hostClass, set);
-  const range = recordsDependsRange(ownVersion());
-  if (range === undefined) throw new Error("this plugin-qualify names no version, so the package cannot say which one reads it");
+  const floor = recordsDependsFloor(ownVersion());
+  if (floor === undefined) throw new Error("this plugin-qualify names no version, so the package cannot say which one reads it");
   const day = today(now);
   const version = args.version ?? day.version;
   statSync(args.stateDir);
@@ -390,7 +387,7 @@ function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: str
         "Architecture: all",
         `Maintainer: ${args.maintainer}`,
         `Installed-Size: ${String(kib)}`,
-        `Depends: plugin-qualify (>= ${range.floor}~), plugin-qualify (<< ${range.ceiling}~)`,
+        `Depends: plugin-qualify (>= ${floor}~)`,
         "Section: sound",
         "Priority: optional",
         "Multi-Arch: foreign",

@@ -22,6 +22,11 @@ describe("no version ceiling on a dependency", () => {
   it("debian/control's Build-Depends and Depends state floors only", () => {
     expect(read("debian/control")).not.toMatch(/\(<<|\(<=|\(< /);
   });
+  it("the records package generator writes a floor-only Depends (a source check: its deb arm needs the full dependency tree)", () => {
+    const src = read("src/records-package.ts");
+    expect(src).toContain("Depends: plugin-qualify (>= ");
+    expect(src).not.toMatch(/\(<<|\(<=|\(< /);
+  });
   it("the workflows' install lines state floors only", () => {
     for (const w of ["ci.yml", "publish.yml", "release.yml"]) {
       const lines = read(`.github/workflows/${w}`).split("\n").filter((l) => /(dnf|apt-get) install/.test(l));
