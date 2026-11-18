@@ -149,7 +149,7 @@ fi
 %dir %{_datadir}/%{name}/catalogs
 
 %package contract
-Summary: The qualification domain of plugin-qualify, as data
+Summary: Qualification domain of plugin-qualify, as data
 BuildArch: noarch
 
 %description contract
