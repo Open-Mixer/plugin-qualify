@@ -313,24 +313,44 @@ export function buildVocabulary(domain: QualificationDomain) {
   };
 }
 
-/** The vocabulary of the installed domain, read once when this module loads: the start-up read. */
-const VOCABULARY = buildVocabulary(qualificationDomain());
+type Vocabulary = ReturnType<typeof buildVocabulary>;
+let built: { readonly domain: QualificationDomain; readonly vocabulary: Vocabulary } | undefined;
 
-export const UNMEASURED_TERMS: readonly UnmeasuredTerm[] = VOCABULARY.UNMEASURED_TERMS;
-export const SCALING_TERMS: readonly ScalingTerm[] = VOCABULARY.SCALING_TERMS;
-export const SCALING_NOTE_TERMS = VOCABULARY.SCALING_NOTE_TERMS;
-export const EXCLUSION_TERMS: readonly ScalingTerm[] = VOCABULARY.EXCLUSION_TERMS;
+/** The vocabulary of the domain in use (handed or installed), built at the first use and kept. */
+function vocabulary(): Vocabulary {
+  const domain = qualificationDomain();
+  if (built?.domain !== domain) built = { domain, vocabulary: buildVocabulary(domain) };
+  return built.vocabulary;
+}
+
+/**
+ * A word list that reads the vocabulary when first used, not when this module loads, so a page may import it and then
+ * hand its document with `init`; used before that, it refuses by name.
+ */
+function lazy<T extends readonly unknown[]>(pick: (v: Vocabulary) => T): T {
+  const forward = (prop: string | symbol) => Reflect.get(pick(vocabulary()), prop, pick(vocabulary())) as unknown;
+  return new Proxy([] as unknown as T, {
+    get: (_t, prop) => forward(prop),
+    has: (_t, prop) => prop in pick(vocabulary()),
+    ownKeys: () => Reflect.ownKeys(pick(vocabulary())),
+    getOwnPropertyDescriptor: (_t, prop) => {
+      const d = Reflect.getOwnPropertyDescriptor(pick(vocabulary()), prop);
+      return d === undefined ? undefined : { ...d, configurable: true };
+    },
+  });
+}
+
+export const UNMEASURED_TERMS: readonly UnmeasuredTerm[] = lazy((v) => v.UNMEASURED_TERMS);
+export const SCALING_TERMS: readonly ScalingTerm[] = lazy((v) => v.SCALING_TERMS);
+export const SCALING_NOTE_TERMS = lazy((v) => v.SCALING_NOTE_TERMS);
+export const EXCLUSION_TERMS: readonly ScalingTerm[] = lazy((v) => v.EXCLUSION_TERMS);
 /** The measurement methods the format has names for: the latency methods, then the cost methods. */
-export const METHOD_TERMS: readonly ScalingTerm[] = VOCABULARY.METHOD_TERMS;
-export const MEASUREMENT_DIMENSIONS: readonly MeasurementDimension[] = VOCABULARY.MEASUREMENT_DIMENSIONS;
-export const VERDICT_RATINGS: readonly VerdictRating[] = VOCABULARY.VERDICT_RATINGS;
-export const HOST_ISOLATIONS: readonly HostIsolation[] = VOCABULARY.HOST_ISOLATIONS;
-export const HOST_LATENCY_HANDLING: readonly HostLatencyHandling[] = VOCABULARY.HOST_LATENCY_HANDLING;
-export const VOICE_BASES: readonly VoiceBasis[] = VOCABULARY.VOICE_BASES;
-
-const UNMEASURED_BY_CODE = VOCABULARY.UNMEASURED_BY_CODE;
-const SCALING_CODES = VOCABULARY.SCALING_CODES;
-const METHOD_CODES = VOCABULARY.METHOD_CODES;
+export const METHOD_TERMS: readonly ScalingTerm[] = lazy((v) => v.METHOD_TERMS);
+export const MEASUREMENT_DIMENSIONS: readonly MeasurementDimension[] = lazy((v) => v.MEASUREMENT_DIMENSIONS);
+export const VERDICT_RATINGS: readonly VerdictRating[] = lazy((v) => v.VERDICT_RATINGS);
+export const HOST_ISOLATIONS: readonly HostIsolation[] = lazy((v) => v.HOST_ISOLATIONS);
+export const HOST_LATENCY_HANDLING: readonly HostLatencyHandling[] = lazy((v) => v.HOST_LATENCY_HANDLING);
+export const VOICE_BASES: readonly VoiceBasis[] = lazy((v) => v.VOICE_BASES);
 
 /**
  * The vocabulary term for a code, or `undefined` when the code is not one of ours.
@@ -340,7 +360,7 @@ const METHOD_CODES = VOCABULARY.METHOD_CODES;
  * should consult, and it is deliberately conservative about strangers.
  */
 export function unmeasuredTerm(code: string | undefined): UnmeasuredTerm | undefined {
-  return code === undefined ? undefined : UNMEASURED_BY_CODE.get(code);
+  return code === undefined ? undefined : vocabulary().UNMEASURED_BY_CODE.get(code);
 }
 
 /**
@@ -351,17 +371,17 @@ export function unmeasuredTerm(code: string | undefined): UnmeasuredTerm | undef
  */
 export function unmeasuredKind(code: string | undefined): UnmeasuredKind {
   if (code === undefined) return "not-attempted";
-  return UNMEASURED_BY_CODE.get(code)?.kind ?? "probe-failed";
+  return vocabulary().UNMEASURED_BY_CODE.get(code)?.kind ?? "probe-failed";
 }
 
 /** True when `code` is a scaling term this version of the format defines. */
 export function isKnownScalingCode(code: string): boolean {
-  return SCALING_CODES.has(code);
+  return vocabulary().SCALING_CODES.has(code);
 }
 
 /** True when `code` is a method term this version of the format defines. */
 export function isKnownMethodCode(code: string): boolean {
-  return METHOD_CODES.has(code);
+  return vocabulary().METHOD_CODES.has(code);
 }
 
 /** `value` as a dimension, or `undefined` when it is not one. */

@@ -3,6 +3,7 @@
 // `plugin-qualify compare` and `plugin-qualify compare summary`: the processes and the files. Every decision is in
 // src/compare.ts; this module finds the hosts and their versions, starts the private JACK server, runs
 // tools/compare-host.mjs for each plugin and host, and writes the records and the summary.
+import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, rmSync, statfsSync } from "node:fs";
 import { cpus, tmpdir } from "node:os";

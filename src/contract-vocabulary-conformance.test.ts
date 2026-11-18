@@ -14,7 +14,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { openQualificationDomainAt } from "./qualification-domain.js";
+import { openQualificationDomainAt } from "./qualification-domain-node.js";
 import { clapCoreTsDirCandidates, isHostingTableName } from "../tools/clap-core-tsdir.mjs";
 import { OUT as GENERATED_HOSTING_CODES, hostingCodesFileFrom } from "../tools/gen-hosting-codes.mjs";
 import { HOSTING_CODE } from "./hosting-codes.js";

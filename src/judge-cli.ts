@@ -16,6 +16,7 @@ import { writeQualification } from "./qualification-record.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
 import { EXIT_CODE, OUTPUT_FORMATS, type OutputFormat } from "./qualify-options.js";
 import { OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 export interface JudgeArgs {
   readonly files: readonly string[];
@@ -67,6 +68,10 @@ export function parseJudgeArgs(argv: readonly string[]): ParseJudgeResult {
 }
 
 export function judgeHelpText(): string {
+  return withContractPathHelp(judgeHelpTextBody());
+}
+
+function judgeHelpTextBody(): string {
   return [
     "plugin-qualify judge — judge probe outputs and write the qualification records",
     "",

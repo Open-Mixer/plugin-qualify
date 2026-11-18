@@ -18,6 +18,7 @@ import { clapPinUri, pinVerdictOf, type PinEntry, type PinVerdict } from "./pins
 import { QUALIFICATION_RECORD_SCHEMA, type HistoryBlock, type QualificationRecord, type RecordVerdict } from "./qualification-record.js";
 import { EXIT_CODE, OUTPUT_FORMATS, type OutputFormat } from "./qualify-options.js";
 import type { SuitabilityRating } from "./rating.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 export interface AdjustArgs {
   readonly history: string;
@@ -78,6 +79,10 @@ export function parseAdjustArgs(argv: readonly string[]): ParseAdjustResult {
 }
 
 export function adjustHelpText(): string {
+  return withContractPathHelp(adjustHelpTextBody());
+}
+
+function adjustHelpTextBody(): string {
   return [
     "plugin-qualify adjust — write a second verdict beside each measured one from plugin-hostd's running history",
     "",

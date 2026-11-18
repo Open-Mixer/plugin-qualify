@@ -34,6 +34,11 @@
       "import": "./dist/qualify-declarations.js",
       "default": "./src/qualify-declarations.ts"
     },
+    "./qualification-domain": {
+      "types": "./dist/qualification-domain.d.ts",
+      "import": "./dist/qualification-domain.js",
+      "default": "./src/qualification-domain.ts"
+    },
     "./measurement": {
       "types": "./dist/measurement/index.d.ts",
       "import": "./dist/measurement/index.js",

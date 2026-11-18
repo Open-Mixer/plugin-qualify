@@ -3,12 +3,13 @@
 /**
  * The tests read the domain of this checkout, contract.d/qualification/, where a program reads the installed one
  * (`INSTALLED_CONTRACT_DIR`): the source tree is the owner's document, and the install copies it byte for byte
- * (packaging/plugin-qualify.spec, debian/rules). Only a test sets the place; a production program has no way to.
+ * (packaging/plugin-qualify.spec, debian/rules). Only a test sets the place: the module of the installed place is
+ * replaced here, and OMX_CONTRACT_PATH, which only a CLI entry point reads, is set for the CLIs a test spawns.
  */
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { vi } from "vitest";
+import "./qualification-domain-node.js";
 
-vi.mock("./qualification-installed-dir.js", () => ({
-  INSTALLED_CONTRACT_DIR: join(dirname(fileURLToPath(import.meta.url)), "..", "contract.d"),
-}));
+const CONTRACT_DIR = vi.hoisted(() => `${import.meta.dirname}/../contract.d`);
+process.env.OMX_CONTRACT_PATH = CONTRACT_DIR;
+
+vi.mock("./qualification-installed-dir.js", () => ({ INSTALLED_CONTRACT_DIR: CONTRACT_DIR }));

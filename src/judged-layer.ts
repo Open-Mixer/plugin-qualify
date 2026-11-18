@@ -20,6 +20,7 @@ import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.j
 import { pinVerdictOf, type PinVerdict } from "./pins-file.js";
 import { QUALIFICATION_RECORD_SCHEMA, ISOLATED_TIER_HOST, type QualificationRecord } from "./qualification-record.js";
 import type { SuitabilityRating } from "./rating.js";
+import { withContractPathHelp } from "./qualification-domain.js";
 
 /** The host a judged layer is written for: the one that runs plugins, in workers of its own (PLUGIN_DB_ISOLATION_HOSTS). */
 export const JUDGED_HOST = "plugin-hostd";
@@ -146,6 +147,10 @@ export interface JudgedLayerArgs {
 }
 
 export function judgedLayerHelpText(): string {
+  return withContractPathHelp(judgedLayerHelpTextBody());
+}
+
+function judgedLayerHelpTextBody(): string {
   return [
     "usage: plugin-qualify judged-layer <record.qualification.json> --machine-class <word> --files <sha256>",
     "                                   [--layout <scheme>:<sha256>] [--judged-by <version>] [--address <address>] [--body]",

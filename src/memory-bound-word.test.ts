@@ -9,7 +9,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { openQualificationDomainAt } from "./qualification-domain.js";
+import { openQualificationDomainAt } from "./qualification-domain-node.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(PKG, rel), "utf8");

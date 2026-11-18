@@ -4,6 +4,7 @@
  * plugin-qualify — scan, offline measurement, hosting sweep and the fail-closed rating of audio
  * plugins.
  */
+import "./qualification-domain-node.js";
 export * from "./qualify-declarations.js";
 export * from "./measurement/index.js";
 export * from "./tool-paths.js";
