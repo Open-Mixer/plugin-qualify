@@ -1,6 +1,6 @@
 name: release
 
-# A version tag builds the RPM (Fedora 44, x86_64 and aarch64) and the DEB (Debian bookworm and trixie,
+# A version tag builds the RPM (Fedora 44, x86_64 and aarch64) and the DEB (Debian trixie,
 # amd64 and arm64), signs them, publishes them into the rpm/ and deb/ trees of the OpenMixer Pages
 # repository and attaches them to the GitHub release, beside the `pnpm pack` tarball
 # openmixer-plugin-qualify-<version>.tgz (dist/ built in). Anything else builds unsigned trees and packs
@@ -86,6 +86,9 @@ jobs:
       catch-up: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
       # the CLAP headers from the pin, plugin-db-dev (pin.h) and libplugin-hostd-protocol-dev from the channel: the CLAP prober's build;
       # libomx-clap-lv2-dev from the channel: the LV2 measurer's host features
+      # the Debian suites the build makes: the one declaration the install matrix below is held to by
+      # src/release-install-matrix.test.ts (a cell for a suite not listed here finds no artifact)
+      suite-matrix: '["trixie"]'
       dependencies: 'clap-headers'
       requires: ''
       # the release-notes filter of the build (changelog.sh) runs python3, which the debian: image does not carry
@@ -115,7 +118,6 @@ jobs:
       matrix:
         include:
           - { image: 'fedora:44', artifact: plugin-qualify-rpms-fc44-x86_64 }
-          - { image: 'debian:bookworm', artifact: plugin-qualify-debs-bookworm-amd64 }
           - { image: 'debian:trixie', artifact: plugin-qualify-debs-trixie-amd64 }
     steps:
       - uses: actions/checkout@v4

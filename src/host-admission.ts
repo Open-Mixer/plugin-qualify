@@ -11,7 +11,7 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { withRunHome } from "./run-home.js";
+import { runCwd, withRunHome } from "./run-home.js";
 import type { HostProfile } from "./host-profiles.js";
 import { ADMIT_STEP_MS_ENV } from "./qualify-declarations.js";
 
@@ -249,8 +249,10 @@ export const SPAWNED_ADMISSIONS: AdmissionRuns = {
   jalv(uri, env) {
     // SIGKILL at the deadline: jalv hosting some plugins ignores SIGTERM, and one stuck in jack_client_open never reaches
     // the loop that reads the flag TERM sets, so a TERM left spawnSync waiting with it (#187). Alive at the deadline is
-    // all the verdict asks, so nothing is lost by not letting it exit cleanly.
-    const r = spawnSync("jalv", ["-n", "plugin-qualify", uri], { encoding: "utf8", timeout: JALV_HOSTED_MS, killSignal: "SIGKILL", input: "", env: withRunHome(env ?? process.env) });
+    // all the verdict asks, so nothing is lost by not letting it exit cleanly. Killed, jalv never removes the state
+    // directory it made with a relative mkdtemp("jalvXXXXXX"), so it starts in the run's scratch directory, which
+    // goes when the run ends: never in the caller's working directory, a user's home when the run started there.
+    const r = spawnSync("jalv", ["-n", "plugin-qualify", uri], { encoding: "utf8", timeout: JALV_HOSTED_MS, killSignal: "SIGKILL", input: "", cwd: runCwd(), env: withRunHome(env ?? process.env) });
     const code = (r.error as NodeJS.ErrnoException | undefined)?.code;
     if (code === "ENOENT") return { installed: false, stillRunning: false, status: null, signal: null, stderr: "" };
     return { installed: true, stillRunning: code === "ETIMEDOUT", status: r.status, signal: code === "ETIMEDOUT" ? null : r.signal, stderr: r.stderr ?? "" };
