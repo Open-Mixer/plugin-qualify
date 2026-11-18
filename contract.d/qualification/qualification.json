@@ -52,22 +52,22 @@
           {
             "const": "nothing-to-measure",
             "title": "nothingToMeasure",
-            "x-code": 0,
             "description": "A property of the plugin: any prober on any machine reaches it, so it may override a figure.",
+            "x-code": 0,
             "x-text": "A property of the plugin: any prober on any machine reaches it, so it may override a figure."
           },
           {
             "const": "probe-failed",
             "title": "probeFailed",
-            "x-code": 1,
             "description": "A property of this run: it says nothing about the plugin and never overrides a figure.",
+            "x-code": 1,
             "x-text": "A property of this run: it says nothing about the plugin and never overrides a figure."
           },
           {
             "const": "not-attempted",
             "title": "notAttempted",
-            "x-code": 2,
             "description": "The run did not cover this plugin or this dimension: a partial run, not a finding.",
+            "x-code": 2,
             "x-text": "The run did not cover this plugin or this dimension: a partial run, not a finding."
           }
         ]
@@ -80,144 +80,144 @@
           {
             "const": "no-audio-in",
             "title": "noAudioIn",
-            "x-code": 0,
             "description": "No audio input port: nothing to drive.",
+            "x-code": 0,
             "x-text": "No audio input port: nothing to drive.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "no-audio-out",
             "title": "noAudioOut",
-            "x-code": 1,
             "description": "No audio output port: nothing to read.",
+            "x-code": 1,
             "x-text": "No audio output port: nothing to read.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "silent-output",
             "title": "silentOutput",
-            "x-code": 2,
             "description": "Driven, and silent under a stimulus that should have passed.",
+            "x-code": 2,
             "x-text": "Driven, and silent under a stimulus that should have passed.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "needs-carrier",
             "title": "needsCarrier",
-            "x-code": 3,
             "description": "Needs a second audio input the prober did not supply.",
+            "x-code": 3,
             "x-text": "Needs a second audio input the prober did not supply.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "needs-impulse-response",
             "title": "needsImpulseResponse",
-            "x-code": 4,
             "description": "A convolver needing an impulse response the prober did not load.",
+            "x-code": 4,
             "x-text": "A convolver needing an impulse response the prober did not load.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "needs-content",
             "title": "needsContent",
-            "x-code": 5,
             "description": "An instrument that is silent under notes until a sample, a sound font or an instrument file is loaded, which the prober did not load.",
+            "x-code": 5,
             "x-text": "An instrument that is silent under notes until a sample, a sound font or an instrument file is loaded, which the prober did not load.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "unpinnable",
             "title": "unpinnable",
-            "x-code": 6,
             "description": "The files the host loads cannot be pinned.",
+            "x-code": 6,
             "x-text": "The files the host loads cannot be pinned.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "no-voices",
             "title": "noVoices",
-            "x-code": 7,
             "description": "An instrument whose voice-info declares a capacity of 0.",
+            "x-code": 7,
             "x-text": "An instrument whose voice-info declares a capacity of 0.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "notes-unplayable",
             "title": "notesUnplayable",
-            "x-code": 8,
             "description": "An instrument whose note input reads no dialect the prober speaks.",
+            "x-code": 8,
             "x-text": "An instrument whose note input reads no dialect the prober speaks.",
             "x-group": "nothing-to-measure"
           },
           {
             "const": "voices-unknown",
             "title": "voicesUnknown",
-            "x-code": 9,
             "description": "An instrument that declares no voice capacity, run with no probe count.",
+            "x-code": 9,
             "x-text": "An instrument that declares no voice capacity, run with no probe count.",
             "x-group": "not-attempted"
           },
           {
             "const": "refused-instantiation",
             "title": "refusedInstantiation",
-            "x-code": 10,
             "description": "The plugin would not instantiate at this rate or block size.",
+            "x-code": 10,
             "x-text": "The plugin would not instantiate at this rate or block size.",
             "x-group": "probe-failed"
           },
           {
             "const": "probe-crashed",
             "title": "probeCrashed",
-            "x-code": 11,
             "description": "The probe worker died while hosting the plugin.",
+            "x-code": 11,
             "x-text": "The probe worker died while hosting the plugin.",
             "x-group": "probe-failed"
           },
           {
             "const": "probe-timeout",
             "title": "probeTimeout",
-            "x-code": 12,
             "description": "The probe passed its per-plugin time limit.",
+            "x-code": 12,
             "x-text": "The probe passed its per-plugin time limit.",
             "x-group": "probe-failed"
           },
           {
             "const": "non-finite-output",
             "title": "nonFiniteOutput",
-            "x-code": 13,
             "description": "The output held NaN or infinity.",
+            "x-code": 13,
             "x-text": "The output held NaN or infinity.",
             "x-group": "probe-failed"
           },
           {
             "const": "not-installed",
             "title": "notInstalled",
-            "x-code": 14,
             "description": "The plugin is not installed on this machine.",
+            "x-code": 14,
             "x-text": "The plugin is not installed on this machine.",
             "x-group": "probe-failed"
           },
           {
             "const": "worker-nonconforming",
             "title": "workerNonconforming",
-            "x-code": 15,
             "description": "An LV2 worker interface with work or work_response NULL.",
+            "x-code": 15,
             "x-text": "An LV2 worker interface with work or work_response NULL.",
             "x-group": "probe-failed"
           },
           {
             "const": "probe-error",
             "title": "probeError",
-            "x-code": 16,
             "description": "A failure with no more specific reason; its own words are kept beside it.",
+            "x-code": 16,
             "x-text": "A failure with no more specific reason; its own words are kept beside it.",
             "x-group": "probe-failed"
           },
           {
             "const": "not-attempted",
             "title": "notAttempted",
-            "x-code": 17,
             "description": "The run did not cover this plugin for this dimension.",
+            "x-code": 17,
             "x-text": "The run did not cover this plugin for this dimension.",
             "x-group": "not-attempted"
           },
@@ -238,8 +238,8 @@
           {
             "const": "impulse-onset",
             "title": "impulseOnset",
-            "x-code": 0,
             "description": "The delay from a unit impulse to the first output sample above the residual floor: what the plugin does.",
+            "x-code": 0,
             "x-text": "The delay from a unit impulse to the first output sample above the residual floor: what the plugin does.",
             "x-from": [
               {
@@ -255,8 +255,8 @@
           {
             "const": "declared-port",
             "title": "declaredPort",
-            "x-code": 1,
             "description": "Read from the plugin's own latency report: what it claims.",
+            "x-code": 1,
             "x-text": "Read from the plugin's own latency report: what it claims.",
             "x-from": [
               {
@@ -272,8 +272,8 @@
           {
             "const": "note-onset",
             "title": "noteOnset",
-            "x-code": 2,
             "description": "The delay from a note on to the first output sample above the floor.",
+            "x-code": 2,
             "x-text": "The delay from a note on to the first output sample above the floor."
           }
         ]
@@ -285,8 +285,8 @@
           {
             "const": "block-time-percentile",
             "title": "blockTimePercentile",
-            "x-code": 0,
             "description": "A percentile of per-block wall time under a sustained stimulus, warm-up discarded, in nanoseconds per sample.",
+            "x-code": 0,
             "x-text": "A percentile of per-block wall time under a sustained stimulus, warm-up discarded, in nanoseconds per sample."
           }
         ]
@@ -298,43 +298,43 @@
           {
             "const": "fixed-frame",
             "title": "fixedFrame",
-            "x-code": 0,
             "description": "The same frame count at every rate.",
+            "x-code": 0,
             "x-text": "The same frame count at every rate."
           },
           {
             "const": "fixed-time",
             "title": "fixedTime",
-            "x-code": 1,
             "description": "The same milliseconds at every rate.",
+            "x-code": 1,
             "x-text": "The same milliseconds at every rate."
           },
           {
             "const": "zero",
             "title": "zero",
-            "x-code": 2,
             "description": "No latency a mix can notice at any measured rate.",
+            "x-code": 2,
             "x-text": "No latency a mix can notice at any measured rate."
           },
           {
             "const": "nonconforming",
             "title": "nonconforming",
-            "x-code": 3,
             "description": "Fits neither law at a magnitude that reaches a mix: flagged, never averaged.",
+            "x-code": 3,
             "x-text": "Fits neither law at a magnitude that reaches a mix: flagged, never averaged."
           },
           {
             "const": "single-rate",
             "title": "singleRate",
-            "x-code": 4,
             "description": "One usable reading: no law can be fitted.",
+            "x-code": 4,
             "x-text": "One usable reading: no law can be fitted."
           },
           {
             "const": "unmeasured",
             "title": "unmeasured",
-            "x-code": 5,
             "description": "No rate produced a figure.",
+            "x-code": 5,
             "x-text": "No rate produced a figure."
           }
         ]
@@ -346,15 +346,15 @@
           {
             "const": "below-budget",
             "title": "belowBudget",
-            "x-code": 0,
             "description": "The readings fit no law but every one is inside the latency budget: the detector's noise.",
+            "x-code": 0,
             "x-text": "The readings fit no law but every one is inside the latency budget: the detector's noise."
           },
           {
             "const": "informational-rate",
             "title": "informationalRate",
-            "x-code": 1,
             "description": "Only a reading below the operational rates breaks the law; it stays as information.",
+            "x-code": 1,
             "x-text": "Only a reading below the operational rates breaks the law; it stays as information."
           }
         ]
@@ -366,8 +366,8 @@
           {
             "const": "impossible-zero",
             "title": "impossibleZero",
-            "x-code": 0,
             "description": "Zero frames at this rate while another rate measured non-zero.",
+            "x-code": 0,
             "x-text": "Zero frames at this rate while another rate measured non-zero."
           }
         ]
@@ -469,15 +469,15 @@
           {
             "const": "unmeasured-on-class",
             "title": "unmeasuredOnClass",
-            "x-code": 0,
             "description": "The only figure was taken on another machine class: never read as a pass, never scaled.",
+            "x-code": 0,
             "x-text": "The only figure was taken on another machine class: never read as a pass, never scaled."
           },
           {
             "const": "limit-exceeded",
             "title": "limitExceeded",
-            "x-code": 1,
             "description": "The run hit the limit probe isolation set for the resource; the limit is recorded beside it.",
+            "x-code": 1,
             "x-text": "The run hit the limit probe isolation set for the resource; the limit is recorded beside it."
           }
         ]
@@ -567,22 +567,22 @@
           {
             "const": "desk",
             "title": "desk",
-            "x-code": 0,
             "description": "An x86-64 desk.",
+            "x-code": 0,
             "x-text": "An x86-64 desk."
           },
           {
             "const": "raspberry-pi-4",
             "title": "raspberryPi4",
-            "x-code": 1,
             "description": "A Raspberry Pi 4, aarch64.",
+            "x-code": 1,
             "x-text": "A Raspberry Pi 4, aarch64."
           },
           {
             "const": "raspberry-pi-5",
             "title": "raspberryPi5",
-            "x-code": 2,
             "description": "A Raspberry Pi 5, aarch64.",
+            "x-code": 2,
             "x-text": "A Raspberry Pi 5, aarch64."
           }
         ]
