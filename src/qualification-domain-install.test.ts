@@ -64,12 +64,12 @@ describe("the qualification domain's installation", () => {
   it("the spec and debian/rules each call the installer's domain mode and type no install line for the domain", () => {
     const spec = read("packaging/plugin-qualify.spec");
     const install = spec.slice(spec.indexOf("\n%install\n"), spec.indexOf("\n%post\n"));
-    const call = /install-contract-dir\.sh" --domain contract\.d\/qualification\b.*contractdir omx-contract\)/;
+    const call = /install-contract-dir\.sh" --domain contract\.d\/qualification \\\n\s*"[^\n]*--variable=contractdir omx-contract\)"/;
     expect(install).toMatch(call);
     expect(install).toContain("%{buildroot}");
     const rules = read("debian/rules");
     expect(rules).toMatch(call);
-    expect(rules).toMatch(/--domain contract\.d\/qualification[^\n]*debian\/tmp/);
+    expect(rules).toMatch(/--domain contract\.d\/qualification \\\n\s*"[^\n]*debian\/tmp/);
     for (const t of [install, rules]) expect(t).not.toMatch(/^\s*install .*contract\.d\/qualification/m);
   });
 });
