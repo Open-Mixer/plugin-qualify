@@ -63,6 +63,8 @@ jobs:
 
       - uses: ./.github/actions/install-scanners
 
+      - uses: ./.github/actions/install-omx-contract
+
       - name: Type-check
         run: pnpm lint
 

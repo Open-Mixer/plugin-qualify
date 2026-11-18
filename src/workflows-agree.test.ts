@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const SHARED = ['build-native', 'install-plugin-hostd', 'install-scanners'] as const;
+const SHARED = ['build-native', 'install-plugin-hostd', 'install-scanners', 'install-omx-contract'] as const;
 const WORKFLOWS = ['ci.yml', 'publish.yml'] as const;
 
 /** The `uses:` lines of a workflow, in order, and the index of the step that runs the suite. */

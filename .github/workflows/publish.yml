@@ -62,6 +62,8 @@ jobs:
 
       - uses: ./.github/actions/install-scanners
 
+      - uses: ./.github/actions/install-omx-contract
+
       - name: Build and test
         run: |
           pnpm lint
