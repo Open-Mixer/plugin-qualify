@@ -14,23 +14,22 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { FIXTURE_CLAP_ID, writeFakeClap, writeFixtureRecord } from "./distributed-records.support.js";
 import { parseSyncArgs, resolveSyncSettings, runSync } from "./qualify-sync.js";
-import { readDeb, recordsDependsRange, recordsPackageName } from "./records-package.js";
+import { readDeb, recordsDependsFloor, recordsPackageName } from "./records-package.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
-// the plugin-qualify these records are written by: its minor, up to the next one
+// the plugin-qualify these records are written by: its minor, and no ceiling
 const ownVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 const [ownMajor = 0, ownMinor = 0] = ownVersion.split(".").map(Number);
 const recordsFloor = `${String(ownMajor)}.${String(ownMinor)}.0`;
-const recordsCeiling = `${String(ownMajor)}.${String(ownMinor + 1)}`;
 
 describe("the records package's name and dependency", () => {
   it("is named for plugin-db's qualification layer, the class and the set", () => {
     expect(recordsPackageName("rpi5", "zynthian-vangelis")).toBe("plugin-db-qualification-rpi5-zynthian-vangelis");
   });
-  it("depends on the minor of the plugin-qualify that wrote it, up to the next minor", () => {
-    expect(recordsDependsRange("0.19.3")).toEqual({ floor: "0.19.0", ceiling: "0.20" });
-    expect(recordsDependsRange("1.4.0")).toEqual({ floor: "1.4.0", ceiling: "1.5" });
-    expect(recordsDependsRange("x")).toBeUndefined();
+  it("depends on the minor of the plugin-qualify that wrote it as a floor, with no ceiling", () => {
+    expect(recordsDependsFloor("0.19.3")).toBe("0.19.0");
+    expect(recordsDependsFloor("1.4.0")).toBe("1.4.0");
+    expect(recordsDependsFloor("x")).toBeUndefined();
   });
 });
 
@@ -84,7 +83,8 @@ describe("plugin-qualify-records-package", () => {
     expect(d.control["Package"]).toBe("plugin-db-qualification-test-class-test-set-48000-128");
     expect(d.control["Version"]).toBe("2026.10.29");
     expect(d.control["Architecture"]).toBe("all");
-    expect(d.control["Depends"]).toBe(`plugin-qualify (>= ${recordsFloor}~), plugin-qualify (<< ${recordsCeiling}~)`);
+    expect(d.control["Depends"]).toBe(`plugin-qualify (>= ${recordsFloor}~)`);
+    expect(d.control["Depends"]).not.toContain("<<");
     expect(d.files).toEqual([...device.kept, "provenance.json"].map((f) => `${dir}/${f}`).sort());
     expect(d.controlFiles).toEqual(["./control", "./md5sums"]);
     if (dpkgDeb) {
