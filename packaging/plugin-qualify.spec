@@ -31,6 +31,8 @@ BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
 Requires: python3
+# the program reads its own domain at start-up
+Requires: plugin-qualify-contract = %{version}-%{release}
 # the measurer and the LV2 host probe link lilv, and the descriptors read it through python3-lilv
 Requires: lilv-libs
 Requires: python3-lilv
