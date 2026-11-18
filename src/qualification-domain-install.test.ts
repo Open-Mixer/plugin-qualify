@@ -28,8 +28,7 @@ function files(dir: string, rel = ""): string[] {
 
 /** A package stanza of a debian/control (or the spec's %package) by its first line. */
 function stanza(text: string, first: string): string {
-  const i = text.split("\n\n").findIndex((s) => s.startsWith(first));
-  return i < 0 ? "" : text.split("\n\n")[i];
+  return text.split("\n\n").find((s) => s.startsWith(first)) ?? "";
 }
 
 describe("the qualification domain's installation", () => {
