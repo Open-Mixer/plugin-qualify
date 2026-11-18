@@ -63,14 +63,14 @@ jobs:
 
       - uses: ./.github/actions/install-scanners
 
-      - uses: ./.github/actions/install-omx-contract
-
       - name: Type-check
         run: pnpm lint
 
       - name: package.json names the repository this workflow runs in
         run: node packaging/check-repository.mjs
 
+      # leaves out the files of .github/container-tests.txt (vitest.config.ts): they need omx-contract 3.20.0 as a
+      # system package, which the container-tests job below installs and runs them with
       - name: Test
         run: pnpm test
 
@@ -87,6 +87,29 @@ jobs:
           set -euo pipefail
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           node packaging/check-tarball.mjs "$RUNNER_TEMP"/pack/openmixer-plugin-qualify-*.tgz
+
+  # the test files of .github/container-tests.txt: they need omx-contract 3.20.0 as a system package (the installer's
+  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora; the build and test job above leaves them out
+  container-tests:
+    name: tests that need omx-contract installed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      image: fedora:44
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
+      - uses: actions/checkout@v4
+      - name: Add the OpenMixer channel
+        uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.0' 'omx-contract < 4' 'omx-contract-devel >= 3.20.0' 'omx-contract-data >= 3.20.0'
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - name: Install
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run them
+        env:
+          OMX_CONTAINER_TESTS: '1'
+        run: pnpm exec vitest run $(grep -v '^#' .github/container-tests.txt)
 
   # one pack per listed language from the spec and debian/control, and the catalogs through omx-contract's release
   # gate (translate --check, tools/catalogs-gate.sh): a listed language with no catalog, a missing key or a stale entry

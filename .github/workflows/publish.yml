@@ -62,8 +62,8 @@ jobs:
 
       - uses: ./.github/actions/install-scanners
 
-      - uses: ./.github/actions/install-omx-contract
-
+      # leaves out the files of .github/container-tests.txt (vitest.config.ts): they need omx-contract 3.20.0 as a
+      # system package, which ci.yml's container-tests job installs and runs them with
       - name: Build and test
         run: |
           pnpm lint

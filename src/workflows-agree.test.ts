@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const SHARED = ['build-native', 'install-plugin-hostd', 'install-scanners', 'install-omx-contract'] as const;
+const SHARED = ['build-native', 'install-plugin-hostd', 'install-scanners'] as const;
 const WORKFLOWS = ['ci.yml', 'publish.yml'] as const;
 
 /** The `uses:` lines of a workflow, in order, and the index of the step that runs the suite. */
@@ -60,6 +60,24 @@ describe('ci.yml and publish.yml prepare the runner alike', () => {
     const action = read('.github/actions/install-scanners/action.yml');
     for (const variable of ['OMX_CLAP_SCAN', 'OMX_CLAP_FAKE', 'PYTHONPATH']) expect(action).toContain(`echo "${variable}=`);
     expect(action).toMatch(/apt-get install[^\n]*python3-lilv[^\n]*omx-clap-host-tests/);
+  });
+
+  it('the test files left out of an ordinary run are the ones the container job runs', () => {
+    const list = read('.github/container-tests.txt')
+      .split('\n')
+      .filter((l) => l.trim() !== '' && !l.startsWith('#'));
+    expect(list.length).toBeGreaterThan(0);
+    for (const file of list) expect(() => read(file), `${file} is listed and must exist`).not.toThrow();
+    // one definition: the config reads the list for the exclusion, the container job reads it for what it runs
+    expect(read('vitest.config.ts')).toContain('.github/container-tests.txt');
+    const ci = read('.github/workflows/ci.yml');
+    const job = ci.slice(ci.indexOf('\n  container-tests:'), ci.indexOf('\n  catalogs:'));
+    expect(job).toMatch(/OMX_CONTAINER_TESTS: '1'/);
+    expect(job).toContain(`grep -v '^#' .github/container-tests.txt`);
+    expect(job).not.toMatch(/src\/[\w.-]+\.test\.ts/);
+    // the other workflows run the ordinary suite: neither names the files itself
+    for (const w of WORKFLOWS) expect(read(`.github/workflows/${w}`)).not.toMatch(new RegExp(list.map((f) => f.replace(/[.]/g, '\\.')).join('|')));
+    expect(read('.github/workflows/publish.yml')).toContain('.github/container-tests.txt');
   });
 
   it('publish.yml publishes by OIDC: no token, no secret', () => {
