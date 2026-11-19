@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { machineReason, parseSyncArgs, resolveSyncSettings, runSync, SYNC_CODE } from "./qualify-sync.js";
+import { TEXT_CODE } from "./text-codes.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -107,7 +108,7 @@ describe("a plugin the machine left unmeasured (#192)", () => {
   it("only the machine's reasons count: an errno, or a measurement that wrote no document", () => {
     const u = (code: string, detail?: string) => ({ outcome: "unmeasured" as const, code, ...(detail === undefined ? {} : { detail }) });
     expect(machineReason(u(SYNC_CODE.notMeasured, "probe exited 2 measuring x, and wrote no document: open: ENOSPC"))).toBe("ENOSPC");
-    expect(machineReason(u(SYNC_CODE.notMeasured, "probe exited 2 measuring x, and wrote no document"))).toBe("the measurement wrote no document");
+    expect(machineReason(u(SYNC_CODE.notMeasured, "probe exited 2 measuring x, and wrote no document"))).toBe(TEXT_CODE.syncNoDocument);
     expect(machineReason(u(SYNC_CODE.notMeasured, "probe: no such plugin x"))).toBeUndefined();
     expect(machineReason(u(SYNC_CODE.notMeasured, "no JACK server: omx-clap-host could not open a JACK client (resp -201)"))).toBe("no JACK server");
     expect(machineReason(u("probe.limit.not-implemented"))).toBeUndefined();

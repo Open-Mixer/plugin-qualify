@@ -13,6 +13,7 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { judgedLayerOf } from "./judged-layer.js";
 import { SPAWNED_PLUGIN_DB, pluginDbPin, pluginDbPutJudged, type PinWhere, type PluginDbRun } from "./plugin-db-cli.js";
 import { layerPinOf } from "./plugin-db-pin.js";
+import { localeOf, textOf } from "./text-catalog.js";
 import { VERSION } from "./judgement-line.js";
 import type { QualificationRecord } from "./qualification-record.js";
 import type { SyncState } from "./qualify-sync.js";
@@ -121,7 +122,7 @@ export function storeJudgedLayers(state: SyncState, opts: StoreOptions): StoreOu
       const layer = judgedLayerOf(record, { machineClass: opts.machineClass, pin, judgedBy: judgedByOf(record) });
       if (layer.layer === null) {
         noLayer++;
-        add(layerless, layer.reason, p.record);
+        add(layerless, textOf(layer.reason, localeOf(opts.env)), p.record);
         continue;
       }
       const where = whereOf(p.pin!.uri, opts.lv2Path);

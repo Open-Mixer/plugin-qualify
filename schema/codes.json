@@ -381,6 +381,620 @@
       "args": [
         "error"
       ]
+    },
+    "cliUnknownOption": {
+      "code": "qualify.cli.unknown-option",
+      "text": {
+        "en": "unknown option {option}"
+      },
+      "args": [
+        "option"
+      ]
+    },
+    "cliUnknownArgument": {
+      "code": "qualify.cli.unknown-argument",
+      "text": {
+        "en": "unknown argument {argument}"
+      },
+      "args": [
+        "argument"
+      ]
+    },
+    "cliNeedsValue": {
+      "code": "qualify.cli.needs-value",
+      "text": {
+        "en": "{option} needs a value"
+      },
+      "args": [
+        "option"
+      ]
+    },
+    "cliIsNeeded": {
+      "code": "qualify.cli.is-needed",
+      "text": {
+        "en": "{option} is needed"
+      },
+      "args": [
+        "option"
+      ]
+    },
+    "cliWholeAboveZero": {
+      "code": "qualify.cli.whole-above-zero",
+      "text": {
+        "en": "{option} takes a whole number above 0"
+      },
+      "args": [
+        "option"
+      ]
+    },
+    "cliFormatOneOf": {
+      "code": "qualify.cli.format-one-of",
+      "text": {
+        "en": "--format must be one of {formats}"
+      },
+      "args": [
+        "formats"
+      ]
+    },
+    "cliFormatTextOrJson": {
+      "code": "qualify.cli.format-text-or-json",
+      "text": {
+        "en": "--format is text or json"
+      },
+      "args": []
+    },
+    "cliOptionProblem": {
+      "code": "qualify.cli.option-problem",
+      "text": {
+        "en": "{option}: {problem}"
+      },
+      "args": [
+        "option",
+        "problem"
+      ]
+    },
+    "cliAllTakesNoTargets": {
+      "code": "qualify.cli.all-takes-no-targets",
+      "text": {
+        "en": "--all takes no plugin targets"
+      },
+      "args": []
+    },
+    "cliAllWithTargets": {
+      "code": "qualify.cli.all-with-targets",
+      "text": {
+        "en": "--all and named plugins do not go together"
+      },
+      "args": []
+    },
+    "cliNameTarget": {
+      "code": "qualify.cli.name-target",
+      "text": {
+        "en": "name a plugin (URI or .lv2 bundle) or pass --all"
+      },
+      "args": []
+    },
+    "cliRatesList": {
+      "code": "qualify.cli.rates-list",
+      "text": {
+        "en": "--rates must be positive integers, comma-separated"
+      },
+      "args": []
+    },
+    "cliQuantaList": {
+      "code": "qualify.cli.quanta-list",
+      "text": {
+        "en": "--quanta must be positive integers, comma-separated"
+      },
+      "args": []
+    },
+    "cliTwoGrids": {
+      "code": "qualify.cli.two-grids",
+      "text": {
+        "en": "--grid-hosts and --grid name two grids; give one"
+      },
+      "args": []
+    },
+    "cliCellsBudget": {
+      "code": "qualify.cli.cells-budget",
+      "text": {
+        "en": "--cells-per-plugin-budget must be a whole number, 0 or more"
+      },
+      "args": []
+    },
+    "cliBlocks": {
+      "code": "qualify.cli.blocks",
+      "text": {
+        "en": "--blocks must be a whole number, 1 or more"
+      },
+      "args": []
+    },
+    "cliPinsFile": {
+      "code": "qualify.cli.pins-file",
+      "text": {
+        "en": "--pins needs a file name"
+      },
+      "args": []
+    },
+    "adjustOptionsOnly": {
+      "code": "qualify.adjust.options-only",
+      "text": {
+        "en": "{argument}: adjust takes options only; the records are read from --qualification-dir"
+      },
+      "args": [
+        "argument"
+      ]
+    },
+    "adjustNowSeconds": {
+      "code": "qualify.adjust.now-seconds",
+      "text": {
+        "en": "--now must be UTC seconds, a whole number"
+      },
+      "args": []
+    },
+    "adjustNameHistory": {
+      "code": "qualify.adjust.name-history",
+      "text": {
+        "en": "name the history file with --history"
+      },
+      "args": []
+    },
+    "hereConfigFile": {
+      "code": "qualify.here.config-file",
+      "text": {
+        "en": "--config takes a file"
+      },
+      "args": []
+    },
+    "compareHostsList": {
+      "code": "qualify.compare.hosts-list",
+      "text": {
+        "en": "--hosts takes a list of {hosts}"
+      },
+      "args": [
+        "hosts"
+      ]
+    },
+    "compareHostsListBad": {
+      "code": "qualify.compare.hosts-list-bad",
+      "text": {
+        "en": "--hosts takes a list of {hosts}; not a host: {bad}"
+      },
+      "args": [
+        "hosts",
+        "bad"
+      ]
+    },
+    "compareNameTargets": {
+      "code": "qualify.compare.name-targets",
+      "text": {
+        "en": "name the plugins (LV2 URIs, bundles or .clap files) or --all"
+      },
+      "args": []
+    },
+    "comparePublishNeeds": {
+      "code": "qualify.compare.publish-needs",
+      "text": {
+        "en": "--publish writes a summary for the records: it needs --out, --host-class and --set"
+      },
+      "args": []
+    },
+    "comparePublishHosts": {
+      "code": "qualify.compare.publish-hosts",
+      "text": {
+        "en": "--publish compares against {hosts}: --hosts must name them"
+      },
+      "args": [
+        "hosts"
+      ]
+    },
+    "compareOneDirectory": {
+      "code": "qualify.compare.one-directory",
+      "text": {
+        "en": "one directory"
+      },
+      "args": []
+    },
+    "compareNameDirectory": {
+      "code": "qualify.compare.name-directory",
+      "text": {
+        "en": "name the directory of the comparison records"
+      },
+      "args": []
+    },
+    "comparePublishNeedsSet": {
+      "code": "qualify.compare.publish-needs-set",
+      "text": {
+        "en": "--publish needs --host-class and --set"
+      },
+      "args": []
+    },
+    "gridPartUnknown": {
+      "code": "qualify.grid.part-unknown",
+      "text": {
+        "en": "the grid is hosts, full, or cells as <rate>/<quantum>, comma-separated; \"{part}\" is none of them"
+      },
+      "args": [
+        "part"
+      ]
+    },
+    "memoryLimitUnread": {
+      "code": "qualify.memory.limit-unread",
+      "text": {
+        "en": "the memory limit is off, or bytes as 2147483648, 2048M or 2G; \"{value}\" is neither"
+      },
+      "args": [
+        "value"
+      ]
+    },
+    "adapterNoVersion": {
+      "code": "qualify.adapter.no-version",
+      "text": {
+        "en": "{tool} --version names no version, so a run could not say which host it was under"
+      },
+      "args": [
+        "tool"
+      ]
+    },
+    "judgeNameProbeOutput": {
+      "code": "qualify.judge.name-probe-output",
+      "text": {
+        "en": "name at least one probe output"
+      },
+      "args": []
+    },
+    "judgedNameOneRecord": {
+      "code": "qualify.judged.name-one-record",
+      "text": {
+        "en": "name one record"
+      },
+      "args": []
+    },
+    "judgedMachineClass": {
+      "code": "qualify.judged.machine-class",
+      "text": {
+        "en": "--machine-class is required"
+      },
+      "args": []
+    },
+    "recordsNameDirectory": {
+      "code": "qualify.records.name-directory",
+      "text": {
+        "en": "name a qualification directory or a run root"
+      },
+      "args": []
+    },
+    "recordsPackageWord": {
+      "code": "qualify.records.package-word",
+      "text": {
+        "en": "{what} {value}: a package name holds lowercase letters, digits, + - and . only"
+      },
+      "args": [
+        "what",
+        "value"
+      ]
+    },
+    "recordsCellUnread": {
+      "code": "qualify.records.cell-unread",
+      "text": {
+        "en": "--cell {cell} is not <rate>/<quantum>"
+      },
+      "args": [
+        "cell"
+      ]
+    },
+    "recordsCellOneDirectory": {
+      "code": "qualify.records.cell-one-directory",
+      "text": {
+        "en": "--cell names the cell of one directory; name one"
+      },
+      "args": []
+    },
+    "recordsVersionUnread": {
+      "code": "qualify.records.version-unread",
+      "text": {
+        "en": "--version {version} is not a Debian version"
+      },
+      "args": [
+        "version"
+      ]
+    },
+    "judgedSchemaOther": {
+      "code": "qualify.judged.schema-other",
+      "text": {
+        "en": "record schema {schema} is not {expected}"
+      },
+      "args": [
+        "schema",
+        "expected"
+      ]
+    },
+    "judgedNoVerdict": {
+      "code": "qualify.judged.no-verdict",
+      "text": {
+        "en": "no verdict under {host}"
+      },
+      "args": [
+        "host"
+      ]
+    },
+    "judgedNoVerdictFormat": {
+      "code": "qualify.judged.no-verdict-format",
+      "text": {
+        "en": "no verdict under a host for {format}"
+      },
+      "args": [
+        "format"
+      ]
+    },
+    "judgedNotMeasured": {
+      "code": "qualify.judged.not-measured",
+      "text": {
+        "en": "{host}: not measured ({deciding})"
+      },
+      "args": [
+        "host",
+        "deciding"
+      ]
+    },
+    "judgedNoProbeVersion": {
+      "code": "qualify.judged.no-probe-version",
+      "text": {
+        "en": "the record names no plugin-hostd-probe version"
+      },
+      "args": []
+    },
+    "judgedNoRules": {
+      "code": "qualify.judged.no-rules",
+      "text": {
+        "en": "the record states no rules, and no judgedBy was given"
+      },
+      "args": []
+    },
+    "recordsLeftUnmeasured": {
+      "code": "qualify.records.left-unmeasured",
+      "text": {
+        "en": "unmeasured, never applies"
+      },
+      "args": []
+    },
+    "recordsLeftUnreadable": {
+      "code": "qualify.records.left-unreadable",
+      "text": {
+        "en": "does not read"
+      },
+      "args": []
+    },
+    "recordsLeftNotRecord": {
+      "code": "qualify.records.left-not-record",
+      "text": {
+        "en": "not a {schema} naming its probe output"
+      },
+      "args": [
+        "schema"
+      ]
+    },
+    "recordsLeftOtherCell": {
+      "code": "qualify.records.left-other-cell",
+      "text": {
+        "en": "measured at {cells}, not at its set's {cell}"
+      },
+      "args": [
+        "cells",
+        "cell"
+      ]
+    },
+    "recordsLeftNoCell": {
+      "code": "qualify.records.left-no-cell",
+      "text": {
+        "en": "measured at no cell, not at its set's {cell}"
+      },
+      "args": [
+        "cell"
+      ]
+    },
+    "recordsLeftNoProbeOutput": {
+      "code": "qualify.records.left-no-probe-output",
+      "text": {
+        "en": "its probe output {file} is not there"
+      },
+      "args": [
+        "file"
+      ]
+    },
+    "recordsLeftProbeOutputOther": {
+      "code": "qualify.records.left-probe-output-other",
+      "text": {
+        "en": "its probe output {file} is not the copy it names"
+      },
+      "args": [
+        "file"
+      ]
+    },
+    "searchPathNoKey": {
+      "code": "qualify.search-path.no-key",
+      "text": {
+        "en": "plugin-hostd --search-path printed no {key} with its source"
+      },
+      "args": [
+        "key"
+      ]
+    },
+    "searchPathNoEffective": {
+      "code": "qualify.search-path.no-effective",
+      "text": {
+        "en": "plugin-hostd --search-path printed no effective lv2 and clap lists"
+      },
+      "args": []
+    },
+    "searchPathNoHostd": {
+      "code": "qualify.search-path.no-hostd",
+      "text": {
+        "en": "plugin-hostd is not installed: the directories scanned are the ones plugin-hostd searches"
+      },
+      "args": []
+    },
+    "searchPathUnsupported": {
+      "code": "qualify.search-path.unsupported",
+      "text": {
+        "en": "this plugin-hostd has no --search-path (plugin-hostd 0.20.3 or later names the directories it searches)"
+      },
+      "args": []
+    },
+    "searchPathExited": {
+      "code": "qualify.search-path.exited",
+      "text": {
+        "en": "plugin-hostd --search-path exited {status}"
+      },
+      "args": [
+        "status"
+      ]
+    },
+    "searchPathFromEnv": {
+      "code": "qualify.search-path.from-env",
+      "text": {
+        "en": "{key} is plugin-hostd's environment ({variable}), not {where}: the running daemon may search other directories; write it in that file"
+      },
+      "args": [
+        "key",
+        "variable",
+        "where"
+      ]
+    },
+    "searchPathFromEnvOwnFile": {
+      "code": "qualify.search-path.from-env-own-file",
+      "text": {
+        "en": "{key} is plugin-hostd's environment ({variable}), not plugin-hostd's own settings file: the running daemon may search other directories; write it there"
+      },
+      "args": [
+        "key",
+        "variable"
+      ]
+    },
+    "searchPathFromDefault": {
+      "code": "qualify.search-path.from-default",
+      "text": {
+        "en": "{key} is plugin-hostd's default, not {where}: the running daemon may search other directories; write it in that file"
+      },
+      "args": [
+        "key",
+        "where"
+      ]
+    },
+    "searchPathFromDefaultOwnFile": {
+      "code": "qualify.search-path.from-default-own-file",
+      "text": {
+        "en": "{key} is plugin-hostd's default, not plugin-hostd's own settings file: the running daemon may search other directories; write it there"
+      },
+      "args": [
+        "key"
+      ]
+    },
+    "syncNoPluginListed": {
+      "code": "qualify.sync.no-plugin-listed",
+      "text": {
+        "en": "no plugin was listed"
+      },
+      "args": []
+    },
+    "syncNoDocument": {
+      "code": "qualify.sync.no-document",
+      "text": {
+        "en": "the measurement wrote no document"
+      },
+      "args": []
+    },
+    "descriptorNoBinaryHash": {
+      "code": "qualify.descriptor.no-binary-hash",
+      "text": {
+        "en": "{plugin}: no SHA-256 of its binary"
+      },
+      "args": [
+        "plugin"
+      ]
+    },
+    "descriptorBinaryUnreadable": {
+      "code": "qualify.descriptor.binary-unreadable",
+      "text": {
+        "en": "{path}: {error}"
+      },
+      "args": [
+        "path",
+        "error"
+      ]
+    },
+    "descriptorNoUnitsSheet": {
+      "code": "qualify.descriptor.no-units-sheet",
+      "text": {
+        "en": "no omx-contract units sheet at {places}"
+      },
+      "args": [
+        "places"
+      ]
+    },
+    "descriptorNoSchema": {
+      "code": "qualify.descriptor.no-schema",
+      "text": {
+        "en": "no omx-contract schema at {places}"
+      },
+      "args": [
+        "places"
+      ]
+    },
+    "descriptorNoJsonschema": {
+      "code": "qualify.descriptor.no-jsonschema",
+      "text": {
+        "en": "python3-jsonschema is not installed"
+      },
+      "args": []
+    },
+    "descriptorOriginScanned": {
+      "code": "qualify.descriptor.origin-scanned",
+      "text": {
+        "en": "a scanned descriptor carries origin scanned"
+      },
+      "args": []
+    },
+    "descriptorSchemaRefused": {
+      "code": "qualify.descriptor.schema-refused",
+      "text": {
+        "en": "{where}: {message}"
+      },
+      "args": [
+        "where",
+        "message"
+      ]
+    },
+    "descriptorDirUnwritable": {
+      "code": "qualify.descriptor.dir-unwritable",
+      "text": {
+        "en": "{directory}: {error}"
+      },
+      "args": [
+        "directory",
+        "error"
+      ]
+    },
+    "descriptorNotClapScan": {
+      "code": "qualify.descriptor.not-clap-scan",
+      "text": {
+        "en": "not a CLAP scan document"
+      },
+      "args": []
+    },
+    "judgedFilesPin": {
+      "code": "qualify.judged.files-pin",
+      "text": {
+        "en": "--files must be the 64 hex digits of the files pin"
+      },
+      "args": []
+    },
+    "judgedLayoutForm": {
+      "code": "qualify.judged.layout-form",
+      "text": {
+        "en": "--layout must be <scheme>:<sha256>"
+      },
+      "args": []
     }
   }
 }
