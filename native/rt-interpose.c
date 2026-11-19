@@ -63,6 +63,9 @@ OMX_RT_LOCAL int armed;
  * and never the verdict, and only the audio thread's calls are recorded as events. In the host comparison's watch the
  * window is per thread already, so every counted call is the watched thread's. */
 static uint64_t n_alloc_other, n_lock_other, n_syscall_other;
+/* Several other threads (a plugin's worker, a host's pool helpers) bump these at once in either build, and under a pool
+ * they are added to the verdict, so they are atomic whatever OMX_RT_INC is. */
+#define OMX_RT_INC_ATOMIC(x) __atomic_fetch_add(&(x), 1, __ATOMIC_RELAXED)
 #ifdef OMX_RT_WATCH
 #define ON_ARMER() 1
 #else
@@ -73,7 +76,7 @@ static pthread_t armer;
   do {                                                                               \
     if (armed && !in_record) {                                                       \
       if (ON_ARMER()) { OMX_RT_INC(own); record(kind); }                             \
-      else OMX_RT_INC(other);                                                        \
+      else OMX_RT_INC_ATOMIC(other);                                                 \
     }                                                                                \
   } while (0)
 /* A try-lock never waits. The qualification counts it as a lock, as before; the host comparison keeps it apart, since a
@@ -91,7 +94,9 @@ static uint64_t n_trylock;
  * and the ring while a record is being taken. */
 static struct omx_rt_event events[OMX_RT_EV_MAX];
 static int n_events;
-OMX_RT_LOCAL int in_record;
+/* Per thread in both builds: the armer taking a record must not mute the other threads' counting meanwhile, and the
+ * unwinder's own calls are the recording thread's alone. */
+static __thread __attribute__((tls_model("initial-exec"))) int in_record;
 
 static void record(int kind) {
 #ifdef OMX_RT_WATCH
@@ -199,9 +204,9 @@ void omx_rt_counts(uint64_t *alloc, uint64_t *lock, uint64_t *sys) {
 }
 /* What other threads did while the window was armed (D20): a figure, never the verdict. */
 void omx_rt_other_counts(uint64_t *alloc, uint64_t *lock, uint64_t *sys) {
-  if (alloc) *alloc = n_alloc_other;
-  if (lock) *lock = n_lock_other;
-  if (sys) *sys = n_syscall_other;
+  if (alloc) *alloc = __atomic_load_n(&n_alloc_other, __ATOMIC_RELAXED);
+  if (lock) *lock = __atomic_load_n(&n_lock_other, __ATOMIC_RELAXED);
+  if (sys) *sys = __atomic_load_n(&n_syscall_other, __ATOMIC_RELAXED);
 }
 /* Present-and-loaded witness: without this the host cannot tell a clean plugin from
  * an interposer that never loaded, which is the difference between a measurement and
