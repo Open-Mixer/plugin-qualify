@@ -46,7 +46,9 @@ function record() {
   const rec = stored(LV2_CLEAN);
   const probe = readProbeOutput(readFileSync(join(FIXTURES, `${LV2_CLEAN}.probe.json`), "utf8"));
   if (!probe.ok) throw new Error(probe.problem);
-  return storeExport(rec, probe.output).record;
+  const exported = storeExport(rec, probe.output).record;
+  // the store requires the load the probe started under; a fixture of an older release holds none
+  return { ...exported, probe: { ...exported.probe, load: exported.probe.load ?? { loadavg1: 0.5, cores: 4 } } };
 }
 
 /** The writer is told to keep its layer under a directory of the test's own (`--root`, for tests): no run here touches a user's layer. */
