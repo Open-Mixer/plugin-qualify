@@ -295,7 +295,7 @@ line is information: the plugin still loads.
 ### The facts of here
 
 `plugin-qualify here [--json] [--config <file>]` prints the facts of this machine a plugin-db query is asked with,
-by plugin-db's own keys (#56): `machineClass`, the host class the sync reads distributed records by (`host_class` in
+by plugin-db's own keys (#56): `machineClass`, the host class the sync reads and writes records under (`host_class` in
 the settings file, else the board's from the device tree, `rpi5`, else the machine's, `x86-64`); `hostName` and
 `hostVersion`, plugin-hostd and the version it answers installed; `hostingEpoch`, plugin-hostd's; `rules`, this
 plugin-qualify's; and `recordSchema`. A fact that cannot be read is left out, never guessed. `--json` prints them as
@@ -712,7 +712,7 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 | --- | --- |
 | `hostd_conf` | plugin-hostd's own settings file: `$XDG_CONFIG_HOME/plugin-hostd.conf`, else `~/.config/plugin-hostd.conf` |
 | `pin_file` | `/var/lib/omx/qualified.pins` |
-| `qualification_dir`, `descriptor_dir` | `/var/lib/omx/qualification`, `/var/lib/omx/descriptors` |
+| `descriptor_dir` | `/var/lib/omx/descriptors` |
 | `state_file` | `/var/lib/omx/qualify-sync.json` |
 | `budget_s` | `60` |
 | `host_profile` | `omx-clap-host` |
@@ -721,8 +721,7 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 | `memory_limit` | half of the machine's RAM (`off` for none) |
 | `memory_notes` | `16`: the notes an instrument with no declared capacity holds in a `--memory-only` run |
 | `hostd_port`, `hostd_feedback_port` | `5555`, the next port |
-| `host_class` | the board's own, from the device tree (`rpi5`); none elsewhere |
-| `distributed_dir` | `/usr/share/omx/qualification` |
+| `host_class` | the board's own, from the device tree (`rpi5`), else `x86-64` on an x86_64 machine; none elsewhere, and the run is refused until one is named |
 
 Those are the service's (`--system`); run by a user, the files go under `$XDG_STATE_HOME/omx`.
 
@@ -732,7 +731,7 @@ prints, so a plugin the sync pins is one the daemon finds. `lv2_path`, `lv2_extr
 file, or as flags, are refused with a pointer to plugin-hostd's settings file. When plugin-hostd takes `lv2_path` or
 `clap_path` from its environment (`LV2_PATH`, `CLAP_PATH`) or its default rather than the file, the run says so: the
 running daemon, started with another environment, may search other directories. Writing both lists in plugin-hostd's
-settings file makes them agree exactly, since the file is over the environment. `--force` qualifies everything again, and `--no-distributed` reads no distributed record. A second `plugin-qualify-sync` waits for the run in progress (a lock on `<state_file>.lock`); `--no-wait` exits 0 at once and leaves a marker, and the holder runs once more at its end over what changed meanwhile.
+settings file makes them agree exactly, since the file is over the environment. `--force` qualifies everything again, and `--no-distributed` takes no stored record. A second `plugin-qualify-sync` waits for the run in progress (a lock on `<state_file>.lock`); `--no-wait` exits 0 at once and leaves a marker, and the holder runs once more at its end over what changed meanwhile.
 
 Every run starts by bringing each pin's files up to the ones `plugin-hostd --pin-files` names, measuring nothing: a pin
 written before 0.17.3 lacks the preset files an LV2's manifest names, which plugin-hostd 0.15.0 also checks, and its add
@@ -760,13 +759,13 @@ again. The figures in the records are carried across and judged again:
 plugin-qualify-sync --system --rejudge
 ```
 
-`--rejudge` measures nothing and needs no measuring tool. It reads every record in `qualification_dir` with the probe
-output it names, and passes them through the same judge a measurement goes through, under the rules of the running
+`--rejudge` measures nothing and needs no measuring tool. It reads every record of the scope's layer of the store, from
+its rows alone (no probe output is kept), and passes them through the same judge a measurement goes through, under the rules of the running
 version: a real-time violation under `run()` or under notes is `conditional` and pinned `isolated`, each host's budget is
 read, and a plugin with no footprint is `unknown` on a host with a memory budget, never read as fitting. It also judges
 each record for `omx-clap-host`, `openmixer-console` and the Pi boards `openmixer-pi-4gb` and `openmixer-pi-8gb`. The
-verdicts, the tiers and the plugin's pin word are replaced; the figures, the probe output and who took them stay as they
-were. The record gains a `rejudged` block with `at`, `by` (the version that judged) and `figures` (`tool`, `measuredAt`
+verdicts, the tiers and the plugin's pin word are replaced and the record is put again; the figures and who took them stay as they
+were. A record whose rows lack a figure the judge needs owes `qualify.sync.figures-unreadable` and is left as it is. The record gains a `rejudged` block with `at`, `by` (the version that judged) and `figures` (`tool`, `measuredAt`
 and `runId`, as measured). A run that finds nothing to change writes nothing.
 
 A verdict never says more than the figures do. An LV2 plugin's `omx-clap-host` verdict is decided by its run under the LV2
@@ -852,57 +851,50 @@ hour at most for the 1,542 plugins of the Zynthian set. Those are upper bounds: 
 whole pass at one cell took, which also ran 30 lifecycles, the sweep, the latency and the cost. A plugin that hangs
 takes `budget_s` a cell. The test fixtures take 0.1 s each, both cells, on an x86-64 desktop.
 
-### Distributed records
+### Records the store holds
 
-A device that ships with a known plugin set need not measure it again at first start. The qualification records
-another device of the same machine class wrote for that set are installed read-only, and the sync takes from them
-every plugin whose files are the bytes that were measured:
+A device that ships with a known plugin set need not measure it again at first start. The qualification records of that
+set are in the qualification store, which the sync reads through `plugin-qualification-db`; it takes from them every
+plugin whose files are the bytes that were measured. The sync's own records are in the same store, in the scope's own
+layer (the system layer under `--system`, the user's otherwise), put there by the sync through
+`plugin-qualification-db-write`. A record the scope's layer holds shadows the whole record of the same key that the base
+holds. The host class the records are read under is `host_class` in the settings, or, when it is unset, the board's own
+name read from the device tree (`rpi5` on a Raspberry Pi 5), else `x86-64` on an x86_64 machine; where none gives one, the
+run says so and stops.
 
-```
-/usr/share/omx/qualification/<host class>/<set>/          # system (--system)
-$XDG_DATA_HOME/omx/qualification/<host class>/<set>/      # a user run, then each $XDG_DATA_DIRS/omx/qualification
-```
+Before a plugin is measured, the sync asks the store for the records of it: a CLAP record whose binary has the same name
+below its install root, or an LV2 record of the same plugin uri. The name only finds the record; a record applies when,
+and only when:
 
-Each `<set>` directory holds the records (`*.qualification.json`, each with its probe output `*.probe.json`) and a
-`provenance.json` that says where they come from: the set, the host class, the image, the package versions of the
-measuring device, the date and the package that installed them. The host class is a directory name: `host_class`
-in the settings, or, when it is unset, the board's own name read from the device tree (`rpi5` on a Raspberry Pi 5,
-`rpi4` on a Raspberry Pi 4). Where neither gives one, the layer is not read and the run says so.
-
-Before a plugin is measured, the sync looks for a distributed record of it: a CLAP record whose binary is the same
-`.clap` path, or an LV2 record of the same plugin uri. The name only finds the record; a record applies when, and
-only when:
-
-- every file of its `binary.files` is installed at that path relative to the plugin's root, with that SHA-256,
-  computed on the device;
-- its schema is the one this version writes and its probe output is one this version's reader accepts, the copy
-  intact (its SHA-256 the one the record names): the same acceptance the sync gives a record of its own, which it
-  never measures again for a newer tool;
+- the files of the installed item are exactly the record's list (`binary.files`): the same paths below the install
+  root and, computed on the device, the same SHA-256 for each, none missing and none beside them. Where the item is
+  installed (`/usr/lib/clap`, `/usr/lib64/clap`, a home's `.clap`) decides nothing;
 - it holds a verdict for the sync's `host_profile`, and that verdict ended `qualified`, `refused`, `crashed` or
   `hung`. One that could not be measured at the source (`unmeasured`) is measured here;
 - its probe took the latency figure, or named why it could not. A record from a probe that ran before the latency
   pass (plugin-hostd-probe 0.12 on an LV2 plugin) holds neither, and is measured here: its plugin would otherwise read
-  "latency unknown" for a figure today's probe takes.
+  "latency unknown" for a figure today's probe takes;
+- it holds every step its outcome calls for, and its rows hold every figure the judge reads.
 
 The verdicts of a record that applies are not taken as the measuring device's plugin-qualify wrote them: its figures
-are judged again under this version's rules, as `--rejudge` judges a device's own records after an upgrade. A plugin an
-older judge refused for an RT-safety violation alone is taken as `conditional`, pinned `isolated` and runs alone in a
-worker of its own. A record this version's judge cannot decide for the host (an LV2 plugin with no run under
+are judged again from its rows under this version's rules, as `--rejudge` judges a device's own records after an upgrade.
+A plugin an older judge refused for an RT-safety violation alone is taken as `conditional`, pinned `isolated` and runs
+alone in a worker of its own. A record this version's judge cannot decide for the host (an LV2 plugin with no run under
 omx-clap-host's adapter) is measured here.
 
-A plugin whose distributed records apply is not measured: the records are copied into `qualification_dir` with the
-set's `provenance` object added, its pin is taken from the probe output the record judged, its descriptor is
-written, and the run says
+A plugin whose stored records apply is not measured: the records are put in the scope's layer, its pin is built from the
+record's list, layout and tested version (the probe output is not kept), its descriptor is written, and the run says
 
 ```
-distributed: http://distrho.sf.net/plugins/3BandEQ: applied (zynthian-vangelis)
+stored: http://distrho.sf.net/plugins/3BandEQ: applied (zynthian-vangelis)
 ```
 
-A plugin with a distributed record whose files differ is measured as before, and the run says
-`distributed: <uri>: binary differs`; one with no distributed record is measured without a word. The summary counts
-the plugins taken from the layer, `distributed N`, apart from the ones measured and skipped. A later run treats an
-applied plugin like one it measured: skipped while its files are unchanged, measured when they change. `--force`
-measures everything and reads no distributed record; `--no-distributed` keeps the layer out of a run.
+A plugin with a stored record whose files differ is measured as before, and the run says
+`stored: <uri>: binary differs`; one with no stored record is measured without a word, and so is every plugin when the
+store holds no record at all. The summary counts the plugins taken from the store, `distributed N`, apart from the ones
+measured and skipped. A later run treats a taken plugin like one it measured: skipped while its files are unchanged,
+measured when they change. `--force` measures everything and takes no stored record; `--no-distributed` keeps the store's
+records out of a run.
 
 A record set is per machine class, rate and quantum. The packages that install a run's sets are built by
 `plugin-qualify-records-package`, from the run's root (each `b<rate>-<quantum>/qualification` under it is one cell) or
@@ -945,7 +937,7 @@ measuring tools (`tools/lv2-measure.mjs`, the mod-host sweep). A run that would 
 
 ## The qualification store (plugin-qualify-sync)
 
-**Status:** designed here, implemented in the commits that follow; the contract is the qualification-store spec of
+**Status:** implemented; the contract is the qualification-store spec of
 Open-Mixer/plugin-db-qualification (`docs/design/specs/qualification-sqlite.md` at 13619143e: sections 3.7, 6.1, 6.2 and
 the cases C1 to C9 and C6b of section 8).
 
