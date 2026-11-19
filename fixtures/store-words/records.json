@@ -1,0 +1,3709 @@
+{
+ "about": "Words of real qualification records, trimmed to the fields the store spec section 3.5 maps to a checked column; a greedy cover of every (field, word) pair the records hold.",
+ "records": [
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.silent-under-note",
+     "cells": [
+      {
+       "code": "omx-clap-host.silent-under-note"
+      },
+      {
+       "code": "omx-clap-host.silent-under-note"
+      }
+     ]
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.silent-under-note",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.silent-under-note",
+        "params": {
+         "peak": 0,
+         "notes": 30,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 239016,
+         "syscalls": 0,
+         "locks": 9200
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 239016,
+         "syscalls": 0,
+         "locks": 9200
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.silent-under-note",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.silent-under-note",
+        "params": {
+         "peak": 0,
+         "notes": 30,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 239016,
+         "syscalls": 0,
+         "locks": 9200
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 704,
+         "firstInstanceKb": 3680,
+         "ceilingKb": 393216,
+         "consoleCeilingKb": 3145728,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.silent-under-note",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.silent-under-note",
+        "params": {
+         "peak": 0,
+         "notes": 30,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 239016,
+         "syscalls": 0,
+         "locks": 9200
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 704,
+         "firstInstanceKb": 3680,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.memory.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "omx-clap-host.silent-under-note"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       },
+       "noteSweep": {
+        "dialect": "midi"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       },
+       "noteSweep": {
+        "dialect": "midi"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": [
+      {
+       "dimension": "latency",
+       "code": "hosting.latency.unmeasured"
+      },
+      {
+       "dimension": "cost",
+       "code": "hosting.cost.unmeasured-at-rate-and-quantum"
+      },
+      {
+       "dimension": "latency",
+       "code": "hosting.latency.unmeasured"
+      },
+      {
+       "dimension": "cost",
+       "code": "hosting.cost.unmeasured-at-rate-and-quantum"
+      }
+     ]
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "unsafe"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.silent-output"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.crashed",
+     "ends": [
+      {
+       "step": "lifecycle",
+       "outcome": "probe.crashed",
+       "signal": "SIGSEGV"
+      }
+     ]
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "probe.crashed",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "probe.crashed"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.crashed",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.crashed"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      },
+      {
+       "step": "pool",
+       "result": "not-asked"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.resp-102",
+     "cells": [
+      {
+       "code": "omx-clap-host.resp-102"
+      },
+      {
+       "code": "omx-clap-host.resp-102"
+      }
+     ]
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.resp-102",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.resp-102",
+        "params": {
+         "step": "add",
+         "resp": -102,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.resp-102",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.resp-102",
+        "params": {
+         "step": "add",
+         "resp": -102,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 320,
+         "firstInstanceKb": 3696,
+         "ceilingKb": 393216,
+         "consoleCeilingKb": 3145728,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.resp-102",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.resp-102",
+        "params": {
+         "step": "add",
+         "resp": -102,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 320,
+         "firstInstanceKb": 3696,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.memory.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "omx-clap-host.resp-102"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": [
+      {
+       "dimension": "latency",
+       "code": "hosting.latency.unmeasured"
+      },
+      {
+       "dimension": "latency",
+       "code": "hosting.latency.unmeasured"
+      }
+     ]
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.not-added"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.oom",
+     "ends": [
+      {
+       "step": "lifecycle",
+       "outcome": "probe.error"
+      },
+      {
+       "step": "lifecycle",
+       "outcome": "probe.error"
+      }
+     ]
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.no-jack-client",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.oom",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.oom",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.oom",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.oom",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.oom",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.oom",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.oom",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.oom",
+        "params": {}
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "probe.oom"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "probe.oom"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.oom",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       },
+       "memoryLimit": {
+        "mechanism": "rlimit-data"
+       }
+      },
+      {
+       "outcome": "probe.oom",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       },
+       "memoryLimit": {
+        "mechanism": "rlimit-data"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.oom"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.refused-instantiation",
+     "ends": [
+      {
+       "step": "lifecycle",
+       "outcome": "probe.ok"
+      },
+      {
+       "step": "lifecycle",
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.no-jack-client",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.refused-instantiation",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.refused-instantiation",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.refused-instantiation",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.refused-instantiation",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.refused-instantiation",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.refused-instantiation",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.refused-instantiation",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.refused-instantiation",
+        "params": {}
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "probe.refused-instantiation"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "probe.refused-instantiation"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.refused-instantiation",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.refused-instantiation",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.refused-instantiation"
+      },
+      {
+       "outcome": "probe.refused-instantiation"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.refused-instantiation"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.timeout",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.no-jack-client",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.timeout",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.timeout",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.timeout",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.timeout",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.timeout",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.timeout",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.timeout",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.timeout",
+        "params": {}
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "probe.timeout"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "probe.timeout"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.timeout",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.timeout",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.timeout"
+      },
+      {
+       "outcome": "probe.timeout"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.timeout"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.silent-output"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.rt-safety.violations-in-run",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 74,
+         "syscalls": 0,
+         "locks": 0
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-under-notes",
+        "params": {
+         "allocations": 153,
+         "syscalls": 0,
+         "locks": 0
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.within-ceiling",
+        "params": {
+         "coreFractionP95": 0.014893488,
+         "ceiling": 0.05
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "hosting.rt-safety.violations-in-run"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "noteSweep": {
+        "dialect": "clap"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "unsafe"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      },
+      {
+       "step": "pool",
+       "result": "not-asked"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.above-ceiling",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.above-ceiling",
+        "params": {
+         "rate": 48000,
+         "quantum": 128,
+         "figure": "perInstance",
+         "kb": 579184,
+         "ceilingKb": 393216,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.within-provisional-ceiling",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 579184,
+         "firstInstanceKb": 595216,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      },
+      {
+       "step": "pool",
+       "result": "not-asked"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.signal-SIGABRT",
+     "cells": [
+      {
+       "code": "omx-clap-host.signal-SIGABRT"
+      },
+      {
+       "code": "omx-clap-host.signal-SIGABRT"
+      }
+     ]
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.signal-SIGABRT",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.signal-SIGABRT",
+        "params": {
+         "step": "add",
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.signal-SIGABRT",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.signal-SIGABRT",
+        "params": {
+         "step": "add",
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 960,
+         "firstInstanceKb": 21312,
+         "ceilingKb": 393216,
+         "consoleCeilingKb": 3145728,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.signal-SIGABRT",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.signal-SIGABRT",
+        "params": {
+         "step": "add",
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 1024,
+         "events": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 960,
+         "firstInstanceKb": 21312,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.memory.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "omx-clap-host.signal-SIGABRT"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "noteSweep": {
+        "dialect": "midi"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "noteSweep": {
+        "dialect": "midi"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.not-added"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.resp-101",
+     "cells": [
+      {
+       "code": "omx-clap-host.resp-101"
+      },
+      {
+       "code": "omx-clap-host.resp-101"
+      }
+     ]
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.resp-101",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.resp-101",
+        "params": {
+         "step": "add",
+         "resp": -101,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 31,
+         "syscalls": 0,
+         "locks": 0
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 31,
+         "syscalls": 0,
+         "locks": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.resp-101",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.resp-101",
+        "params": {
+         "step": "add",
+         "resp": -101,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 31,
+         "syscalls": 0,
+         "locks": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 2064,
+         "firstInstanceKb": 5328,
+         "ceilingKb": 393216,
+         "consoleCeilingKb": 3145728,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "omx-clap-host.resp-101",
+      "reasons": [
+       {
+        "dimension": "hostAdmission",
+        "code": "omx-clap-host.resp-101",
+        "params": {
+         "step": "add",
+         "resp": -101,
+         "rate": 48000,
+         "quantum": 128
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 31,
+         "syscalls": 0,
+         "locks": 0
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 2064,
+         "firstInstanceKb": 5328,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.memory.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "omx-clap-host.resp-101"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "hosting.rt-safety.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.unmeasured",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.rt-safety.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.unmeasured",
+        "params": {}
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "hosting.rt-safety.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.unmeasured",
+        "params": {}
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 32,
+         "firstInstanceKb": 1088,
+         "ceilingKb": 393216,
+         "consoleCeilingKb": 3145728,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "hosting.rt-safety.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.unmeasured",
+        "params": {}
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 32,
+         "firstInstanceKb": 1088,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.rt-safety.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "hosting.rt-safety.unmeasured"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": [
+      {
+       "dimension": "latency",
+       "code": "hosting.latency.unmeasured"
+      },
+      {
+       "dimension": "latency",
+       "code": "hosting.latency.unmeasured"
+      }
+     ]
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.rt-safety.violations-under-notes",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 512
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-under-notes",
+        "params": {
+         "allocations": 3,
+         "syscalls": 32,
+         "locks": 112
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "hosting.rt-safety.violations-under-notes"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "noteSweep": {
+        "dialect": "clap"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "unsafe"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      },
+      {
+       "step": "pool",
+       "result": "off",
+       "code": "pool.not-rt-safe"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.rt-safety.violations-in-run",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 513,
+         "syscalls": 1,
+         "locks": 68633
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.above-ceiling",
+        "params": {
+         "coreFractionP95": 1.6707408,
+         "ceiling": 0.05
+        }
+       },
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.spiky-tail",
+        "params": {
+         "tailRatio": 279.76835404375714,
+         "ceiling": 4
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "hosting.rt-safety.violations-in-run"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok"
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "unsafe"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      },
+      {
+       "step": "pool",
+       "result": "not-asked"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "run",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "hosting.memory.within-provisional-ceiling",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 32,
+         "firstInstanceKb": 1216,
+         "ceilingKb": 393216,
+         "consoleCeilingKb": 3145728,
+         "provisional": "yes"
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "run",
+      "deciding": "hosting.memory.within-provisional-ceiling",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 1024
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.within-provisional-ceiling",
+        "params": {
+         "perInstanceKb": 32,
+         "firstInstanceKb": 1216,
+         "ceilingKb": 917504,
+         "consoleCeilingKb": 7340032,
+         "provisional": "yes"
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.memory.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.silent-output"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": [
+      {
+       "code": "qualify.sync.isolated-step-owed",
+       "measurement": "isolated-step"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.crashed",
+     "ends": [
+      {
+       "step": "lifecycle",
+       "outcome": "probe.crashed",
+       "signal": "SIGABRT"
+      },
+      {
+       "step": "lifecycle",
+       "outcome": "probe.crashed",
+       "signal": "SIGABRT"
+      }
+     ]
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.no-jack-client",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "probe.crashed"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "probe.crashed"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.crashed",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.crashed",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.crashed"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 512
+        }
+       },
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-notes",
+        "params": {
+         "blocks": 512,
+         "events": 0
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok",
+       "noteSweep": {
+        "dialect": "clap"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      },
+      {
+       "step": "pool",
+       "result": "not-run",
+       "code": "pool.not-watched"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "rpi5",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.crashed",
+     "ends": [
+      {
+       "step": "lifecycle",
+       "outcome": "probe.crashed",
+       "signal": "SIGSEGV"
+      },
+      {
+       "step": "lifecycle",
+       "outcome": "probe.crashed",
+       "signal": "SIGSEGV"
+      }
+     ]
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.no-jack-client",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "probe.crashed",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "probe.crashed",
+        "params": {}
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-4gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-pi-8gb",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "probe.crashed"
+     },
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "probe.crashed"
+     },
+     "offeredOn": []
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.crashed",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.crashed",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      },
+      {
+       "outcome": "probe.ok",
+       "latency": {
+        "code": "hosting.latency.unmeasured"
+       }
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     },
+     {
+      "dimension": "memoryGrowth",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "memoryRun": {
+     "cells": [
+      {
+       "outcome": "probe.ok"
+      },
+      {
+       "outcome": "probe.ok"
+      }
+     ]
+    },
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.crashed"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.crashed"
+      }
+     ]
+    },
+    "rejudged": {
+     "owes": []
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "custom",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.rt-safety.violations-in-run",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.violations-in-run",
+        "params": {
+         "allocations": 0,
+         "syscalls": 0,
+         "locks": 512
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "isolated": {
+      "host": "omx-clap-host",
+      "deciding": "hosting.rt-safety.violations-in-run"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok"
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "unsafe"
+      },
+      {
+       "step": "isolated",
+       "result": "refused",
+       "code": "isolated.non-finite-output"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "dir": "x86-64",
+   "offer": "default",
+   "record": {
+    "probe": {
+     "reason": "on-request",
+     "outcome": "probe.ok",
+     "ends": []
+    },
+    "adapter": {
+     "host": "omx-clap-host",
+     "code": "omx-clap-host.not-started",
+     "cells": []
+    },
+    "verdicts": [
+     {
+      "host": "omx-clap-host",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 512
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "hosting": "isolated",
+      "arm": "declaration",
+      "deciding": "hosting.memory.unmeasured",
+      "reasons": [
+       {
+        "dimension": "rtSafety",
+        "code": "hosting.rt-safety.clean-under-sweep",
+        "params": {
+         "blocks": 512
+        }
+       },
+       {
+        "dimension": "memory",
+        "code": "hosting.memory.unmeasured",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     }
+    ],
+    "cost": [
+     {
+      "host": "omx-clap-host",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 48000,
+         "quantum": 128
+        }
+       }
+      ]
+     },
+     {
+      "host": "openmixer-console",
+      "reasons": [
+       {
+        "dimension": "cost",
+        "code": "hosting.cost.unmeasured-at-rate-and-quantum",
+        "params": {
+         "rate": 96000,
+         "quantum": 1024
+        }
+       }
+      ]
+     }
+    ],
+    "tiers": {
+     "inProcess": {
+      "host": "openmixer-console",
+      "deciding": "hosting.memory.unmeasured"
+     },
+     "isolated": {
+      "host": "omx-clap-host"
+     },
+     "offeredOn": [
+      "isolated"
+     ]
+    },
+    "measurements": {
+     "grid": [
+      {
+       "outcome": "probe.ok"
+      }
+     ],
+     "unmeasured": []
+    },
+    "notMeasured": [
+     {
+      "dimension": "stability",
+      "code": "hosting.stability.unsoaked"
+     }
+    ],
+    "run": {
+     "steps": [
+      {
+       "step": "scan",
+       "result": "ok"
+      },
+      {
+       "step": "describe",
+       "result": "ok"
+      },
+      {
+       "step": "probe",
+       "result": "probe.ok"
+      },
+      {
+       "step": "rt-safety",
+       "result": "safe"
+      },
+      {
+       "step": "isolated",
+       "result": "isolated"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "provenance": [
+  {
+   "tier": "hardware",
+   "hostClass": "rpi5",
+   "hostProfile": "omx-clap-host",
+   "settings": {}
+  },
+  {
+   "tier": "provisional",
+   "hostClass": "x86-64",
+   "hostProfile": "omx-clap-host",
+   "settings": {
+    "host_class": "",
+    "clap_extra": "",
+    "memory_limit": "",
+    "hostd_port": ""
+   }
+  }
+ ]
+}
