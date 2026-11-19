@@ -22,10 +22,16 @@ import { storeExport } from "./store-export.support.js";
 const WRITE = process.env["PLUGIN_QUALIFICATION_DB_WRITE"] ?? "plugin-qualification-db-write";
 const READ = process.env["PLUGIN_QUALIFICATION_DB"] ?? "plugin-qualification-db";
 
-/** The commands read the installed contract directory: the test setup's own override (this package's one domain) is not theirs. */
+/**
+ * The commands check words against every domain of a contract directory, not this package's one: the test setup's own
+ * override of OMX_CONTRACT_PATH is not theirs. They read the installed directory, or the one STORE_CONTRACT_DIR names (a
+ * run whose installed contract packages are older than the domains the store needs).
+ */
 const commandEnv = (): NodeJS.ProcessEnv => {
   const env = { ...process.env };
-  delete env["OMX_CONTRACT_PATH"];
+  const dir = env["STORE_CONTRACT_DIR"];
+  if (dir !== undefined && dir !== "") env["OMX_CONTRACT_PATH"] = dir;
+  else delete env["OMX_CONTRACT_PATH"];
   return env;
 };
 
