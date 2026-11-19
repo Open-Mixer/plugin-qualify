@@ -176,7 +176,12 @@ describe("every measurement word list is the contract's, in its order", () => {
       () => codes(METHOD_TERMS),
       [...words("QUALIFICATION_MEASUREMENT_LATENCY_METHODS"), ...words("QUALIFICATION_MEASUREMENT_COST_METHODS")],
     ],
-    ["MEASUREMENT_DIMENSIONS", () => [...MEASUREMENT_DIMENSIONS], words("QUALIFICATION_MEASUREMENT_DIMENSIONS")],
+    [
+      "MEASUREMENT_DIMENSIONS",
+      () => [...MEASUREMENT_DIMENSIONS],
+      // memory, hostAdmission and memoryGrowth are words of a record's reasons, no key of a measurement document
+      words("QUALIFICATION_MEASUREMENT_DIMENSIONS").filter((w) => !["memory", "hostAdmission", "memoryGrowth"].includes(w)),
+    ],
     ["VERDICT_RATINGS", () => [...VERDICT_RATINGS], words("QUALIFICATION_MEASUREMENT_VERDICT_RATINGS")],
     ["VOICE_BASES", () => [...VOICE_BASES], words("QUALIFICATION_MEASUREMENT_VOICE_BASES")],
     ["HOST_ISOLATIONS", () => [...HOST_ISOLATIONS], words("QUALIFICATION_RESOURCE_HOST_ISOLATIONS")],
