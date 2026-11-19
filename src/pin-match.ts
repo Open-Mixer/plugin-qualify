@@ -86,10 +86,10 @@ export function matchStored(
  * The pin a match gives plugin-hostd, built from the record's list, layout and tested version (section 3.7); none for a
  * record that is unpinnable or holds no layout: the plugin is pinned on its first add, as when no pin was taken.
  */
-export function pinOfStored(item: SyncItem, r: StoredResult, host: string): PinEntry | undefined {
+export function pinOfStored(item: SyncItem, r: StoredResult, host: string, reasons?: Parameters<typeof pinVerdictOf>[1]): PinEntry | undefined {
   if (r.unpinnable === 1 || r.layout_scheme === null || r.layout_sha256 === null) return undefined;
   const v = r.verdicts.find((x) => x.host === host);
-  const word = v !== undefined && v.measured === 1 ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+  const word = v !== undefined && v.measured === 1 ? pinVerdictOf(v.rating as SuitabilityRating, reasons) : undefined;
   return {
     uri: storedUri(item, r),
     integrity: {

@@ -66,7 +66,7 @@ function enriched(doc: Record<string, any>, memoryUnmeasured = false): Record<st
     p.cost = { unit: "ns-per-sample", median: 41.2, percentile: { p: 95, value: 47.9 }, min: 39, max: 112, iqr: 3, blocks: 100, warmupBlocks: 8, warmupMedian: 50, timingFloorNsPerBlock: 180, voices: { held: 8, basis: "declared", capacity: 16 } };
     p.memory = memoryUnmeasured ? { unmeasuredReason: unmeasuredWordOf("probe.crashed"), unmeasuredDetail: "the run ended probe.crashed" } : { afterInstantiateKb: 20_000, afterActivateKb: 21_000, atRestKb: 20_500, secondInstanceKb: 20_900, notesHeldKb: 22_000, notesHeld: 8, basis: "declared" };
     p.memoryLimit = { bytes: 2_147_483_648, mechanism: "rlimit-as" };
-    p.rtSafety = { interposer: true, swept: true, sweepApplicable: true, blocks: 512, allocations: 1, locks: 2, syscalls: 3, threadViolations: 0, processErrors: 0, events: ["alloc"] };
+    p.rtSafety = { interposer: true, swept: true, sweepApplicable: true, blocks: 512, allocations: 1, locks: 2, syscalls: 3, threadViolations: 0, processErrors: 0, events: ["alloc"], ownThreads: 1, otherThreads: { allocations: 2, locks: 3, syscalls: 4 } };
     p.noteSweep = { applicable: true, dialect: "clap", allocations: 1, locks: 1, syscalls: 1 };
   }
   return out;
@@ -176,9 +176,7 @@ describe("C6b: the row judge equals the probe judge over the corpus", () => {
 
   describe("one sabotage per mapped column", () => {
     for (const column of MAPPED_COLUMNS) {
-      // ownThreads and otherThreads are not in the probe reader before the real-time probe change lands: no oracle holds them yet
-      const pending119 = ["cell.rt_own_threads", "cell.rt_other_allocations", "cell.rt_other_locks", "cell.rt_other_syscalls"].includes(column);
-      (pending119 ? it.skip : it)(`leaving out ${column} makes the comparison differ on a record that reads it`, async () => {
+      it(`leaving out ${column} makes the comparison differ on a record that reads it`, async () => {
         const differing: string[] = [];
         for (const e of entries) {
           const d = await firstDifference(e, column);

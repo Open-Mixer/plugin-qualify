@@ -22,7 +22,7 @@ BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
 BuildRequires: pkgconfig(plugin-db) >= 0.4.4
 BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.9
-BuildRequires: pkgconfig(omx-contract) >= 3.20.0
+BuildRequires: pkgconfig(omx-contract) >= 3.20.2
 BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
 BuildRequires: pkgconfig(omxdsp) >= 0.32.1
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)

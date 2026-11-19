@@ -1054,7 +1054,7 @@ function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest
     if (whole.layer === "base" || JSON.stringify(whole.record) !== JSON.stringify(record)) ctx.store.put(key, record);
     const v = record.verdicts.find((x) => x.host === host);
     if (v === undefined) continue; // the other tier's record: carried, and no plugin of the sweep
-    const pin = pinOfStored(item, { ...result, verdicts: [{ host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 }] }, host);
+    const pin = pinOfStored(item, { ...result, verdicts: [{ host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 }] }, host, v.reasons);
     plugins.push({ uri: storedUri(item, result), outcome: outcomeOfVerdict(v), ...(v.deciding === undefined ? {} : { code: v.deciding }), ...(pin === undefined ? {} : { pin }), record: key });
   }
   if (item.format === "clap") scanClapDescriptors(ctx, item);

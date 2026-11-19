@@ -16,7 +16,9 @@ import type { StoredRecord } from "./qualification-store.js";
 
 type Json = Record<string, any>;
 
-/** The mapped columns of a cell and where each lives in the cell's document, one sabotage a column (section 6.2). */
+/**
+ * The mapped columns of a cell (the thread counts as the probe reader and the record carry them: `otherThreads.allocations`,
+ * `.locks`, `.syscalls`; the store writer names them `...InRun`, which no record holds) and where each lives in the cell's document, one sabotage a column (section 6.2). */
 export const CELL_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   "cell.latency_declared_frames": ["latency", "declaredFrames"],
   "cell.latency_measured_frames": ["latency", "measuredFrames"],
@@ -44,9 +46,9 @@ export const CELL_COLUMNS: Readonly<Record<string, readonly string[]>> = {
   "cell.rt_thread_violations": ["rtSafety", "threadViolations"],
   "cell.rt_process_errors": ["rtSafety", "processErrors"],
   "cell.rt_own_threads": ["rtSafety", "ownThreads"],
-  "cell.rt_other_allocations": ["rtSafety", "otherThreads", "allocationsInRun"],
-  "cell.rt_other_locks": ["rtSafety", "otherThreads", "locksInRun"],
-  "cell.rt_other_syscalls": ["rtSafety", "otherThreads", "syscallsInRun"],
+  "cell.rt_other_allocations": ["rtSafety", "otherThreads", "allocations"],
+  "cell.rt_other_locks": ["rtSafety", "otherThreads", "locks"],
+  "cell.rt_other_syscalls": ["rtSafety", "otherThreads", "syscalls"],
   "cell.note_sweep_applicable": ["noteSweep", "applicable"],
   "cell.note_sweep_dialect": ["noteSweep", "dialect"],
   "cell.note_sweep_allocations": ["noteSweep", "allocations"],

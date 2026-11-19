@@ -153,3 +153,15 @@ describe("QualificationStore reads through plugin-qualification-db", () => {
     expect(() => store.counts()).toThrow(/unknown verb counts/);
   });
 });
+
+describe("storedForm keeps what the store maps", () => {
+  it("the package object stays, and the fields without a column go", async () => {
+    const { storedForm } = await import("./qualification-record.js");
+    const r = exported(LV2_CLEAN).record;
+    const pkg = { format: "rpm", name: "x", version: "1", release: "1", distro: "fc45", arch: "x86_64" };
+    const out = storedForm({ ...r, package: pkg, rules: "plugin-qualify-rules/1.0", latencyLineMs: 5 } as never) as unknown as Record<string, unknown>;
+    expect(out["package"]).toEqual(pkg);
+    expect(out["rules"]).toBeUndefined();
+    expect(out["latencyLineMs"]).toBeUndefined();
+  });
+});
