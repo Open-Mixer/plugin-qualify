@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { ADAPTER_HOST, admitPlugin, classifyJalvRun, classifyProtocolRun, type JalvRun, type ModHostRun } from "./host-admission.js";
+import { ADAPTER_HOST, ADMITTED_HOSTS, admitPlugin, classifyJalvRun, classifyProtocolRun, type JalvRun, type ModHostRun } from "./host-admission.js";
 import { isOutOfMemory } from "./memory-bound.js";
 import { init } from "./qualification-domain.js";
 import { ISOLATED_CODE } from "./qualify-isolated.js";
@@ -107,6 +107,31 @@ describe("QUALIFICATION_ADAPTER_CODE_KINDS", () => {
   });
 });
 
+describe("QUALIFICATION_ADAPTER_HOSTS", () => {
+  const HOSTS = "QUALIFICATION_ADAPTER_HOSTS";
+  const held = () => wordsOf(original, HOSTS).map((w) => w.const);
+  /** The check an adapter code's host and record.adapter_host meet: a word of the item, not a judge profile. */
+  const hostOfCode = (code: string): string => code.split(".")[0] as string;
+  it("holds exactly the hosts the producers run a plugin under, read from the source", () => {
+    expect(held().length, `${HOSTS} is not an item of the domain`).toBeGreaterThan(0);
+    expect([...new Set([ADAPTER_HOST, ...ADMITTED_HOSTS])].sort()).toEqual([...held()].sort());
+    expect(held().sort()).toEqual(["jalv", "mod-host", "omx-clap-host"]);
+  });
+  it("admits the host of every code the composers write, mod-host and jalv included", () => {
+    const codes = [classifyProtocolRun("mod-host", mod({ steps: add({ resp: -102 }) })).code, classifyJalvRun(jalv({ status: 3 })).code, classifyProtocolRun(A, mod({ installed: false })).code];
+    expect(codes).toEqual(["mod-host.resp-102", "jalv.exit-3", "omx-clap-host.not-installed"]);
+    for (const c of codes) expect(held(), c).toContain(hostOfCode(c ?? ""));
+  });
+  it("refuses a host the item does not hold, and a judge profile that is no host a plugin ran under", () => {
+    for (const w of ["carla", "openmixer-console", "openmixer-pi-4gb"]) expect(held()).not.toContain(w);
+  });
+  it("is not the host profiles: mod-host and jalv are no word of QUALIFICATION_HOST_PROFILES", () => {
+    const profiles = wordsOf(original, "QUALIFICATION_HOST_PROFILES").map((w) => w.const);
+    expect(profiles).not.toContain("jalv");
+    expect(profiles).not.toContain("mod-host");
+  });
+});
+
 describe("QUALIFICATION_STEP_CODES", () => {
   it("holds every code the isolated and the pool step tables hold, read from the producers", () => {
     const produced = [...Object.values(ISOLATED_CODE), ...Object.values(POOL_CODE)];
@@ -149,6 +174,7 @@ describe("x-since names the version of the domain document that first carried th
     "RUN_STEPS", "STEP_RESULTS", "STEP_CODES", "REJUDGE_OWES", "REJUDGE_MEASUREMENTS",
   ].map((n) => `QUALIFICATION_${n}`);
   const V130 = [KINDS, OUTCOMES];
+  const V140 = ["QUALIFICATION_ADAPTER_HOSTS"];
   const semver = (v: string) => v.split(".").map(Number);
   const above = (a: string, b: string) => {
     const [x, y] = [semver(a), semver(b)];
@@ -161,14 +187,14 @@ describe("x-since names the version of the domain document that first carried th
       expect(above(schema["x-since"] as string, original.info.version), `${item} x-since ${String(schema["x-since"])} is above ${original.info.version}`).toBe(false);
     }
   });
-  it("is 1.0.0 for the items the domain was created with, 1.2.0 for the record store's, 1.3.0 for the adapter's", () => {
+  it("is 1.0.0 for the items the domain was created with, 1.2.0 for the record store's, 1.3.0 for the adapter's, 1.4.0 for its hosts", () => {
     for (const [item, schema] of Object.entries(original.components.schemas)) {
-      const want = V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
+      const want = V140.includes(item) ? "1.4.0" : V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
       expect(schema["x-since"], item).toBe(want);
     }
-    expect(Object.keys(original.components.schemas)).toHaveLength(17 + V120.length + V130.length);
+    expect(Object.keys(original.components.schemas)).toHaveLength(17 + V120.length + V130.length + V140.length);
   });
-  it("the domain is 1.3.0", () => {
-    expect(original.info.version).toBe("1.3.0");
+  it("the domain is 1.4.0", () => {
+    expect(original.info.version).toBe("1.4.0");
   });
 });

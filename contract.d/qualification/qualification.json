@@ -3,7 +3,7 @@
   "$id": "https://openmixer.org/contract/qualification",
   "info": {
     "title": "What a qualification measures and records",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "x-owner": "plugin-qualify",
     "x-stability": "experimental"
   },
@@ -1390,6 +1390,33 @@
             "description": "The isolated step.",
             "x-code": 0,
             "x-text": "The isolated step."
+          }
+        ]
+      },
+      "QUALIFICATION_ADAPTER_HOSTS": {
+        "description": "The hosts a plugin RAN UNDER: the host of an adapter code, <host>.<kind>[-<parameter>], and a record's adapter host. Not a judge profile.",
+        "x-since": "1.4.0",
+        "oneOf": [
+          {
+            "const": "omx-clap-host",
+            "title": "omxClapHost",
+            "description": "The CLAP host of the console, which runs an LV2 plugin once as an adapter.",
+            "x-code": 0,
+            "x-text": "The CLAP host of the console, which runs an LV2 plugin once as an adapter."
+          },
+          {
+            "const": "mod-host",
+            "title": "modHost",
+            "description": "mod-host, run on an LV2 plugin through its socket.",
+            "x-code": 1,
+            "x-text": "mod-host, run on an LV2 plugin through its socket."
+          },
+          {
+            "const": "jalv",
+            "title": "jalv",
+            "description": "jalv, run headless on an LV2 plugin.",
+            "x-code": 2,
+            "x-text": "jalv, run headless on an LV2 plugin."
           }
         ]
       },
