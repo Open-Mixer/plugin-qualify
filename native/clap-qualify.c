@@ -2012,6 +2012,12 @@ static int qualify_plugin(const clap_plugin_factory_t *factory, const clap_plugi
     }
     if (f.interposer) {
       ip.counts(&f.note_allocations, &f.note_locks, &f.note_syscalls);
+      /* the note sweep under a pool too: the helpers' calls are the audio path's (see the rt-safety counts above) */
+      if (o->pool_helpers && ip.other_counts) {
+        uint64_t oa = 0, ol = 0, os = 0;
+        ip.other_counts(&oa, &ol, &os);
+        f.note_allocations += oa, f.note_locks += ol, f.note_syscalls += os;
+      }
       f.n_note_rt_events = ip.events(f.note_rt_events, OMX_RT_EV_MAX);
     }
   }
