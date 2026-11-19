@@ -94,13 +94,13 @@ describe("the cells and the verdict of the host", () => {
   it("a record measured at another cell is passed over, naming the cells it holds", () => {
     const m = matchStored([r], item, "omx-clap-host", d, [{ rate: 96000, quantum: 128 }]);
     expect(m.status).toBe("ignored");
-    expect((m as { lines: string[] }).lines.join("\n")).toContain("48000/512");
+    expect((m as unknown as { lines: string[] }).lines.join("\n")).toContain("48000/512");
   });
   it("a record with no verdict for the host is passed over", () => {
     expect(matchStored([r], item, "jalv", d, CELLS).status).toBe("ignored");
   });
   it("a verdict the source could not measure is measured here", () => {
-    const u = { ...r, verdicts: [{ host: "omx-clap-host", rating: "unknown", deciding: "probe.crashed", measured: false, qualified: false }] };
+    const u = { ...r, verdicts: [{ host: "omx-clap-host", rating: "unknown", deciding: "probe.not-attempted", measured: false, qualified: false }] };
     expect(matchStored([u as StoredResult], item, "omx-clap-host", d, CELLS).status).toBe("ignored");
   });
   it("no result for the plugin says nothing and is measured", () => {

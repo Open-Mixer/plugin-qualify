@@ -13,13 +13,22 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
   LILV_RESOLVE, SYNC_STATE_SCHEMA, digestFiles, discoverSyncItems, parseSyncArgs, resolveSyncSettings, runSync, sameBinaryElsewhere,
   type Lv2Resolve, type SyncState,
 } from "./qualify-sync.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
+import { QualificationStore } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
+
+/** The qualification store of the test: a stand-in that follows the commands' documented interface. */
+let fake = fakeStore();
+beforeEach(() => {
+  fake = fakeStore();
+});
+const store = (): QualificationStore => new QualificationStore("user", { run: fake.run });
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-lv2-resolve-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -82,14 +91,14 @@ describe("the LV2 bundle the sync keys a plugin by is the one lilv loads (#199)"
     };
     writeFileSync(join(m.root, "state.json"), JSON.stringify(state));
     const sp = splitPathFlags(["--lv2-path", `${m.a}:${m.b}`, "--lv2-extra", "", "--clap-path", join(m.root, "no-clap"), "--clap-extra", "",
-      "--pin-file", join(m.root, "qualified.pins"), "--qualification-dir", join(m.root, "q"), "--descriptor-dir", join(m.root, "d"),
+      "--pin-file", join(m.root, "qualified.pins"), "--descriptor-dir", join(m.root, "d"),
       "--state-file", join(m.root, "state.json"), "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed"]);
     const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
     const r = resolveSyncSettings(new Map(), args.args, {}, m.root, undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const lines: string[] = [];
-    const summary = await runSync(r.settings, { env: {}, lv2Resolve: takesComplement(m), log: (l) => lines.push(l) });
+    const summary = await runSync(r.settings, { qualificationStore: store(), env: {}, lv2Resolve: takesComplement(m), log: (l) => lines.push(l) });
     expect(summary).toMatchObject({ qualified: 0, unmeasured: 0, skipped: 1 });
     expect(lines.some((l) => l.startsWith(`lv2:${URI}: loaded from ${m.complement} now`))).toBe(true);
     const after = JSON.parse(readFileSync(join(m.root, "state.json"), "utf8")) as SyncState;

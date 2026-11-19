@@ -10,9 +10,10 @@
  * commands once they take a layer path the tests may name.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import { FIXTURES, LV2_CLEAN, stored } from "./qualify-rejudge.support.js";
 import { readProbeOutput } from "./probe-output.js";
@@ -35,7 +36,12 @@ function record() {
   return storeExport(rec, probe.output).record;
 }
 
-const put = (doc: unknown) => run(WRITE, ["put", "--scope", "user", "--offer", "default", "--host-class", "x86-64"], JSON.stringify(doc));
+/** The writer is told to keep its layer under a directory of the test's own (`--root`, for tests): no run here touches a user's layer. */
+const root = mkdtempSync(join(tmpdir(), "store-contract-"));
+afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+const put = (doc: unknown) => run(WRITE, ["put", "--scope", "user", "--root", root, "--offer", "default", "--host-class", "x86-64"], JSON.stringify(doc));
+const del = (r: { sha256: string; format: string; uri: string }) => run(WRITE, ["delete", "--scope", "user", "--root", root, "--sha256", r.sha256, "--format", r.format, "--uri", r.uri, "--offer", "default", "--host-class", "x86-64"]);
 
 describe("plugin-qualification-db-write put refuses what section 3.7 says it refuses, by code, naming the path", () => {
   const cases: [string, (r: any) => void, RegExp][] = [
@@ -57,6 +63,30 @@ describe("plugin-qualification-db-write put refuses what section 3.7 says it ref
       expect(out.stderr).toMatch(names);
     });
   }
+});
+
+describe("plugin-qualification-db-write put and delete, in a layer of the test's own", () => {
+  it("a valid record is put, put again to replace it, deleted, and a key the layer does not hold is no error", () => {
+    const r = record();
+    const key = { sha256: r.binary.sha256, format: r.plugin.format, uri: r.plugin.id };
+    const first = put(r);
+    expect(first.status, first.stderr).toBe(0);
+    expect(readdirSync(root).length).toBeGreaterThan(0);
+    const again = put({ ...r, measuredAt: "2030-01-01T00:00:00.000Z" });
+    expect(again.status, again.stderr).toBe(0);
+    const gone = del(key);
+    expect(gone.status, gone.stderr).toBe(0);
+    const none = del(key);
+    expect(none.status, none.stderr).toBe(0);
+  });
+
+  it("a refusal writes nothing: the layer holds no record of it", () => {
+    const r = record();
+    r.binary.path = `/usr/lib/${r.binary.path}`;
+    const before = readdirSync(root).sort();
+    expect(put(r).status).toBe(1);
+    expect(readdirSync(root).sort()).toEqual(before);
+  });
 });
 
 describe("plugin-qualification-db reads what the sync asks of it", () => {

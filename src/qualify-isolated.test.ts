@@ -29,6 +29,19 @@ import {
   type IsolatedRunFacts,
 } from "./qualify-isolated.js";
 import { hostdSearchEnv, isolatedPass, type SyncContext, type SyncState } from "./qualify-sync.js";
+import { QualificationStore, type ShadowKey } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
+
+/** A store that holds records which are not whole (the writer's refusals are off), each under a key of its own: its offer is its name. */
+function holding() {
+  const store = new QualificationStore("user", { run: fakeStore({ validate: false }).run });
+  const put = (name: string, r: QualificationRecord): ShadowKey => {
+    const key: ShadowKey = { sha256: r.binary?.sha256 ?? "0".repeat(64), format: r.plugin.format, uri: r.plugin.id, offer: name, hostClass: "x86-64" };
+    store.put(key, r);
+    return key;
+  };
+  return { store, put };
+}
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-isolated-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -179,26 +192,21 @@ describe("the step itself, on a private server", () => {
 });
 
 describe("the completion of a record already judged", () => {
-  const write = (r: QualificationRecord, name: string): string => {
-    const path = join(scratch, name);
-    writeFileSync(path, JSON.stringify(r));
-    return path;
-  };
-
   it("adds the step and keeps the run's id; the rest of the record is untouched", () => {
     const steps = baseSteps(record());
     const before = record({ run: { id: "run-1", steps } });
-    const path = write(before, "keep.qualification.json");
-    const done = completeIsolated(path, before, "urn:p", CELL, () => WELL, {});
-    const after = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
+    const { store, put } = holding();
+    const key = put("keep", before);
+    const done = completeIsolated(store, key, before, "urn:p", CELL, () => WELL, {});
+    const after = store.record(key)!;
     expect(after.run?.id).toBe("run-1");
     expect(after.run?.steps).toEqual([...steps, done?.step]);
     expect({ ...after, run: undefined }).toEqual(JSON.parse(JSON.stringify({ ...before, run: undefined })));
   });
 
-  it("a record with no run takes the id of its figures", () => {
-    const path = write(record(), "old.qualification.json");
-    expect(completeIsolated(path, record(), "urn:p", CELL, () => WELL, {})?.record.run?.id).toBe("run-from-the-figures");
+  it("a record with no run takes the id its re-judge names", () => {
+    const { store, put } = holding();
+    expect(completeIsolated(store, put("old", record()), record(), "urn:p", CELL, () => WELL, {})?.record.run?.id).toBe("run-from-the-figures");
   });
 
   it("runs nothing when the record owes nothing, or has the step already", () => {
@@ -207,41 +215,41 @@ describe("the completion of a record already judged", () => {
       ran++;
       return WELL;
     };
+    const { store, put } = holding();
     const suitable = record({ rating: "suitable" });
-    expect(completeIsolated(write(suitable, "s.qualification.json"), suitable, "urn:p", CELL, runner, {})).toBeUndefined();
+    expect(completeIsolated(store, put("s", suitable), suitable, "urn:p", CELL, runner, {})).toBeUndefined();
     const done = record({ run: { id: "r", steps: [...baseSteps(record()), judgeIsolatedRun(WELL)] } });
-    expect(completeIsolated(write(done, "d.qualification.json"), done, "urn:p", CELL, runner, {})).toBeUndefined();
+    expect(completeIsolated(store, put("d", done), done, "urn:p", CELL, runner, {})).toBeUndefined();
     expect(ran).toBe(0);
   });
 
   it("a step that could not run is tried again and replaced; one that ran is not", () => {
+    const { store, put } = holding();
     const notRun = judgeIsolatedRun({ started: false, problem: "no server" });
     const before = record({ run: { id: "r", steps: [...baseSteps(record()), notRun] } });
-    const path = write(before, "again.qualification.json");
-    const done = completeIsolated(path, before, "urn:p", CELL, () => WELL, {});
+    const key = put("again", before);
+    const done = completeIsolated(store, key, before, "urn:p", CELL, () => WELL, {});
     expect(done?.step.result).toBe(ISOLATED_RESULT.isolated);
-    const isolatedSteps = (JSON.parse(readFileSync(path, "utf8")) as QualificationRecord).run?.steps.filter((s) => s.step === "isolated");
-    expect(isolatedSteps).toEqual([done?.step]);
+    expect(store.record(key)!.run?.steps.filter((s) => s.step === "isolated")).toEqual([done?.step]);
     // silence from the tool that played its note before the link says nothing; silence that heard the notes does
     const { midiInputsLinked: _linked, ...beforeTheLink } = WELL;
     const unheard = judgeIsolatedRun({ ...beforeTheLink, silent: true });
     const old = record({ run: { id: "r", steps: [...baseSteps(record()), unheard] } });
-    expect(completeIsolated(write(old, "unheard.qualification.json"), old, "urn:p", CELL, () => WELL, {})?.step.result).toBe(ISOLATED_RESULT.isolated);
+    expect(completeIsolated(store, put("unheard", old), old, "urn:p", CELL, () => WELL, {})?.step.result).toBe(ISOLATED_RESULT.isolated);
     const heard = record({ run: { id: "r", steps: [...baseSteps(record()), judgeIsolatedRun({ ...WELL, silent: true })] } });
-    expect(completeIsolated(write(heard, "heard.qualification.json"), heard, "urn:p", CELL, () => WELL, {})).toBeUndefined();
+    expect(completeIsolated(store, put("heard", heard), heard, "urn:p", CELL, () => WELL, {})).toBeUndefined();
     const refused = judgeIsolatedRun({ started: true, added: false });
     const seen = record({ run: { id: "r", steps: [...baseSteps(record()), refused] } });
-    expect(completeIsolated(write(seen, "seen.qualification.json"), seen, "urn:p", CELL, () => WELL, {})).toBeUndefined();
+    expect(completeIsolated(store, put("seen", seen), seen, "urn:p", CELL, () => WELL, {})).toBeUndefined();
   });
 
   it("the pass moves each pin with its step, counts them, and a second pass runs only the step that could not run", () => {
-    const dir = mkdtempSync(join(scratch, "pass-"));
-    const names = ["a", "b", "c"].map((n) => `${n}.qualification.json`);
-    for (const n of names) writeFileSync(join(dir, n), JSON.stringify(record()));
+    const { store, put } = holding();
+    const keys = ["a", "b", "c"].map((n) => put(n, record()));
     const facts: Record<string, IsolatedRunFacts> = { "urn:a": WELL, "urn:b": { ...WELL, silent: true }, "urn:c": { started: false, problem: "no jackd" } };
-    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => facts[uri]! } as unknown as SyncContext;
+    const ctx = { settings: { hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, store, env: {}, log: () => {}, isolatedRunner: (uri: string) => facts[uri]! } as unknown as SyncContext;
     const state = {
-      entries: { k: { plugins: ["a", "b", "c"].map((n) => ({ uri: `urn:${n}`, outcome: "qualified", record: join(dir, `${n}.qualification.json`), pin: { uri: `urn:${n}`, integrity: {}, verdict: "isolated" } })) } },
+      entries: { k: { plugins: ["a", "b", "c"].map((n, i) => ({ uri: `urn:${n}`, outcome: "qualified", record: keys[i], pin: { uri: `urn:${n}`, integrity: {}, verdict: "isolated" } })) } },
     } as unknown as SyncState;
     const first = isolatedPass(ctx, state);
     expect(first).toMatchObject({ isolated: 1, refused: 1, notRun: 1 });
@@ -277,15 +285,17 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     writeFileSync(join(dir, "b.ttl"), "ttl");
     const bytes = { files: [{ path: "b.ttl", sha256: "b".repeat(64) }, { path: "a.so", sha256: "a".repeat(64) }], layout: { scheme: "omx-layout/1", sha256: "c".repeat(64) } };
     const rec = (result: string) => ({ ...withVerdict(gap([clean, memory])), binary: { path: "a.so", ...bytes }, run: { id: "r", steps: [...baseSteps(record()), { step: "isolated", result }] } });
-    for (const n of ["ok", "no"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify(rec(n === "ok" ? "isolated" : "refused")));
+    const { store, put } = holding();
+    const keys = ["ok", "no"].map((n) => put(n, rec(n === "ok" ? "isolated" : "refused") as unknown as QualificationRecord));
     const ctx = {
-      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
+      settings: { hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
+      store,
       env: {},
       log: () => {},
       isolatedRunner: () => { throw new Error("nothing is run again"); },
       pinFilesRun: () => ({ status: 0, stdout: `root ${dir}\nfile a.so\nfile b.ttl\n`, stderr: "" }),
     } as unknown as SyncContext;
-    const state = { entries: { k: { plugins: ["ok", "no"].map((n) => ({ uri: `urn:${n}`, outcome: "qualified", code: "x", record: join(dir, `${n}.qualification.json`) })) } } } as unknown as SyncState;
+    const state = { entries: { k: { root: dir, plugins: ["ok", "no"].map((n, i) => ({ uri: `urn:${n}`, outcome: "qualified", code: "x", record: keys[i] })) } } } as unknown as SyncState;
     const r = isolatedPass(ctx, state);
     expect(r.repinned).toBe(2);
     const [ok, no] = r.state.entries["k"]!.plugins;
@@ -302,16 +312,18 @@ describe("a memory gap and nothing else (the Pi, 2026-11-02: 38 plugins qualifie
     writeFileSync(join(dir, "a.so"), "so");
     const bytes = { files: [{ path: "a.so", sha256: "a".repeat(64) }], layout: { scheme: "omx-layout/1", sha256: "c".repeat(64) } };
     const owed = { ...withVerdict(gap([clean, memory])), binary: { path: "a.so", ...bytes }, run: { id: "r", steps: baseSteps(record()) } };
-    for (const n of ["ok", "no", "off"]) writeFileSync(join(dir, `${n}.qualification.json`), JSON.stringify({ ...owed, plugin: { ...owed.plugin, id: `urn:${n}` } }));
+    const { store, put } = holding();
+    const keys = ["ok", "no", "off"].map((n) => put(n, { ...owed, plugin: { ...owed.plugin, id: `urn:${n}` } } as unknown as QualificationRecord));
     const facts: Record<string, IsolatedRunFacts> = { "urn:ok": WELL, "urn:no": { ...WELL, silent: true }, "urn:off": { started: false, problem: "no jackd" } };
     const ctx = {
-      settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
+      settings: { hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] },
+      store,
       env: {},
       log: () => {},
       isolatedRunner: (uri: string) => facts[uri]!,
       pinFilesRun: () => ({ status: 0, stdout: `root ${dir}\nfile a.so\n`, stderr: "" }),
     } as unknown as SyncContext;
-    const state = { entries: { k: { plugins: ["ok", "no", "off"].map((n) => ({ uri: `urn:${n}`, outcome: "unmeasured", record: join(dir, `${n}.qualification.json`) })) } } } as unknown as SyncState;
+    const state = { entries: { k: { root: dir, plugins: ["ok", "no", "off"].map((n, i) => ({ uri: `urn:${n}`, outcome: "unmeasured", record: keys[i] })) } } } as unknown as SyncState;
     const [ok, no, off] = isolatedPass(ctx, state).state.entries["k"]!.plugins;
     expect([ok?.outcome, ok?.pin?.verdict, ok?.pin?.integrity.files?.map((f) => f.path)]).toEqual(["qualified", "isolated", ["a.so"]]);
     expect([no?.outcome, no?.pin?.verdict]).toEqual(["refused", "refused"]);
@@ -339,12 +351,12 @@ describe("two plugins owing the step in one run, whichever comes first (#319)", 
     ["drumkv1 first", STEMS],
     ["samplv1 first", [...STEMS].reverse()],
   ])("%s: the pass runs the step for both and both end qualified, pinned isolated", (_order, stems) => {
-    const dir = mkdtempSync(join(scratch, "order-"));
-    for (const s of stems) writeFileSync(join(dir, `${s}.qualification.json`), JSON.stringify(before(s)));
+    const { store, put } = holding();
+    const keys = stems.map((s) => put(s, before(s)));
     const ran: string[] = [];
-    const ctx = { settings: { qualificationDir: dir, hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
+    const ctx = { store, settings: { hostProfile: { id: "omx-clap-host" }, lv2Dirs: [], clapDirs: [] }, env: {}, log: () => {}, isolatedRunner: (uri: string) => (ran.push(uri), WELL) } as unknown as SyncContext;
     const state = {
-      entries: { k: { plugins: stems.map((s) => ({ uri: before(s).plugin.id, outcome: "unmeasured", code: "omx-clap-host.silent-under-note", pin: { uri: before(s).plugin.id, integrity: {} }, record: join(dir, `${s}.qualification.json`) })) } },
+      entries: { k: { plugins: stems.map((s, i) => ({ uri: before(s).plugin.id, outcome: "unmeasured", code: "omx-clap-host.silent-under-note", pin: { uri: before(s).plugin.id, integrity: {} }, record: keys[i] })) } },
     } as unknown as SyncState;
     const done = isolatedPass(ctx, state);
     expect(ran).toEqual(stems.map((s) => before(s).plugin.id));

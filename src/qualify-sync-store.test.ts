@@ -51,7 +51,7 @@ const keyed = (r: StoredRecord) => shadowKeyOf(r);
 
 /** A state naming each record by its shadow key, as a plugin of an entry whose files are still the bytes it was qualified from. */
 function stateOf(records: readonly StoredRecord[], rootOf: (r: StoredRecord) => string): SyncState {
-  const entries: SyncState["entries"] = {};
+  const entries: Record<string, SyncState["entries"][string]> = {};
   for (const r of records) {
     entries[`${r.format}:${r.uri}`] = { format: r.format as "clap" | "lv2", root: rootOf(r), files: [], qualifiedAt: "2026-11-01T00:00:00.000Z", seconds: 0, plugins: [{ uri: r.uri, outcome: "qualified", record: keyed(r) }] };
   }
@@ -178,7 +178,7 @@ describe("C7: pruneStale on the store", () => {
     const { fake, store, dd } = setup();
     const before = stateOf([gone, kept], () => "/b");
     const after = stateOf([kept], () => "/b");
-    after.entries["lv2:copy"] = { ...after.entries[`lv2:${kept.uri}`]!, plugins: [{ uri: "copy", outcome: "qualified", record: keyed(gone) }] };
+    (after.entries as Record<string, SyncState["entries"][string]>)["lv2:copy"] = { ...after.entries[`lv2:${kept.uri}`]!, plugins: [{ uri: "copy", outcome: "qualified", record: keyed(gone) }] };
     pruneStale({ ...settingsOf(), descriptorDir: dd }, store, before, after);
     expect(fake.user().map((r) => r.uri)).toContain(gone.uri);
   });

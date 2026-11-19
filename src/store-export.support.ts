@@ -120,7 +120,7 @@ export function storeExport(record: QualificationRecord, probe: ProbeOutput, omi
   // the records are written with the binary's path below the install root, never an absolute one (section 3.7)
   doc.binary.path = String(doc.binary.path).slice(String(doc.binary.path).lastIndexOf("/") + 1);
   doc.measurements.grid = doc.measurements.grid.map(cellOf);
-  if (record.plugin.format === "clap") doc.hostExtensions = [...(probe.offer.clapExtensions ?? [])];
+  if (record.plugin.format === "clap" && probe.offer.clapExtensions !== undefined) doc.hostExtensions = [...probe.offer.clapExtensions];
   else delete doc.hostExtensions;
   const cell = omit === undefined ? undefined : CELL_COLUMNS[omit];
   if (cell !== undefined) for (const p of doc.measurements.grid) dropAt(p, cell);

@@ -45,7 +45,11 @@ export function refusalOf(record: QualificationRecord): { code: string; path: st
   return undefined;
 }
 
-export function fakeStore(options: { readonly absent?: boolean; readonly base?: readonly StoredRecord[] } = {}): FakeStore {
+/**
+ * `validate: false` is for the unit tests of what a pass does to a record's run, whose records are not whole: the writer's
+ * refusals (section 3.7) are not enforced and a record with no binary is stored under the key `0...0`.
+ */
+export function fakeStore(options: { readonly absent?: boolean; readonly base?: readonly StoredRecord[]; readonly validate?: boolean } = {}): FakeStore {
   const user: StoredRecord[] = [];
   const calls: string[] = [];
   const base: StoredRecord[] = [...(options.base ?? [])];
@@ -72,9 +76,9 @@ export function fakeStore(options: { readonly absent?: boolean; readonly base?: 
     if (tool === "write") {
       if (verb === "put") {
         const record = JSON.parse(input ?? "{}") as QualificationRecord;
-        const bad = refusalOf(record);
+        const bad = options.validate === false ? undefined : refusalOf(record);
         if (bad !== undefined) return { status: 1, stdout: "", stderr: `plugin-qualification-db-write: put: ${bad.code}: ${bad.path}: ${bad.word}` };
-        const stored: StoredRecord = { layer: "user", sha256: record.binary.sha256, format: record.plugin.format, uri: record.plugin.id, offer: flag(args, "--offer")!, host_class: flag(args, "--host-class")!, record };
+        const stored: StoredRecord = { layer: "user", sha256: record.binary?.sha256 ?? "0".repeat(64), format: record.plugin.format, uri: record.plugin.id, offer: flag(args, "--offer")!, host_class: flag(args, "--host-class")!, record };
         const at = user.findIndex((u) => key(u) === key(stored));
         if (at >= 0) user[at] = stored;
         else user.push(stored);

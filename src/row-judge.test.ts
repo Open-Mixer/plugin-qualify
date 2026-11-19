@@ -214,3 +214,41 @@ describe("C6: a record whose rows lack a figure the judge needs is not judged ag
     expect(judgedText(j.fromRows(altered, OPTIONS).record)).toEqual(judgedText(j.fromRows(stored, OPTIONS).record));
   });
 });
+
+describe("host_extensions NULL is not measured, never an empty set", () => {
+  /** A CLAP plugin whose probe crashed before the offer: no extension list, and every cell lost. */
+  const crashed = (): Entry => {
+    const doc = fixtureJson("success-msi");
+    doc["run"] = { ...doc["run"], outcome: "probe.crashed", complete: false };
+    doc["offer"] = { id: "default", realtime: "none" };
+    doc["grid"] = doc["grid"].map((p: Record<string, unknown>) => ({ rate: p["rate"], quantum: p["quantum"], outcome: "probe.crashed" }));
+    const probe = probeOf(doc);
+    return { name: "a CLAP probe that crashed", probe, record: recordOf(probe, Buffer.from(JSON.stringify(doc))) };
+  };
+
+  it("the record writer leaves hostExtensions out of a CLAP record whose probe never reached the offer, and puts an empty list for a run that offered none", () => {
+    const c = crashed();
+    expect(c.probe.plugin.format).toBe("clap");
+    expect(c.probe.offer.clapExtensions).toBeUndefined();
+    expect(c.record.hostExtensions).toBeUndefined();
+    const none = probeOf({ ...fixtureJson("success-msi"), offer: { id: "default", clapExtensions: [], realtime: "none" } });
+    expect(recordOf(none, Buffer.from("{}")).hostExtensions).toEqual([]);
+  });
+
+  it("the row judge reads such a record as it is: not unreadable, and equal to the probe judge", async () => {
+    const c = crashed();
+    const j = await judges();
+    const stored = storeExport(c.record, c.probe);
+    expect(stored.record.hostExtensions).toBeUndefined();
+    expect(j.unreadable(stored)).toBeUndefined();
+    expect(await firstDifference(c)).toBeUndefined();
+  });
+
+  it("an empty list is data: a finished probe's record with it is readable, and without it is not", async () => {
+    const c = corpus().find((e) => e.name === "success-msi")!;
+    const j = await judges();
+    const stored = storeExport(c.record, c.probe);
+    expect(j.unreadable({ ...stored, record: { ...stored.record, hostExtensions: [] } })).toBeUndefined();
+    expect(j.unreadable({ ...stored, record: { ...stored.record, hostExtensions: undefined } })).toMatch(/host_extensions/);
+  });
+});
