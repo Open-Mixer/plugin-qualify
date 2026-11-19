@@ -93,6 +93,7 @@ function cellOf(p: Json): Json {
     for (const k of keys.slice(0, -1)) to = to[k] ??= {};
     to[keys[keys.length - 1]!] = from;
   }
+  if (p.latencyMs !== undefined) out.latencyMs = p.latencyMs;
   // the latency and cost words of a cell the run could not measure (`code`) and the events are rows too
   if (p.latency?.code !== undefined) (out.latency ??= {}).code = p.latency.code;
   if (p.memory?.basis !== undefined) (out.memory ??= {}).basis = p.memory.basis;
@@ -113,9 +114,6 @@ export function storeExport(record: QualificationRecord, probe: ProbeOutput, omi
   const doc: Json = JSON.parse(JSON.stringify(record));
   // `record.run_id` is a required column: a record from before the steps holds the probe output's run id there
   doc.run ??= { id: probe.run.id, steps: [] };
-  // the fields the store maps to no column
-  delete doc.latencyLineMs;
-  delete doc.rules;
   doc.notMeasured ??= [];
   delete doc.provenance;
   delete doc.history;
