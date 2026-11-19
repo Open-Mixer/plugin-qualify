@@ -10,10 +10,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { openQualificationDomainAt } from "./qualification-domain-node.js";
+import { TEST_CONTRACT_DIR } from "./test-contract-dir.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(PKG, rel), "utf8");
-const domain = openQualificationDomainAt(join(PKG, "contract.d"));
+const domain = openQualificationDomainAt(TEST_CONTRACT_DIR);
 
 describe("memory-bound", () => {
   it("is a declared unmeasured reason", () => {
@@ -26,7 +27,7 @@ describe("memory-bound", () => {
     expect(c.match(/"memory-bound"/g)).toHaveLength(1);
   });
   it("has its sentence in every language of the domain", () => {
-    const dir = join(PKG, "contract.d/qualification/catalogs");
+    const dir = join(TEST_CONTRACT_DIR, "qualification/catalogs");
     const files = readdirSync(dir).filter((f) => f.endsWith(".json"));
     expect(files.length).toBe(6);
     for (const f of files) {

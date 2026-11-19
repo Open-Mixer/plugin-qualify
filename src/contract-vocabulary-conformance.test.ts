@@ -15,6 +15,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { openQualificationDomainAt } from "./qualification-domain-node.js";
+import { TEST_CONTRACT_DIR } from "./test-contract-dir.js";
 import { clapCoreTsDirCandidates, isHostingTableName } from "../tools/clap-core-tsdir.mjs";
 import { OUT as GENERATED_HOSTING_CODES, hostingCodesFileFrom } from "../tools/gen-hosting-codes.mjs";
 import { HOSTING_CODE } from "./hosting-codes.js";
@@ -162,7 +163,7 @@ describe("HOSTING_CODE is omx-clap-core's hosting tables, in full", () => {
 });
 
 /** The words of a contract item, in its order. */
-const domain = openQualificationDomainAt(join(PKG, "contract.d"));
+const domain = openQualificationDomainAt(TEST_CONTRACT_DIR);
 const words = (name: string): readonly string[] => domain.words(name);
 const codes = (terms: readonly { readonly code: string }[]): string[] => terms.map((t) => t.code);
 

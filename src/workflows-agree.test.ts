@@ -66,7 +66,7 @@ describe('ci.yml and publish.yml prepare the runner alike', () => {
     const list = read('.github/container-tests.txt')
       .split('\n')
       .filter((l) => l.trim() !== '' && !l.startsWith('#'));
-    expect(list.length).toBeGreaterThan(0);
+    // the list may be empty: the one file it held read the domain's installer, which is plugin-hostd's now
     for (const file of list) expect(() => read(file), `${file} is listed and must exist`).not.toThrow();
     // one definition: the config reads the list for the exclusion, the container job reads it for what it runs
     expect(read('vitest.config.ts')).toContain('.github/container-tests.txt');
@@ -76,7 +76,7 @@ describe('ci.yml and publish.yml prepare the runner alike', () => {
     expect(job).toContain(`grep -v '^#' .github/container-tests.txt`);
     expect(job).not.toMatch(/src\/[\w.-]+\.test\.ts/);
     // the other workflows run the ordinary suite: neither names the files itself
-    for (const w of WORKFLOWS) expect(read(`.github/workflows/${w}`)).not.toMatch(new RegExp(list.map((f) => f.replace(/[.]/g, '\\.')).join('|')));
+    for (const w of list.length === 0 ? [] : WORKFLOWS) expect(read(`.github/workflows/${w}`)).not.toMatch(new RegExp(list.map((f) => f.replace(/[.]/g, '\\.')).join('|')));
     expect(read('.github/workflows/publish.yml')).toContain('.github/container-tests.txt');
   });
 

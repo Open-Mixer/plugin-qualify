@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ADAPTER_HOST, admitPlugin, classifyJalvRun, classifyProtocolRun, type JalvRun, type ModHostRun } from "./host-admission.js";
 import { isOutOfMemory } from "./memory-bound.js";
 import { init } from "./qualification-domain.js";
+import { TEST_CONTRACT_DIR } from "./test-contract-dir.js";
 import { ISOLATED_CODE } from "./qualify-isolated.js";
 import { POOL_CODE } from "./qualify-pool.js";
 import { noPrivateServerCode } from "./qualify-adapter-pass.js";
@@ -21,7 +22,7 @@ const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(PKG, rel), "utf8");
 type Word = { const: string; title: string; "x-code": number; "x-since"?: string };
 type Doc = { info: { version: string }; components: { schemas: Record<string, { "x-since"?: string; oneOf: Word[] }> } };
-const original = JSON.parse(read("contract.d/qualification/qualification.json")) as Doc;
+const original = JSON.parse(readFileSync(join(TEST_CONTRACT_DIR, "qualification", "qualification.json"), "utf8")) as Doc;
 const clone = (): Doc => JSON.parse(JSON.stringify(original)) as Doc;
 const wordsOf = (doc: Doc, item: string): Word[] => doc.components.schemas[item]?.oneOf ?? [];
 const KINDS = "QUALIFICATION_ADAPTER_CODE_KINDS";
@@ -149,6 +150,7 @@ describe("x-since names the version of the domain document that first carried th
     "RUN_STEPS", "STEP_RESULTS", "STEP_CODES", "REJUDGE_OWES", "REJUDGE_MEASUREMENTS",
   ].map((n) => `QUALIFICATION_${n}`);
   const V130 = [KINDS, OUTCOMES];
+  const V140 = ["ADAPTER_HOSTS", "PIN_VERDICTS", "HISTORY_MOVES", "HISTORY_REASONS", "HISTORY_BLOCKERS"].map((n) => `QUALIFICATION_${n}`);
   const semver = (v: string) => v.split(".").map(Number);
   const above = (a: string, b: string) => {
     const [x, y] = [semver(a), semver(b)];
@@ -161,14 +163,14 @@ describe("x-since names the version of the domain document that first carried th
       expect(above(schema["x-since"] as string, original.info.version), `${item} x-since ${String(schema["x-since"])} is above ${original.info.version}`).toBe(false);
     }
   });
-  it("is 1.0.0 for the items the domain was created with, 1.2.0 for the record store's, 1.3.0 for the adapter's", () => {
+  it("is 1.0.0 for the items the domain was created with, 1.2.0 for the record store's, 1.3.0 for the adapter's, 1.4.0 for the producer words", () => {
     for (const [item, schema] of Object.entries(original.components.schemas)) {
-      const want = V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
+      const want = V140.includes(item) ? "1.4.0" : V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
       expect(schema["x-since"], item).toBe(want);
     }
-    expect(Object.keys(original.components.schemas)).toHaveLength(17 + V120.length + V130.length);
+    expect(Object.keys(original.components.schemas)).toHaveLength(17 + V120.length + V130.length + V140.length);
   });
-  it("the domain is 1.3.0", () => {
-    expect(original.info.version).toBe("1.3.0");
+  it("the domain is 1.4.0", () => {
+    expect(original.info.version).toBe("1.4.0");
   });
 });
