@@ -839,6 +839,13 @@
             "description": "The plugin runs in a process of its own, away from the console's audio thread.",
             "x-code": 0,
             "x-text": "The plugin runs in a process of its own, away from the console's audio thread."
+          },
+          {
+            "const": "in-process",
+            "title": "inProcess",
+            "description": "The plugin runs inside the console's own process.",
+            "x-code": 1,
+            "x-text": "The plugin runs inside the console's own process."
           }
         ]
       },

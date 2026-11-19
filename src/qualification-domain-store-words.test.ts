@@ -86,6 +86,14 @@ describe("the record store's words are items of the qualification domain", () =>
     expect([...profiles].filter((w) => !wordsOf("QUALIFICATION_HOST_PROFILES").includes(w))).toEqual([]);
     expect([...classes].filter((w) => !wordsOf("QUALIFICATION_HOST_CLASSES").includes(w))).toEqual([]);
   });
+  it("QUALIFICATION_VERDICT_HOSTINGS holds every HostingPath the producer can write, as it writes it", () => {
+    const src = readFileSync(join(PKG, "src", "hosting-suitability.ts"), "utf8");
+    const m = /export type HostingPath = ([^;]+);/.exec(src);
+    expect(m, "HostingPath is not declared in hosting-suitability.ts").not.toBeNull();
+    const paths = [...(m?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1] as string);
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.filter((w) => !wordsOf("QUALIFICATION_VERDICT_HOSTINGS").includes(w))).toEqual([]);
+  });
   it("the package words are items: deb and rpm, their distros and arches", () => {
     expect(wordsOf("QUALIFICATION_PACKAGE_FORMATS")).toEqual(["deb", "rpm"]);
     expect(wordsOf("QUALIFICATION_PACKAGE_DISTROS")).toEqual(["trixie", "fc44", "fc45"]);
