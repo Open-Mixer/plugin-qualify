@@ -17,7 +17,7 @@ import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput, type ProbeOutput } from "./probe-output.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
-import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, type QualificationRecord } from "./qualification-record.js";
+import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, unmeasuredWordOf, type QualificationRecord } from "./qualification-record.js";
 import { FIXTURES } from "./qualify-rejudge.support.js";
 import { MAPPED_COLUMNS, storeExport } from "./store-export.support.js";
 
@@ -58,13 +58,13 @@ const probeOf = (doc: unknown): ProbeOutput => {
 };
 
 /** A probe output with every figure the judge reads set at its first measured cell (the fixtures hold a few of them each). */
-function enriched(doc: Record<string, any>): Record<string, any> {
+function enriched(doc: Record<string, any>, memoryUnmeasured = false): Record<string, any> {
   const out = JSON.parse(JSON.stringify(doc));
   for (const p of out.grid ?? []) {
     if (p.outcome !== "probe.ok") continue;
     p.latency = { declaredFrames: 3, measuredFrames: 4, method: "impulse-onset" };
     p.cost = { unit: "ns-per-sample", median: 41.2, percentile: { p: 95, value: 47.9 }, min: 39, max: 112, iqr: 3, blocks: 100, warmupBlocks: 8, warmupMedian: 50, timingFloorNsPerBlock: 180, voices: { held: 8, basis: "declared", capacity: 16 } };
-    p.memory = { afterInstantiateKb: 20_000, afterActivateKb: 21_000, atRestKb: 20_500, secondInstanceKb: 20_900, notesHeldKb: 22_000, notesHeld: 8, basis: "declared" };
+    p.memory = memoryUnmeasured ? { unmeasuredReason: unmeasuredWordOf("probe.crashed"), unmeasuredDetail: "the run ended probe.crashed" } : { afterInstantiateKb: 20_000, afterActivateKb: 21_000, atRestKb: 20_500, secondInstanceKb: 20_900, notesHeldKb: 22_000, notesHeld: 8, basis: "declared" };
     p.memoryLimit = { bytes: 2_147_483_648, mechanism: "rlimit-as" };
     p.rtSafety = { interposer: true, swept: true, sweepApplicable: true, blocks: 512, allocations: 1, locks: 2, syscalls: 3, threadViolations: 0, processErrors: 0, events: ["alloc"] };
     p.noteSweep = { applicable: true, dialect: "clap", allocations: 1, locks: 1, syscalls: 1 };
@@ -94,7 +94,7 @@ function corpus(): Entry[] {
   for (const name of ["success-msi", "plugin-crash", "memory-limit-refused"]) {
     const doc = fixtureJson(name);
     const bytes = Buffer.from(JSON.stringify(doc));
-    for (const [label, d] of [[name, doc], [`${name} (every figure set)`, enriched(doc)]] as const) {
+    for (const [label, d] of [[name, doc], [`${name} (every figure set)`, enriched(doc)], [`${name} (memory unmeasured)`, enriched(doc, true)]] as const) {
       const probe = probeOf(d);
       out.push({ name: label, record: recordOf(probe, bytes), probe });
     }
@@ -109,7 +109,7 @@ function rebuilt(probe: ProbeOutput, record: QualificationRecord): Pick<Qualific
 }
 
 /** The verdicts, tiers and cost as the record writes them: the text two judges are compared on. */
-const judgedText = (r: QualificationRecord) => ({ verdicts: JSON.stringify(r.verdicts), tiers: JSON.stringify(r.tiers), cost: JSON.stringify(r.cost) });
+const judgedText = (r: QualificationRecord) => ({ verdicts: JSON.stringify(r.verdicts), tiers: JSON.stringify(r.tiers), cost: JSON.stringify(r.cost), runId: JSON.stringify(r.rejudged?.figures.runId ?? null) });
 
 /** The first field of the judgment that differs between the two judges for one entry, or `undefined` when none does. */
 async function firstDifference(e: Entry, omit?: string): Promise<string | undefined> {
@@ -122,9 +122,25 @@ async function firstDifference(e: Entry, omit?: string): Promise<string | undefi
   } catch (err) {
     return `rows: ${(err as Error).message}`;
   }
-  for (const k of ["verdicts", "tiers", "cost"] as const) if (was[k] !== now[k]) return `${k}: ${was[k].slice(0, 160)} != ${now[k].slice(0, 160)}`;
+  for (const k of ["verdicts", "tiers", "cost", "runId"] as const) if (was[k] !== now[k]) { let i = 0; while (was[k][i] === now[k][i]) i++; return `${k} at ${String(i)}: ...${was[k].slice(Math.max(0, i - 80), i + 120)} != ...${now[k].slice(Math.max(0, i - 80), i + 120)}`; }
   // the rows reproduce the probe output the judge reads, field for field: a column left out shows here when it moves no verdict
-  const view = (o: ProbeOutput) => JSON.stringify({ run: o.run.outcome, plugin: o.plugin, offer: o.offer.id, ext: o.offer.clapExtensions ?? null, grid: o.grid.map((p) => ({ rate: p.rate, quantum: p.quantum, outcome: p.outcome, latency: p.latency, cost: p.cost === undefined ? null : { median: p.cost.median, percentile: p.cost.percentile, voices: p.cost.voices ?? null }, rt: p.rtSafety ?? null, note: p.noteSweep ?? null, mem: p.memory ?? null, limit: p.memoryLimit ?? null })), binary: { path: o.binary.path, files: o.binary.files, layout: o.binary.layout ?? null } });
+  const view = (o: ProbeOutput) =>
+    canon({
+      run: o.run.outcome,
+      plugin: { format: o.plugin.format, id: o.plugin.id, version: o.plugin.version ?? null },
+      offer: o.offer.id,
+      ext: o.offer.clapExtensions ?? null,
+      grid: o.grid.map((p) => ({
+        rate: p.rate, quantum: p.quantum, outcome: p.outcome,
+        latency: p.latency === undefined ? null : { d: p.latency.declaredFrames ?? null, m: p.latency.measuredFrames ?? null },
+        cost: p.cost === undefined ? null : { median: p.cost.median, percentile: p.cost.percentile, voices: p.cost.voices ?? null },
+        rt: p.rtSafety ?? null,
+        note: p.noteSweep ?? null,
+        mem: p.memory === undefined ? null : { a: p.memory.afterInstantiateKb ?? null, b: p.memory.afterActivateKb ?? null, c: p.memory.atRestKb ?? null, d: p.memory.secondInstanceKb ?? null, e: p.memory.notesHeldKb ?? null, f: p.memory.unmeasuredReason ?? null },
+        limit: p.memoryLimit ?? null,
+      })),
+      binary: { path: o.binary.path, files: o.binary.files, layout: o.binary.layout ?? null },
+    });
   const rowsView = view(j.outputOfRows(stored));
   const probeView = view(probeWithRelativePath(e.probe));
   if (rowsView !== probeView) return `judge input: ${firstDiff(probeView, rowsView)}`;
@@ -133,6 +149,9 @@ async function firstDifference(e: Entry, omit?: string): Promise<string | undefi
 
 /** The probe's output as the store exports it: the binary's path below the install root, never the absolute one. */
 const probeWithRelativePath = (o: ProbeOutput): ProbeOutput => ({ ...o, binary: { ...o.binary, path: o.binary.path.slice(o.binary.path.lastIndexOf("/") + 1) } });
+
+/** JSON with its keys in order: two readers of one document may build their objects in another. */
+const canon = (v: unknown): string => JSON.stringify(v, (_k, x) => (x !== null && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
 
 const firstDiff = (a: string, b: string): string => {
   let i = 0;

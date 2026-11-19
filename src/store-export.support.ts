@@ -109,6 +109,8 @@ function cellOf(p: Json): Json {
  */
 export function storeExport(record: QualificationRecord, probe: ProbeOutput, omit?: string, hostClass = "x86-64"): StoredRecord {
   const doc: Json = JSON.parse(JSON.stringify(record));
+  // `record.run_id` is a required column: a record from before the steps holds the probe output's run id there
+  doc.run ??= { id: probe.run.id, steps: [] };
   delete doc.provenance;
   delete doc.history;
   delete doc.tiers?.dimmed;

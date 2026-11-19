@@ -4,12 +4,12 @@
  * Keeping a device's qualification records through an upgrade, instead of measuring every plugin again. An upgrade is a
  * different host (`HOSTING_NOTE`): the figures are carried across and judged again, never trusted.
  *
- * `plugin-qualify-sync --rejudge` measures nothing. Each record's probe output goes through the one judge
- * (`judgeProbeOutput`) under today's rules, with the host runs the record already holds, and the verdicts, the tiers and
+ * `plugin-qualify-sync --rejudge` measures nothing. Each record of the scope's user layer, as the store exports it, goes
+ * through the one judge (`judgeProbeOutput`) from its rows alone (`row-judge.ts`; no probe bytes are kept) under today's rules, with the host runs the record already holds, and the verdicts, the tiers and
  * the plugin's pin word are replaced; the figures and their provenance are not touched, and the record says who took the
  * figures and when. A verdict that needs a run the record lacks (an LV2 plugin's omx-clap-host verdict is decided by its
  * adapter run) reads `unknown`, and the record owes that run: nothing is guessed, and a run that never happened gives a
- * plugin no pin word. A record whose plugin's bytes changed, or whose probe output is not the one it names, is left as it
+ * plugin no pin word. A record whose plugin's bytes changed, or whose rows lack a figure the judge needs, is left as it
  * is and owes a qualification. A second run changes nothing.
  *
  * `plugin-qualify-sync --memory-only` takes one figure: the footprint of each recorded plugin at the cells a Pi runs,
@@ -17,7 +17,7 @@
  * cells changes in the record. It judges nothing: a `--rejudge` afterwards reads the footprints. Growth over time needs a
  * soak, which this does not run: the record says so in `notMeasured`.
  */
-import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -30,7 +30,7 @@ import type { PluginTarget } from "./loader.js";
 import { cellKey, type GridCell } from "./measurement-grid.js";
 import { pinVerdictOf } from "./pins-file.js";
 import { failedOutcome, judgeProbeOutput, type RecordReason } from "./probe-judge.js";
-import { PROBE_OK, readProbeOutput, sha256Hex, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import { probeTarget, ProbeRunnerError, type ProbeRun } from "./probe-runner.js";
 import { proberOffer } from "./clap-qualify.js";
 import {
@@ -51,9 +51,11 @@ import {
 import { ISOLATED_RESULT, RUN_STEP, isolatedFinished, pinAfterStep } from "./qualify-isolated.js";
 import { pinAfterPool, poolStepOf } from "./qualify-pool.js";
 import { PI_CELLS, PROBE_MEMORY_ONLY_ENV, PROBE_NOTES_ENV } from "./qualify-declarations.js";
-import { SYNC_STATE_SCHEMA, digestFiles, recordStem, type SyncContext, type SyncEntry, type SyncPlugin, type SyncState } from "./qualify-sync.js";
-import type { SuitabilityRating } from "./rating.js";
+import { SYNC_STATE_SCHEMA, digestFiles, type SyncContext, type SyncEntry, type SyncPlugin, type SyncState } from "./qualify-sync.js";
+import { keyId, keyLabel, shadowKeyOf, type ShadowKey, type StoredRecord } from "./qualification-store.js";
+import { outputOfRows, rowsUnreadable } from "./row-judge.js";
 import { writeFileWhole } from "./whole-file.js";
+import type { SuitabilityRating } from "./rating.js";
 
 /** The codes of a measurement a record owes. */
 export const OWED_CODE = {
@@ -75,8 +77,6 @@ export const MEMORY_PASS_CELLS: readonly GridCell[] = PI_CELLS;
 
 /** What a memory-only pass cannot say, in every record it writes to: growth over time needs a soak. */
 export const MEMORY_PASS_NOT_MEASURED: NotMeasured = { dimension: "memoryGrowth", code: HOSTING_CODE.stabilityUnsoaked };
-
-const RECORD_SUFFIX = ".qualification.json";
 
 /** The tool as the record says it: this package's own version, read where it is installed. */
 export function rejudgeToolName(): string {
@@ -186,15 +186,13 @@ function runsOwed(record: QualificationRecord, output: ProbeOutput, profiles: re
 export class RejudgeRefusal extends Error {}
 
 /**
- * One record judged again from its probe output, with what it owes. The figures, who took them and when are as they were;
+ * One record judged again from the probe output the judge is handed: the one the rows build (`rejudgeFromRows`), or the
+ * probe's own, which is the oracle of the store spec's case C6b. The figures, who took them and when are as they were;
  * only the verdicts, the tiers and the cost reasons beside them are new. `at` is the prior re-judge's when nothing else
- * differs, so that a second run leaves the file alone.
+ * differs, so that a second run leaves the record alone.
  */
-export function rejudgeRecord(record: QualificationRecord, probeBytes: Uint8Array, options: { readonly host: string; readonly by: string; readonly at: string }): { record: QualificationRecord; owes: readonly OwedMeasurement[] } {
-  if (sha256Hex(probeBytes) !== record.probe.sha256) throw new RejudgeRefusal(`${record.probe.file} is not the probe output the record names (its SHA-256 differs)`);
-  const read = readProbeOutput(Buffer.from(probeBytes).toString("utf8"));
-  if (!read.ok) throw new RejudgeRefusal(`${record.probe.file}: ${read.code}: ${read.problem}`);
-  const output = withMemoryRun(read.output, record);
+export function rejudgeWithOutput(record: QualificationRecord, probe: ProbeOutput, options: { readonly host: string; readonly by: string; readonly at: string }): { record: QualificationRecord; owes: readonly OwedMeasurement[] } {
+  const output = withMemoryRun(probe, record);
   const { profiles, kept } = rejudgeProfiles(record, output, options.host);
   const { reasons, owes: runs } = runsOwed(record, output, profiles);
   const judgment = judgeProbeOutput(output, profiles, { admissions: admissionsOf(record), owed: reasons });
@@ -213,12 +211,19 @@ export function rejudgeRecord(record: QualificationRecord, probeBytes: Uint8Arra
     rejudged: {
       at,
       by: options.by,
-      figures: { tool: record.tool, measuredAt: record.measuredAt, runId: read.output.run.id, ...memory, ...adapterTaken },
+      figures: { tool: record.tool, measuredAt: record.measuredAt, runId: probe.run.id, ...memory, ...adapterTaken },
       ...(owes.length === 0 ? {} : { owes }),
     },
   });
   const same = prior !== undefined && JSON.stringify(next(prior.at)) === JSON.stringify(record);
   return { record: same ? record : next(options.at), owes };
+}
+
+/** One record of the store judged again from its rows alone; a record whose rows lack a figure the judge needs throws, naming it. */
+export function rejudgeFromRows(stored: StoredRecord, options: { readonly host: string; readonly by: string; readonly at: string }): { record: QualificationRecord; owes: readonly OwedMeasurement[] } {
+  const why = rowsUnreadable(stored);
+  if (why !== undefined) throw new RejudgeRefusal(why);
+  return rejudgeWithOutput(stored.record, outputOfRows(stored), options);
 }
 
 // --- a device's records -----------------------------------------------------------------------------------------------
@@ -242,32 +247,18 @@ export interface RejudgeResult {
   readonly owing: readonly OwingRecord[];
 }
 
-/** The entries whose files are not the bytes they were qualified from, and their records' stems. */
-function changedStems(state: SyncState): { stems: Set<string>; entries: Set<string> } {
-  const stems = new Set<string>();
+/** The entries whose files are not the bytes they were qualified from, and the keys of their records. */
+function changedKeys(state: SyncState): { keys: Set<string>; entries: Set<string> } {
+  const keys = new Set<string>();
   const entries = new Set<string>();
   for (const [key, e] of Object.entries(state.entries)) {
     const now = digestFiles(e.root, e.files.map((f) => f.path), e.files);
     if (now !== undefined && now.every((f) => e.files.some((x) => x.path === f.path && x.sha256 === f.sha256))) continue;
     entries.add(key);
-    for (const p of e.plugins) {
-      const stem = p.record === undefined ? undefined : recordStem(p.record);
-      if (stem !== undefined) stems.add(stem);
-    }
+    for (const p of e.plugins) if (p.record !== undefined) keys.add(keyId(p.record));
   }
-  return { stems, entries };
+  return { keys, entries };
 }
-
-const readRecord = (path: string): QualificationRecord | undefined => {
-  try {
-    const r = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
-    return r.schema === QUALIFICATION_RECORD_SCHEMA ? r : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-const nameOf = (record: QualificationRecord): string => record.plugin.id;
 
 /** A state plugin with the verdict its record now holds for the host: the pin's files stay as they are, only its word follows. */
 function pluginWithVerdict(plugin: SyncPlugin, v: RecordVerdict, run?: RunBlock): SyncPlugin {
@@ -297,52 +288,44 @@ function pluginWithVerdictOnly(plugin: SyncPlugin, v: RecordVerdict, run?: RunBl
 }
 
 /**
- * Every record of the device's qualification directory judged again, the state's outcomes and pin words brought into line,
- * and the list of what is owed written beside the state file. Each file is written whole, and only when it differs.
+ * Every record of the scope's user layer judged again from its rows, the state's outcomes and pin words brought into line,
+ * and the list of what is owed written beside the state file. A record is put only when it differs; the base is read only
+ * and is never judged in place.
  */
 export function rejudgeState(ctx: SyncContext, state: SyncState, now: () => string = () => new Date().toISOString()): RejudgeResult {
-  const { qualificationDir: dir, hostProfile, stateFile } = ctx.settings;
+  const { hostProfile, stateFile } = ctx.settings;
   const by = rejudgeToolName();
   const at = now();
-  const changed = changedStems(state);
+  const changed = changedKeys(state);
   const judged = new Map<string, QualificationRecord>();
   const owing: OwingRecord[] = [];
   let changedCount = 0;
   let unchanged = 0;
-  let names: string[] = [];
-  try {
-    names = readdirSync(dir).filter((f) => f.endsWith(RECORD_SUFFIX)).sort();
-  } catch {
-    // no directory, no record
-  }
-  for (const name of names) {
-    const path = join(dir, name);
-    const record = readRecord(path);
-    if (record === undefined) {
-      ctx.log(`${name}: does not read as a record; left as it is`);
-      owing.push({ plugin: name, record: name, owes: [{ measurement: "qualification", code: OWED_CODE.figuresUnreadable }] });
+  const stored = [...ctx.store.userRecords()].sort((a, b) => (a.uri + a.offer).localeCompare(b.uri + b.offer));
+  for (const s of stored) {
+    const key = shadowKeyOf(s);
+    const id = keyId(key);
+    const label = keyLabel(key);
+    if (changed.keys.has(id)) {
+      owing.push({ plugin: s.uri, record: label, owes: [{ measurement: "qualification", code: OWED_CODE.bytesChanged }] });
       continue;
     }
-    if (changed.stems.has(recordStem(name) ?? "")) {
-      owing.push({ plugin: nameOf(record), record: name, owes: [{ measurement: "qualification", code: OWED_CODE.bytesChanged }] });
-      continue;
-    }
-    let result: ReturnType<typeof rejudgeRecord>;
+    let result: ReturnType<typeof rejudgeFromRows>;
     try {
-      result = rejudgeRecord(record, readFileSync(join(dir, record.probe.file)), { host: hostProfile.id, by, at });
+      result = rejudgeFromRows(s, { host: hostProfile.id, by, at });
     } catch (e) {
-      const detail = e instanceof RejudgeRefusal ? e.message : `${record.probe.file}: ${(e as NodeJS.ErrnoException).code ?? String(e)}`;
-      ctx.log(`${name}: ${detail}; left as it is`);
-      owing.push({ plugin: nameOf(record), record: name, owes: [{ measurement: "qualification", code: OWED_CODE.figuresUnreadable, detail }] });
+      if (!(e instanceof RejudgeRefusal)) throw e;
+      ctx.log(`${label}: ${e.message}; left as it is`);
+      owing.push({ plugin: s.uri, record: label, owes: [{ measurement: "qualification", code: OWED_CODE.figuresUnreadable, detail: e.message }] });
       continue;
     }
-    if (result.record === record) unchanged++;
+    if (result.record === s.record) unchanged++;
     else {
-      writeFileWhole(path, `${JSON.stringify(result.record, null, 2)}\n`);
+      ctx.store.put(key, result.record);
       changedCount++;
     }
-    judged.set(name, result.record);
-    if (result.owes.length > 0) owing.push({ plugin: nameOf(record), record: name, owes: result.owes });
+    judged.set(id, result.record);
+    if (result.owes.length > 0) owing.push({ plugin: s.uri, record: label, owes: result.owes });
   }
   const entries: Record<string, SyncEntry> = {};
   for (const [key, entry] of Object.entries(state.entries)) {
@@ -351,11 +334,11 @@ export function rejudgeState(ctx: SyncContext, state: SyncState, now: () => stri
       continue;
     }
     const plugins = entry.plugins.map((plugin) => {
-      const record = plugin.record === undefined ? undefined : judged.get(basename(plugin.record));
+      const record = plugin.record === undefined ? undefined : judged.get(keyId(plugin.record));
       const v = record?.verdicts.find((x) => x.host === hostProfile.id);
       if (v !== undefined) return pluginWithVerdict(plugin, v, record?.run);
-      if (record === undefined && plugin.outcome === "unmeasured" && plugin.record?.endsWith(RECORD_SUFFIX) !== true) {
-        owing.push({ plugin: plugin.uri, ...(plugin.record === undefined ? {} : { record: basename(plugin.record) }), owes: [{ measurement: "qualification", code: OWED_CODE.noFigures }] });
+      if (record === undefined && plugin.outcome === "unmeasured" && plugin.record === undefined) {
+        owing.push({ plugin: plugin.uri, owes: [{ measurement: "qualification", code: OWED_CODE.noFigures }] });
       }
       return plugin;
     });
@@ -415,8 +398,8 @@ export interface MemoryPassResult {
   readonly failed: number;
 }
 
-/** The extensions a record was measured with: its file says which offer it is. */
-const offerOf = (recordName: string): readonly string[] => (recordName.endsWith(`.custom${RECORD_SUFFIX}`) ? OMX_CLAP_HOST_CONFIGURED_EXTENSIONS : []);
+/** The extensions a record was measured with: its offer says which it is. */
+const offerOf = (key: ShadowKey): readonly string[] => (key.offer === "custom" ? OMX_CLAP_HOST_CONFIGURED_EXTENSIONS : []);
 
 /**
  * The footprint of each plugin of the state, at `MEMORY_PASS_CELLS`, merged into the record its verdict for this run's host
@@ -426,19 +409,17 @@ const offerOf = (recordName: string): readonly string[] => (recordName.endsWith(
 export function memoryPass(ctx: SyncContext, state: SyncState, options: { readonly force?: boolean; readonly run?: ProbeRun } = {}): MemoryPassResult {
   const { memory, budgetS, memoryNotes } = ctx.settings;
   const count = { measured: 0, already: 0, failed: 0 };
-  const changed = changedStems(state);
+  const changed = changedKeys(state);
   for (const [key, entry] of Object.entries(state.entries)) {
     if (changed.entries.has(key)) {
       ctx.log(`${key}: its files changed since it was measured; the sync measures it whole`);
       continue;
     }
     for (const plugin of entry.plugins) {
-      if (plugin.record === undefined || !plugin.record.endsWith(RECORD_SUFFIX)) continue;
-      const name = basename(plugin.record);
-      const path = join(ctx.settings.qualificationDir, name);
-      const record = readRecord(path);
+      if (plugin.record === undefined) continue;
+      const record = ctx.store.record(plugin.record);
       if (record === undefined) {
-        ctx.log(`${plugin.uri}: its record ${name} does not read; no footprint taken`);
+        ctx.log(`${plugin.uri}: its record ${keyLabel(plugin.record)} is not in the store; no footprint taken`);
         count.failed++;
         continue;
       }
@@ -452,10 +433,10 @@ export function memoryPass(ctx: SyncContext, state: SyncState, options: { readon
       try {
         const probed =
           entry.format === "clap"
-            ? probeTarget(clapTarget(key, entry, record), { ...limits, offer: offerOf(name), env })
+            ? probeTarget(clapTarget(key, entry, record), { ...limits, offer: offerOf(plugin.record), env })
             : lv2World(entry.root, (world) => probeTarget({ format: "lv2", uri: record.plugin.id, bundle: entry.root }, { ...limits, env: { ...env, LV2_PATH: world } }));
         if (probed.output.binary.sha256 !== record.binary.sha256) throw new ProbeRunnerError(`measured binary ${probed.output.binary.sha256.slice(0, 12)}, the record's is ${record.binary.sha256.slice(0, 12)}`);
-        writeFileWhole(path, `${JSON.stringify(mergeMemoryRun(record, probed.output, MEMORY_PASS_CELLS), null, 2)}\n`);
+        ctx.store.put(plugin.record, mergeMemoryRun(record, probed.output, MEMORY_PASS_CELLS));
         count.measured++;
         ctx.log(`${plugin.uri}: footprint taken at ${MEMORY_PASS_CELLS.map(cellKey).join(", ")} in ${((Date.now() - started) / 1000).toFixed(1)} s`);
       } catch (e) {
