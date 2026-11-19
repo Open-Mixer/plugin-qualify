@@ -155,14 +155,20 @@ describe("QualificationStore reads through plugin-qualification-db", () => {
 });
 
 describe("storedForm keeps what the store maps", () => {
-  it("the package object stays, and the fields without a column go", async () => {
+  it("the package object stays and every mapped field is kept; a set's provenance goes", async () => {
     const { storedForm } = await import("./qualification-record.js");
     const r = exported(LV2_CLEAN).record;
     const pkg = { format: "rpm", name: "x", version: "1", release: "1", distro: "fc45", arch: "x86_64" };
-    const out = storedForm({ ...r, package: pkg, provenance: { set: "s" }, rules: "plugin-qualify-rules/1.0", latencyLineMs: 5 } as never) as unknown as Record<string, unknown>;
+    const grid = r.measurements.grid.map((c) => ({ ...c, latencyMs: 0.04 }));
+    const named = { ...r, plugin: { ...r.plugin, name: "Amp" }, package: pkg, provenance: { set: "s" }, rules: "plugin-qualify-rules/1.0", latencyLineMs: 5, measurements: { ...r.measurements, grid } };
+    const out = storedForm(named as never) as unknown as Record<string, any>;
     expect(out["package"]).toEqual(pkg);
+    // a record's provenance is its set's: the one field the store never holds for a layer's own record
     expect(out["provenance"]).toBeUndefined();
-    expect(out["rules"]).toBeUndefined();
-    expect(out["latencyLineMs"]).toBeUndefined();
+    // the columns the store maps: nothing is stripped
+    expect(out["rules"]).toBe("plugin-qualify-rules/1.0");
+    expect(out["latencyLineMs"]).toBe(5);
+    expect(out["plugin"].name).toBe("Amp");
+    expect(out["measurements"].grid.every((c: { latencyMs?: number }) => c.latencyMs === 0.04)).toBe(true);
   });
 });

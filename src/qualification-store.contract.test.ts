@@ -107,6 +107,21 @@ describe("plugin-qualification-db-write put and delete, in a layer of the test's
   });
 });
 
+describe("every optional field the writer maps is put, not refused as unmapped", () => {
+  it("a record with the line, the rules, a cell's latency in ms, the plugin's name, the pool figures and a history block", () => {
+    const r = JSON.parse(JSON.stringify(record())) as Record<string, any>;
+    r.latencyLineMs = 5;
+    r.rules = "plugin-qualify-rules/1.0";
+    r.plugin.name = "Amp";
+    r.measurements.grid[0].latencyMs = 0.04;
+    r.run.steps = [{ step: "isolated", result: "isolated", pool: { allocationsOn: 0, locksOn: 0, syscallsOn: 0, tasksOnHelpers: 1, dspLoadOff: 40, dspLoadOn: 20, xrunsOff: 0, xrunsOn: 0 } }];
+    r.history = [{ hostClass: "aarch64/4/2400", file: "history", at: "2027-01-15T08:00:00.000Z", key: { uri: "u", digest: "d" }, found: true, windows: { solo: 400, grouped: 10 }, summary: { crashed: false, raisesXruns: false }, unknownKeys: { a: "b" }, verdicts: [{ host: "omx-clap-host", measured: "isolated", adjusted: "in-process", move: "promoted", reason: "history.steady", blockedBy: ["x"] }] }];
+    const out = put(r);
+    // a word of the history's own may still be refused; none of these fields is unmapped
+    expect(out.stderr).not.toContain("field-unmapped");
+  });
+});
+
 describe("plugin-qualification-db reads what the sync asks of it", () => {
   const verdict = (out: { status: number | null; stderr: string }, what: string): void => {
     // a store that is not there is a refusal by name; a verb the command does not have is a usage error
