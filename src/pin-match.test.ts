@@ -107,3 +107,26 @@ describe("the cells and the verdict of the host", () => {
     expect(matchStored([], item, "omx-clap-host", d, CELLS)).toEqual({ status: "none" });
   });
 });
+
+describe("the set compared is plugin-hostd's pin list, not the sync's own discovery (the store spec's section 3.7)", () => {
+  // the record's list is what plugin-hostd named when it was written: a preset file beside the bundle's .ttl files
+  const list = [{ path: "amp.so", sha256: sha("a") }, { path: "amp.ttl", sha256: sha("b") }, { path: "manifest.ttl", sha256: sha("c") }, { path: "presets.ttl", sha256: sha("d") }];
+  const r = result({ format: "lv2", uri: "urn:amp", binary_path: "amp.so", files: list });
+  const discovered = lv2Item(["manifest.ttl", "amp.ttl", "amp.so"]); // discovery does not know presets.ttl
+
+  it("a record whose list holds the preset file applies when plugin-hostd's list does", () => {
+    const m = matchStored([r], discovered, "omx-clap-host", list as never, CELLS);
+    expect(m.status).toBe("applies");
+  });
+
+  it("is passed over when plugin-hostd's list lacks a file of the record, or holds one more, whatever discovery says", () => {
+    const fewer = list.filter((f) => f.path !== "presets.ttl");
+    expect(matchStored([r], discovered, "omx-clap-host", fewer as never, CELLS).status).toBe("ignored");
+    expect(matchStored([r], discovered, "omx-clap-host", [...list, { path: "more.ttl", sha256: sha("e") }] as never, CELLS).status).toBe("ignored");
+    expect(matchStored([r], discovered, "omx-clap-host", list.map((f) => (f.path === "presets.ttl" ? { ...f, sha256: sha("f") } : f)) as never, CELLS).status).toBe("ignored");
+  });
+
+  it("with no list from plugin-hostd nothing is taken: the plugin is measured", () => {
+    expect(matchStored([r], discovered, "omx-clap-host", undefined as never, CELLS).status).toBe("ignored");
+  });
+});
