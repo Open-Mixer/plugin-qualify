@@ -10,7 +10,6 @@ export interface DerivedMatrix {
   rpmArches: string[];
   debSuites: string[];
   debArches: string[];
-  install: Array<{ image: string; artifact: string }>;
   installRpmArches: string[];
   installDebArches: string[];
 }
