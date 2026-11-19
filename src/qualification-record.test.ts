@@ -143,6 +143,32 @@ describe("the qualification record and the probe output it judged", () => {
   });
 });
 
+describe("the tiers of a plugin that started threads of its own (D20, #53)", () => {
+  // the probe output of a clean CLAP run with the plugin's own threads in every cell, or an allocation in its process()
+  const judged = (rt: Record<string, unknown>) => {
+    const doc = JSON.parse(fixtureText("success-msi"));
+    for (const p of doc.grid) if (p.rtSafety) Object.assign(p.rtSafety, rt);
+    const r = readProbeOutput(JSON.stringify(doc));
+    if (!r.ok) throw new Error(r.problem);
+    return tiersOf(judgeProbeOutput(r.output, [OPENMIXER_CONSOLE_PROFILE, OMX_CLAP_HOST_PROFILE]));
+  };
+
+  it("is offered on the tier it is judged own-threads on and never runs alone: conditional and groupable", () => {
+    // the fixture's console verdict carries a reason of its own (extensions not covered); its isolated tier's is own-threads
+    const tiers = judged({ ownThreads: 2, otherThreads: { allocations: 40, locks: 1, syscalls: 0 } });
+    expect(tiers.isolated?.deciding).toBe("hosting.rt-safety.own-threads");
+    expect(tiers.offeredOn).toContain("isolated");
+    expect(tiers.isolated?.runsAlone).toBeUndefined();
+    expect(tiers.dimmed).toBeUndefined();
+  });
+
+  it("an allocation in its process() still runs alone on the isolated tier only", () => {
+    const tiers = judged({ ownThreads: 2, allocations: 4 });
+    expect(tiers.offeredOn).toEqual(["isolated"]);
+    expect(tiers.isolated?.runsAlone).toBe(true);
+  });
+});
+
 describe("runs that share a record file", () => {
   it("become one record holding every verdict, over the first run's probe output", () => {
     const text = fixtureText("success-msi");
