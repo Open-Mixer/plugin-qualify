@@ -111,6 +111,9 @@ export function storeExport(record: QualificationRecord, probe: ProbeOutput, omi
   const doc: Json = JSON.parse(JSON.stringify(record));
   // `record.run_id` is a required column: a record from before the steps holds the probe output's run id there
   doc.run ??= { id: probe.run.id, steps: [] };
+  // the fields the store maps to no column
+  delete doc.latencyLineMs;
+  delete doc.rules;
   delete doc.provenance;
   delete doc.history;
   delete doc.tiers?.dimmed;

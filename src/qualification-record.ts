@@ -526,6 +526,17 @@ export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
   return { ...b, path: b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path, files: [...b.files].sort((x, y) => byBytes(x.path, y.path)) };
 }
 
+/**
+ * The record as the store takes it: its binary in the store's form (`storedBinary`) and without the fields the store maps to
+ * no column, which a reader derives or states itself: `latencyLineMs` (a constant of the judge), `rules` (the rules the
+ * verdicts were judged by) and a cell's `latencyMs` (its measured frames over its rate). The writer refuses an unmapped field by
+ * name (`field-unmapped`), so the sync puts none.
+ */
+export function storedForm(record: QualificationRecord): QualificationRecord {
+  const { latencyLineMs: _line, rules: _rules, ...rest } = record;
+  return { ...rest, binary: storedBinary(record.binary), measurements: { ...record.measurements, grid: record.measurements.grid.map(({ latencyMs: _ms, ...cell }) => cell) } };
+}
+
 export function buildQualificationRecord(
   judgment: Judgment,
   copy: { file: string; sha256: string; bytes: number },
