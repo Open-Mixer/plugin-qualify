@@ -1,0 +1,95 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
+/**
+ * The commands the sync calls, as the store spec documents them (section 6 and 6.1), run for real: no stand-in, no skip.
+ * Each test fails with the name of what is missing until the repository that owns the commands ships it
+ * (`command missing: plugin-qualification-db-write`, `unknown verb counts`), and turns green as each lands.
+ *
+ * Nothing here writes a layer: a refusal writes nothing, and the read verbs only read. The positive round trip (put, query,
+ * delete) is proved against the stand-in of `store-fake.support.ts` in `qualification-store.test.ts`, and against the
+ * commands once they take a layer path the tests may name.
+ */
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+import { FIXTURES, LV2_CLEAN, stored } from "./qualify-rejudge.support.js";
+import { readProbeOutput } from "./probe-output.js";
+import { storeExport } from "./store-export.support.js";
+
+const WRITE = process.env["PLUGIN_QUALIFICATION_DB_WRITE"] ?? "plugin-qualification-db-write";
+const READ = process.env["PLUGIN_QUALIFICATION_DB"] ?? "plugin-qualification-db";
+
+function run(command: string, args: string[], input?: string) {
+  const r = spawnSync(command, args, { encoding: "utf8", timeout: 30_000, ...(input === undefined ? {} : { input }) });
+  if ((r.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") throw new Error(`command missing: ${command}`);
+  return { status: r.status, stdout: r.stdout, stderr: r.stderr };
+}
+
+/** A valid LV2 record of the fixtures as the store holds it: relative paths, in order, the key the binary's own. */
+function record() {
+  const rec = stored(LV2_CLEAN);
+  const probe = readProbeOutput(readFileSync(join(FIXTURES, `${LV2_CLEAN}.probe.json`), "utf8"));
+  if (!probe.ok) throw new Error(probe.problem);
+  return storeExport(rec, probe.output).record;
+}
+
+const put = (doc: unknown) => run(WRITE, ["put", "--scope", "user", "--offer", "default", "--host-class", "x86-64"], JSON.stringify(doc));
+
+describe("plugin-qualification-db-write put refuses what section 3.7 says it refuses, by code, naming the path", () => {
+  const cases: [string, (r: any) => void, RegExp][] = [
+    ["path-absolute", (r) => { r.binary.path = "/usr/lib/lv2/x.lv2/amp.so"; }, /\/usr\/lib\/lv2\/x\.lv2\/amp\.so/],
+    ["path-absolute", (r) => { r.binary.files[0].path = "/etc/manifest.ttl"; }, /\/etc\/manifest\.ttl/],
+    ["files-empty", (r) => { r.binary.files = []; }, /./],
+    ["files-duplicate", (r) => { r.binary.files = [r.binary.files[0], ...r.binary.files]; }, /./],
+    ["files-unordered", (r) => { r.binary.files = [...r.binary.files].reverse(); }, /./],
+    ["binary-not-in-files", (r) => { r.binary.path = "elsewhere.so"; }, /elsewhere\.so/],
+    ["key-not-the-binary", (r) => { r.binary.sha256 = "e".repeat(64); }, /./],
+  ];
+  for (const [code, break_, names] of cases) {
+    it(`${code}`, () => {
+      const r = record();
+      break_(r);
+      const out = put(r);
+      expect(out.status, out.stderr).not.toBe(0);
+      expect(out.stderr).toContain(code);
+      expect(out.stderr).toMatch(names);
+    });
+  }
+});
+
+describe("plugin-qualification-db reads what the sync asks of it", () => {
+  const verdict = (out: { status: number | null; stderr: string }, what: string): void => {
+    // a store that is not there is a refusal by name; a verb the command does not have is a usage error
+    expect(out.status, `${what}: ${out.stderr}`).not.toBe(2);
+    if (out.status !== 0) expect(out.stderr).toMatch(/qualification-db\.[a-z-]+/);
+  };
+
+  it("counts --layer user --json", () => {
+    const out = run(READ, ["counts", "--layer", "user", "--json"]);
+    if (out.status === 2) throw new Error(`unknown verb counts: ${out.stderr.trim()}`);
+    verdict(out, "counts");
+    if (out.status === 0) for (const l of out.stdout.split("\n").filter(Boolean)) expect(JSON.parse(l)).toEqual({ format: expect.any(String), plugins: expect.any(Number), offered: expect.any(Number), not_offered: expect.any(Number) });
+  });
+
+  it("query --json --records --layer user: one object a record, with the record in it", () => {
+    const out = run(READ, ["query", "--json", "--records", "--layer", "user"]);
+    if (out.status === 2) throw new Error(`unknown flag --records or --layer: ${out.stderr.trim()}`);
+    verdict(out, "query --records");
+    if (out.status === 0) for (const l of out.stdout.split("\n").filter(Boolean)) expect(Object.keys(JSON.parse(l))).toEqual(["layer", "sha256", "format", "uri", "offer", "host_class", "record"]);
+  });
+
+  it("query --json --records refuses --rate: a record is not a cell", () => {
+    const out = run(READ, ["query", "--json", "--records", "--rate", "48000"]);
+    expect(out.status).toBe(2);
+    expect(out.stderr).toMatch(/records/);
+  });
+
+  it("query --json carries the per-file list of each result, never empty", () => {
+    const out = run(READ, ["query", "--json", "--layer", "user"]);
+    if (out.status === 2) throw new Error(`unknown flag --layer: ${out.stderr.trim()}`);
+    verdict(out, "query");
+    if (out.status === 0) for (const l of out.stdout.split("\n").filter(Boolean)) expect((JSON.parse(l) as { files: unknown[] }).files.length).toBeGreaterThan(0);
+  });
+});
