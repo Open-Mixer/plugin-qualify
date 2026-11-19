@@ -173,8 +173,8 @@ export class QualificationStore {
   }
 
   /** The records of the merged answer for a plugin's shadow keys, whole (`query --json --records`, no layer). */
-  recordsOf(filter: { readonly sha256: string; readonly format: string; readonly uri: string; readonly offer: string; readonly hostClass: string }): StoredRecord[] {
-    const args = ["--json", "--records", "--sha256", filter.sha256, "--format", filter.format, "--uri", filter.uri, "--offer", filter.offer, "--host-class", filter.hostClass];
+  recordsOf(filter: { readonly sha256: string; readonly format: string; readonly uri: string; readonly offer: string; readonly hostClass: string; readonly layer?: "user" | "base" }): StoredRecord[] {
+    const args = ["--json", "--records", ...(filter.layer === undefined ? [] : ["--layer", filter.layer]), "--sha256", filter.sha256, "--format", filter.format, "--uri", filter.uri, "--offer", filter.offer, "--host-class", filter.hostClass];
     return lines(this.read("query", args)) as StoredRecord[];
   }
 

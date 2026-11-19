@@ -241,13 +241,12 @@ with the fields they are computed from (`probe.format.derived-mismatch`): `machi
 
 ```
 plugin-hostd-probe run --out out/plate.probe.json ./example-plate.clap org.example.plate
-plugin-qualify judge --host-profile omx-clap-host --qualification-dir ./qualification out/plate.probe.json
+plugin-qualify judge --host-profile omx-clap-host --host-class x86-64 out/plate.probe.json
 ```
 
-`judge` writes, into the qualification directory (`--qualification-dir`, else `$XDG_STATE_HOME/omx/qualification`,
-else `~/.local/state/omx/qualification`), the qualification record `<id>@<version>-<sha256 first 12>.<offer>.qualification.json`
-and, beside it, a byte copy of the probe output it judged, `<same name>.probe.json`, because the probe directory
-may be wiped. The record names that copy and its SHA-256 in `probe`, with the run's protocol, reason and machine
+`judge` puts the qualification record of each probe output in the qualification store, in the user layer (`--system`: the
+system layer), through `plugin-qualification-db-write`, under the host class `--host-class` (else this machine's). No copy
+of the probe output is kept. The record names the output it judged and its SHA-256 in `probe`, with the run's protocol, reason and machine
 class, so a reference figure and a local one are told apart. The record holds, for each host profile, the verdict
 (`rating`, `hosting`, the deciding reason code and every reason) and the cost reasons at that profile's rate and
 quantum, and the figures as measured. Exit `0` every plugin qualified, `1` some did not, `2` something could not
@@ -341,13 +340,13 @@ remote-control pages.
 ## Adjusting a verdict by what the plugin did on this machine
 
 ```
-plugin-qualify adjust --history ~/.local/state/plugin-hostd/history --qualification-dir ./qualification --host-profile omx-clap-host
-plugin-qualify adjust --history history --qualification-dir ./qualification --host-class aarch64/4/2400 --pins pins.txt
+plugin-qualify adjust --history ~/.local/state/plugin-hostd/history --host-profile omx-clap-host
+plugin-qualify adjust --history history --host-class aarch64/4/2400 --pins pins.txt
 ```
 
 plugin-hostd keeps a running history of every plugin binary on every host class it ran on (windows run alone and in a
 group, CPU, xrun windows, crashes, restarts, quarantines). `adjust` reads that file directly, so it runs without a daemon,
-and writes a second verdict beside the measured one in each qualification record: a `history` block per host class of the
+and writes a second verdict beside the measured one in each record of the store's user layer (`--system`: the system layer), read through the reader and put again through the writer. The plugin's installed path, which the history is keyed by, is the install root of the installed item that holds the record's key joined with the record's `binary_path`; a record whose key no installed item holds is left as it is, under `adjust.not-installed`. Each record gets a `history` block: a `history` block per host class of the
 file, holding the line it looked for (the plugin's plugin-hostd uri and the digest of the first file of its pin), whether
 the history has it, the windows it counts, and for each `--host-profile` the measured pin verdict, the adjusted one, the
 move (`demote`, `promote` or `none`) and a reason code. The measured `verdicts` and the measurement are never changed: the

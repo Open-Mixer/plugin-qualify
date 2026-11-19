@@ -1,15 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The distributed layer: qualification records another device of the same machine class wrote for a plugin set,
- * installed read-only under `<dir>/<host class>/<set>/` beside the set's `provenance.json`. plugin-qualify-sync reads
- * it before measuring a plugin, and takes a plugin from it instead of measuring it only when every file the record
- * names hashes, here, as it did where it was measured. The name of a plugin finds its record and never decides
- * anything: a record is never trusted by name alone.
- *
- * What applies is copied into the device's own `qualification_dir`, the record with the set's provenance added and
- * its probe output byte for byte, and the plugin's pin is the one that probe output holds. From then on the sync
- * treats the plugin as one it measured.
+ * What the sync and its commands share about the machine's own records: the host class a record is read and written
+ * under, the outcome a verdict makes, and the cells a record holds. The records themselves are the qualification store's
+ * (`qualification-store.ts`): its BASE holds the records another device of the same machine class measured for a plugin
+ * set, installed read-only, and its USER layer (the system layer under `--system`) holds the sync's own, which shadow the
+ * base's of the same key. The sync takes a plugin from a stored record only when the files plugin-hostd names for it are
+ * exactly the record's list (`pin-match.ts`); the name of a plugin finds its record and never decides anything.
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { machine } from "node:os";

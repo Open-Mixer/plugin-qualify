@@ -99,7 +99,7 @@ describe("the key of a record in the history", () => {
     expect(historyKeyOf({ ...r, plugin: { format: "lv2", id: "urn:example:eq" } }, ROOT)?.uri).toBe("urn:example:eq");
     expect(historyKeyOf({ ...r, binary: { ...r.binary, files: [] } }, ROOT)).toBeUndefined();
     const { layout: _layout, ...noLayout } = r.binary;
-    expect(historyKeyOf({ ...r, binary: noLayout })).toBeUndefined();
+    expect(historyKeyOf({ ...r, binary: noLayout }, ROOT)).toBeUndefined();
   });
 });
 

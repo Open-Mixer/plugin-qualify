@@ -2,13 +2,11 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * The qualification record: what plugin-qualify wrote down about one plugin binary and one offer
- * after judging its probe output, kept in `qualification_dir`. Evidence, not a constraint: no
+ * after judging its probe output, kept in the qualification store. Evidence, not a constraint: no
  * reader refuses a descriptor because of it.
  *
- * Two files, always together. The record is the judgment; beside it is a byte copy of the probe
- * output it judged, because the probe directory is runtime and may be wiped. The record names the
- * copy and the SHA-256 of the copy's bytes, so the facts outlive the run without hostd keeping a
- * second store, and a reader can tell that the figures it holds are the ones the verdict came from.
+ * The record is the judgment. It names the probe output it judged (its file name, SHA-256 and size) as evidence of where
+ * the figures came from; no copy of that output is kept, and every figure a later judge needs is in the record.
  *
  * Not yet in the record: the fingerprint of the descriptor's controls, since the descriptor is
  * written by the scan (stage 5) and plugin-qualify does not read one yet.
@@ -537,7 +535,11 @@ const byBytes = (a: string, b: string): number => Buffer.compare(Buffer.from(a),
  * the path the probe measured.
  */
 export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
-  return { ...b, path: b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path, files: [...b.files].sort((x, y) => byBytes(x.path, y.path)) };
+  const files = [...b.files].sort((x, y) => byBytes(x.path, y.path));
+  const below = b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path;
+  // a probe that named the bundle (not its binary) leaves the path no entry of the list: the binary is the entry of the key
+  const path = files.some((f) => f.path === below) ? below : (files.find((f) => f.sha256 === b.sha256)?.path ?? below);
+  return { ...b, path, files };
 }
 
 /**

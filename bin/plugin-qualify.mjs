@@ -14,7 +14,7 @@
  * `/usr/lib/clap`). `plugin-qualify judge` judges probe outputs already written.
  */
 import "../dist/qualification-cli-start.js";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import {
   adjustHelpText,
@@ -23,12 +23,19 @@ import {
   adjustedPinEntries,
   parseAdjustArgs,
   readRecords,
-  rewriteRecord,
+  installedRootOf,
+  QualificationStore,
+  StoreError,
+  discoverSyncItems,
+  fileSha256,
+  hostClassOf,
+  parseSyncArgs,
+  resolveSyncSettings,
+  storedForm,
   ClapScanError,
   EXIT_CODE,
   clapLoader,
   clapPinEntries,
-  defaultQualificationDir,
   judgeExitCode,
   judgedLayerHelpText,
   judgedLayerOf,
@@ -96,14 +103,24 @@ if (process.argv[2] === "judge") {
     for (const r of hosts.refused) process.stderr.write(`plugin-qualify judge: --host-profile ${r.spec}: ${r.problem}\n`);
     process.exit(EXIT_CODE.couldNotMeasure);
   }
-  const dir = j.args.qualificationDir ?? defaultQualificationDir(process.env);
-  const result = judgeFiles(j.args.files, { profiles: hosts.profiles, dir });
+  const hostClass = hostClassOf(j.args.hostClass);
+  if (hostClass === undefined) {
+    process.stderr.write("plugin-qualify judge: this machine has no host class: name one with --host-class\n");
+    process.exit(EXIT_CODE.couldNotMeasure);
+  }
+  const store = new QualificationStore(j.args.system ? "system" : "user");
+  let result;
+  try {
+    result = judgeFiles(j.args.files, { profiles: hosts.profiles, store, hostClass });
+  } catch (e) {
+    if (!(e instanceof StoreError)) throw e;
+    process.stderr.write(`plugin-qualify judge: ${e.message}\n`);
+    process.exit(EXIT_CODE.couldNotMeasure);
+  }
   for (const f of result.failures) process.stderr.write(`plugin-qualify judge: ${f.file}: ${f.problem}\n`);
-  for (const r of result.records) process.stderr.write(`plugin-qualify judge: record ${r.recordPath}\n`);
+  for (const k of result.records) process.stderr.write(`plugin-qualify judge: record ${k.uri} (${k.offer}, ${k.hostClass}) put in the ${j.args.system ? "system" : "user"} layer\n`);
   process.stdout.write(
-    j.args.format === "json"
-      ? `${JSON.stringify(result.records.map((r) => JSON.parse(readFileSync(r.recordPath, "utf8"))), null, 2)}\n`
-      : textTable(result.verdicts),
+    j.args.format === "json" ? `${JSON.stringify(result.records.map((k) => store.record(k)), null, 2)}\n` : textTable(result.verdicts),
   );
   process.exit(judgeExitCode(result));
 }
@@ -147,9 +164,13 @@ if (process.argv[2] === "judged-layer") {
   }
   let record;
   try {
-    record = JSON.parse(readFileSync(j.args.record, "utf8"));
+    record = new QualificationStore("user").recordsOf({ ...j.args.key, ...(j.args.layer === undefined ? {} : { layer: j.args.layer }) })[0]?.record;
   } catch (e) {
-    process.stderr.write(`plugin-qualify judged-layer: ${j.args.record}: cannot read: ${e.message}\n`);
+    process.stderr.write(`plugin-qualify judged-layer: ${e.message}\n`);
+    process.exit(2);
+  }
+  if (record === undefined) {
+    process.stderr.write(`plugin-qualify judged-layer: no record of that key in the store\n`);
     process.exit(2);
   }
   const l = judgedLayerOf(record, {
@@ -188,15 +209,34 @@ if (process.argv[2] === "adjust") {
     process.stderr.write(`plugin-qualify adjust: --history ${a.args.history}: cannot read: ${e.message}\n`);
     process.exit(EXIT_CODE.couldNotMeasure);
   }
-  const dir = a.args.qualificationDir ?? defaultQualificationDir(process.env);
-  const read = readRecords(dir);
-  for (const f of read.failures) process.stderr.write(`plugin-qualify adjust: ${f.file}: ${f.problem}\n`);
-  if (read.records.length === 0) {
-    process.stderr.write(`plugin-qualify adjust: no qualification record in ${dir}\n`);
+  const store = new QualificationStore(a.args.system ? "system" : "user");
+  let read;
+  let items;
+  try {
+    read = readRecords(store);
+    // the installed items, as the sync finds them: a record's plugin is where its key is installed
+    const conf = parseSyncConf(existsSync(SYNC_CONF) ? readFileSync(SYNC_CONF, "utf8") : "");
+    const sync = parseSyncArgs(a.args.system ? ["--system"] : []);
+    const settings = conf.ok && sync.ok ? resolveSyncSettings(conf.values, sync.args, process.env) : undefined;
+    if (settings === undefined || !settings.ok) throw new Error(settings === undefined ? "the sync's settings do not read" : settings.error);
+    items = discoverSyncItems(settings.settings).items;
+  } catch (e) {
+    process.stderr.write(`plugin-qualify adjust: ${e.message}\n`);
     process.exit(EXIT_CODE.couldNotMeasure);
   }
+  if (read.records.length === 0) {
+    process.stderr.write(`plugin-qualify adjust: no record in the ${a.args.system ? "system" : "user"} layer of the qualification store\n`);
+    process.exit(EXIT_CODE.couldNotMeasure);
+  }
+  const hashOf = (path) => {
+    try {
+      return fileSha256(path);
+    } catch {
+      return undefined;
+    }
+  };
   const now = a.args.now ?? Math.floor(Date.now() / 1000);
-  const done = adjustRecords(read.records, text, { profiles: hosts.profiles, file: a.args.history, now, ...(a.args.hostClass === undefined ? {} : { hostClass: a.args.hostClass }) });
+  const done = adjustRecords(read.records, text, { profiles: hosts.profiles, file: a.args.history, now, rootOf: (key, record) => installedRootOf(items, key, record, hashOf), ...(a.args.hostClass === undefined ? {} : { hostClass: a.args.hostClass }) });
   if (!done.ok) {
     process.stderr.write(`plugin-qualify adjust: ${done.problem}\n`);
     process.exit(EXIT_CODE.couldNotMeasure);
@@ -208,9 +248,16 @@ if (process.argv[2] === "adjust") {
     process.exit(EXIT_CODE.couldNotMeasure);
   }
   for (const i of done.ignored) process.stderr.write(`plugin-qualify adjust: ${a.args.history}:${String(i.line)}: not read: ${i.problem}\n`);
+  for (const n of done.notInstalled) process.stderr.write(`plugin-qualify adjust: ${n.key.uri} (${n.key.offer}): ${n.code}: no installed item holds this record's key; left as it is\n`);
   for (const r of done.records) {
-    rewriteRecord(r.path, r.record);
-    process.stderr.write(`plugin-qualify adjust: record ${r.path}\n`);
+    try {
+      store.put(r.key, storedForm(r.record));
+    } catch (e) {
+      if (!(e instanceof StoreError)) throw e;
+      process.stderr.write(`plugin-qualify adjust: ${r.key.uri}: ${e.message}\n`);
+      process.exit(EXIT_CODE.couldNotMeasure);
+    }
+    process.stderr.write(`plugin-qualify adjust: record ${r.key.uri} (${r.key.offer}) put\n`);
   }
   if (a.args.pins !== undefined) writePins(a.args.pins, pinsFile(adjustedPinEntries(done.records, done.hostClasses[0], hosts.profiles[0].id)));
   process.stdout.write(a.args.format === "json" ? `${JSON.stringify(done.records.map((r) => r.record), null, 2)}\n` : adjustTable(done.records));
