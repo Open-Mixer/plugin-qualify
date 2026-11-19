@@ -746,6 +746,8 @@ static void (*rt_begin)(void);
 static void (*rt_end)(void);
 static void (*rt_reset)(void);
 static void (*rt_counts)(uint64_t *, uint64_t *, uint64_t *);
+/* D20: the other threads' counts while the audio thread was armed, absent from an interposer before them */
+static void (*rt_other_counts)(uint64_t *, uint64_t *, uint64_t *);
 static int (*rt_present)(void);
 static int (*rt_events)(struct omx_rt_event *, int);
 
@@ -754,6 +756,7 @@ static void resolve_interposer(void) {
   rt_end = dlsym(RTLD_DEFAULT, "omx_rt_end");
   rt_reset = dlsym(RTLD_DEFAULT, "omx_rt_reset");
   rt_counts = dlsym(RTLD_DEFAULT, "omx_rt_counts");
+  rt_other_counts = dlsym(RTLD_DEFAULT, "omx_rt_other_counts");
   rt_present = dlsym(RTLD_DEFAULT, "omx_rt_present");
   rt_events = dlsym(RTLD_DEFAULT, "omx_rt_events");
 }
@@ -1580,6 +1583,7 @@ struct rt_pass {
   unsigned rng;
   int want_events, swept, n_seen;
   uint64_t allocs, locks, syscalls;
+  uint64_t other_allocs, other_locks, other_syscalls;
   struct omx_rt_event seen[OMX_RT_EV_MAX];
 };
 
@@ -1612,6 +1616,7 @@ static void rt_pass(void *v) {
     rig_after(inst);
   }
   if (rt_counts) rt_counts(&R->allocs, &R->locks, &R->syscalls);
+  if (rt_other_counts) rt_other_counts(&R->other_allocs, &R->other_locks, &R->other_syscalls);
   if (rt_events && R->want_events) R->n_seen = rt_events(R->seen, OMX_RT_EV_MAX);
   m_deactivate(inst->inst);
   m_free(inst->inst);
@@ -2038,6 +2043,7 @@ int main(int argc, char **argv) {
   /* ---- rt-safety: repeated, worst-case, each repeat in a child of its own ---- */
   uint64_t allocs = 0, locks = 0, syscalls = 0;
   uint64_t allocs_min = UINT64_MAX, locks_min = UINT64_MAX, syscalls_min = UINT64_MAX;
+  uint64_t other_allocs = 0, other_locks = 0, other_syscalls = 0;
   int swept = 0, rt_bound = 0;
   struct omx_rt_event seen[OMX_RT_EV_MAX];
   int n_seen = 0;
@@ -2058,6 +2064,9 @@ int main(int argc, char **argv) {
     if (R.allocs < allocs_min) allocs_min = R.allocs;
     if (R.locks < locks_min) locks_min = R.locks;
     if (R.syscalls < syscalls_min) syscalls_min = R.syscalls;
+    if (R.other_allocs > other_allocs) other_allocs = R.other_allocs;
+    if (R.other_locks > other_locks) other_locks = R.other_locks;
+    if (R.other_syscalls > other_syscalls) other_syscalls = R.other_syscalls;
   }
   if (allocs_min == UINT64_MAX) allocs_min = 0;
   if (locks_min == UINT64_MAX) locks_min = 0;
@@ -2129,6 +2138,12 @@ int main(int argc, char **argv) {
            (unsigned long long)syscalls, (unsigned long long)syscalls_min);
     emit_rt_events(seen, n_seen);
     fprintf(jout, "]");
+    /* D20: the threads the plugin started (after the first instantiate, less before), and what other threads did while
+     * the audio thread was armed, the most any repeat saw: a figure, never the verdict */
+    fprintf(jout, ",\"ownThreads\":%d", threads_after_first > threads_before ? threads_after_first - threads_before : 0);
+    if (rt_other_counts)
+      fprintf(jout, ",\"otherThreads\":{\"allocationsInRun\":%llu,\"locksInRun\":%llu,\"syscallsInRun\":%llu}",
+              (unsigned long long)other_allocs, (unsigned long long)other_locks, (unsigned long long)other_syscalls);
   }
   /* the note sweep: not applicable without a MIDI input, its counts only under the interposer */
   if (ns_bound) {

@@ -217,6 +217,17 @@ function readRtSafety(v: unknown): ClapRtSafetyReading {
     locksInRun: count(v, "locksInRun", "rtSafety"),
     syscallsInRun: count(v, "syscallsInRun", "rtSafety"),
     events: strings(v, "events", "rtSafety"),
+    // D20: optional, an older prober prints neither
+    ...(v["ownThreads"] === undefined ? {} : { ownThreads: count(v, "ownThreads", "rtSafety") }),
+    ...(isRecord(v["otherThreads"])
+      ? {
+          otherThreads: {
+            allocationsInRun: count(v["otherThreads"], "allocationsInRun", "rtSafety.otherThreads"),
+            locksInRun: count(v["otherThreads"], "locksInRun", "rtSafety.otherThreads"),
+            syscallsInRun: count(v["otherThreads"], "syscallsInRun", "rtSafety.otherThreads"),
+          },
+        }
+      : {}),
   };
 }
 
