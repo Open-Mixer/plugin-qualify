@@ -58,6 +58,27 @@
 #endif
 static uint64_t n_alloc, n_lock, n_syscall;
 OMX_RT_LOCAL int armed;
+/* D20 (plugin-qualify#53): a call while the window is armed is the audio thread's when the thread that armed it makes
+ * it, and another thread's otherwise (a plugin's own worker, timing-bound): counted apart, the other threads' a figure
+ * and never the verdict, and only the audio thread's calls are recorded as events. In the host comparison's watch the
+ * window is per thread already, so every counted call is the watched thread's. */
+static uint64_t n_alloc_other, n_lock_other, n_syscall_other;
+/* Several other threads (a plugin's worker, a host's pool helpers) bump these at once in either build, and under a pool
+ * they are added to the verdict, so they are atomic whatever OMX_RT_INC is. */
+#define OMX_RT_INC_ATOMIC(x) __atomic_fetch_add(&(x), 1, __ATOMIC_RELAXED)
+#ifdef OMX_RT_WATCH
+#define ON_ARMER() 1
+#else
+static pthread_t armer;
+#define ON_ARMER() pthread_equal(pthread_self(), armer)
+#endif
+#define COUNT(own, other, kind)                                                      \
+  do {                                                                               \
+    if (armed && !in_record) {                                                       \
+      if (ON_ARMER()) { OMX_RT_INC(own); record(kind); }                             \
+      else OMX_RT_INC_ATOMIC(other);                                                 \
+    }                                                                                \
+  } while (0)
 /* A try-lock never waits. The qualification counts it as a lock, as before; the host comparison keeps it apart, since a
  * host that polls a lock from its audio thread without waiting on it is not blocking that thread. */
 #ifdef OMX_RT_WATCH
@@ -73,7 +94,9 @@ static uint64_t n_trylock;
  * and the ring while a record is being taken. */
 static struct omx_rt_event events[OMX_RT_EV_MAX];
 static int n_events;
-OMX_RT_LOCAL int in_record;
+/* Per thread in both builds: the armer taking a record must not mute the other threads' counting meanwhile, and the
+ * unwinder's own calls are the recording thread's alone. */
+static __thread __attribute__((tls_model("initial-exec"))) int in_record;
 
 static void record(int kind) {
 #ifdef OMX_RT_WATCH
@@ -153,12 +176,18 @@ static void resolve(void) {
 }
 
 /* The host's control surface. Looked up with dlsym(RTLD_DEFAULT, ...). */
-void omx_rt_begin(void) { armed = 1; }
+void omx_rt_begin(void) {
+#ifndef OMX_RT_WATCH
+  armer = pthread_self();
+#endif
+  armed = 1;
+}
 void omx_rt_end(void) { armed = 0; }
 void omx_rt_reset(void) {
   n_alloc = 0;
   n_lock = 0;
   n_syscall = 0;
+  n_alloc_other = n_lock_other = n_syscall_other = 0;
   n_events = 0;
   void *warm[4];
   backtrace(warm, 4); /* the unwinder's lazy init lands here, never inside a window */
@@ -173,6 +202,12 @@ void omx_rt_counts(uint64_t *alloc, uint64_t *lock, uint64_t *sys) {
   if (lock) *lock = n_lock;
   if (sys) *sys = n_syscall;
 }
+/* What other threads did while the window was armed (D20): a figure, never the verdict. */
+void omx_rt_other_counts(uint64_t *alloc, uint64_t *lock, uint64_t *sys) {
+  if (alloc) *alloc = __atomic_load_n(&n_alloc_other, __ATOMIC_RELAXED);
+  if (lock) *lock = __atomic_load_n(&n_lock_other, __ATOMIC_RELAXED);
+  if (sys) *sys = __atomic_load_n(&n_syscall_other, __ATOMIC_RELAXED);
+}
 /* Present-and-loaded witness: without this the host cannot tell a clean plugin from
  * an interposer that never loaded, which is the difference between a measurement and
  * an absence. An unloadable interposer is `no-interposer`, never a pass. */
@@ -181,7 +216,7 @@ int omx_rt_present(void) { return 1; }
 void *malloc(size_t n) {
   resolve();
   if (real_malloc == NULL) return boot_alloc(n);
-  if (armed && !in_record) { OMX_RT_INC(n_alloc); record(OMX_RT_MALLOC); }
+  COUNT(n_alloc, n_alloc_other, OMX_RT_MALLOC);
   return bounded(real_malloc(n), n);
 }
 
@@ -192,14 +227,14 @@ void *calloc(size_t nmemb, size_t size) {
     if (p) memset(p, 0, nmemb * size);
     return p;
   }
-  if (armed && !in_record) { OMX_RT_INC(n_alloc); record(OMX_RT_CALLOC); }
+  COUNT(n_alloc, n_alloc_other, OMX_RT_CALLOC);
   return bounded(real_calloc(nmemb, size), nmemb * size);
 }
 
 void *realloc(void *p, size_t n) {
   resolve();
   if (real_realloc == NULL) return boot_alloc(n);
-  if (armed && !in_record) { OMX_RT_INC(n_alloc); record(OMX_RT_REALLOC); }
+  COUNT(n_alloc, n_alloc_other, OMX_RT_REALLOC);
   return bounded(real_realloc(p, n), n);
 }
 
@@ -207,7 +242,7 @@ void free(void *p) {
   resolve();
   /* Never hand the arena to libc free: it did not come from libc. */
   if (from_boot_arena(p)) return;
-  if (armed && !in_record) { OMX_RT_INC(n_alloc); record(OMX_RT_FREE); }
+  COUNT(n_alloc, n_alloc_other, OMX_RT_FREE);
   if (real_free != NULL) real_free(p);
 }
 
@@ -229,13 +264,13 @@ void *aligned_alloc(size_t align, size_t n) {
 
 int pthread_mutex_lock(pthread_mutex_t *m) {
   resolve();
-  if (armed && !in_record) { OMX_RT_INC(n_lock); record(OMX_RT_MUTEX_LOCK); }
+  COUNT(n_lock, n_lock_other, OMX_RT_MUTEX_LOCK);
   return real_mutex_lock ? real_mutex_lock(m) : 0;
 }
 
 int pthread_mutex_trylock(pthread_mutex_t *m) {
   resolve();
-  if (armed && !in_record) { OMX_RT_INC(OMX_RT_TRYLOCK_COUNTER); record(OMX_RT_MUTEX_TRYLOCK); }
+  COUNT(OMX_RT_TRYLOCK_COUNTER, n_lock_other, OMX_RT_MUTEX_TRYLOCK);
   return real_mutex_trylock ? real_mutex_trylock(m) : 0;
 }
 
@@ -249,7 +284,7 @@ int pthread_mutex_trylock(pthread_mutex_t *m) {
   ret name params {                                                                    \
     static ret (*real)params;                                                          \
     if (real == NULL) real = dlsym(RTLD_NEXT, #name);                                  \
-    if (armed && !in_record) { OMX_RT_INC(n_syscall); record(kind); }                            \
+    COUNT(n_syscall, n_syscall_other, kind);                                           \
     return real ? real args : fallback;                                                \
   }
 

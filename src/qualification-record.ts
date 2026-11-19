@@ -13,6 +13,7 @@
  * Not yet in the record: the fingerprint of the descriptor's controls, since the descriptor is
  * written by the scan (stage 5) and plugin-qualify does not read one yet.
  */
+import { sharesAWorker } from "./pin-grouping.js";
 import type { MemoryFootprint } from "./measurement/format.js";
 import { firstInstanceKb, perInstanceKb } from "./memory-budget.js";
 import { mkdirSync, readFileSync } from "node:fs";
@@ -22,6 +23,7 @@ import type { Adjustment } from "./history-adjust.js";
 import type { Judgment, RecordReason } from "./probe-judge.js";
 import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import type { VoicesHeld } from "./measurement/format.js";
+import { packageOwnerOf, type PackageOwner } from "./package-owner.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { qualificationDomain } from "./qualification-domain.js";
@@ -351,6 +353,12 @@ export interface QualificationRecord {
   /** The plugin's version when it was tested; a newer installed one is shown as "tested on X, installed Y". */
   readonly testedVersion?: string;
   readonly binary: ProbeOutput["binary"];
+  /**
+   * The installed package the binary came from (format, name, version, release, distro, arch), read from the package
+   * manager's owner of `binary.path` when the record was written: null when no package owns it or a field is not stated.
+   * Absent on a record written before the field existed, which is not filled in afterwards. Never part of the identity.
+   */
+  readonly package?: PackageOwner | null;
   readonly verdicts: readonly RecordVerdict[];
   /**
    * An LV2 plugin run under plugin-hostd's LV2 adapter (omx-clap-host), as under mod-host: admitted, or refused with
@@ -481,10 +489,16 @@ function tierOf(judgment: Judgment, host: string | undefined): TierVerdict | und
 export function tiersOf(judgment: Judgment): RecordTiers {
   const inProcess = tierOf(judgment, IN_PROCESS_TIER_HOST);
   const isolated = tierOf(judgment, ISOLATED_TIER_HOST[judgment.output.plugin.format]);
-  const runsAlone = isolated?.measured === true && isolated.rating === "conditional";
+  // a conditional plugin runs alone unless every conditional reason is groupable (D20): own threads share a worker, and
+  // a tier offers a plugin whose measured verdict shares one as it offers a qualified one
+  const reasonsOf = (host: string | undefined) => judgment.hosts.find((h) => h.verdict.host === host)?.reasons;
+  const shares = (t: TierVerdict | undefined, host: string | undefined): boolean =>
+    t !== undefined && t.measured && sharesAWorker(t.rating, reasonsOf(host));
+  const isolatedHost = ISOLATED_TIER_HOST[judgment.output.plugin.format];
+  const runsAlone = isolated?.measured === true && isolated.rating === "conditional" && !shares(isolated, isolatedHost);
   const offeredOn: ("in-process" | "isolated")[] = [];
-  if (inProcess?.qualified === true) offeredOn.push("in-process");
-  if (isolated?.qualified === true || runsAlone) offeredOn.push("isolated");
+  if (inProcess?.qualified === true || shares(inProcess, IN_PROCESS_TIER_HOST)) offeredOn.push("in-process");
+  if (isolated?.qualified === true || runsAlone || shares(isolated, isolatedHost)) offeredOn.push("isolated");
   const why = [inProcess, isolated].flatMap((t) => (t === undefined ? [] : [`${t.host}: ${t.deciding ?? t.rating}`]));
   return {
     ...(inProcess === undefined ? {} : { inProcess }),
@@ -511,6 +525,7 @@ export function buildQualificationRecord(
   judgment: Judgment,
   copy: { file: string; sha256: string; bytes: number },
   notMeasured: readonly NotMeasured[] = [],
+  pkg?: PackageOwner | null,
 ): QualificationRecord {
   const o = judgment.output;
   return {
@@ -518,6 +533,7 @@ export function buildQualificationRecord(
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
     binary: o.binary,
+    ...(pkg === undefined ? {} : { package: pkg }),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),
     tiers: tiersOf(judgment),
@@ -590,7 +606,7 @@ export function writeQualification(
   const probePath = join(dir, probeCopyFileName(judgment.output));
   writeFileWhole(probePath, probeBytes);
   const copy = readFileSync(probePath);
-  const record = buildQualificationRecord(judgment, { file: probeCopyFileName(judgment.output), sha256: sha256Hex(copy), bytes: copy.length }, notMeasured);
+  const record = buildQualificationRecord(judgment, { file: probeCopyFileName(judgment.output), sha256: sha256Hex(copy), bytes: copy.length }, notMeasured, packageOwnerOf(judgment.output.binary.path));
   const recordPath = join(dir, recordFileName(judgment.output));
   writeFileWhole(recordPath, `${JSON.stringify(record, null, 2)}\n`);
   return { recordPath, probePath, record, stderrPaths };
