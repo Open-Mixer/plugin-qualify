@@ -7,9 +7,10 @@
 // `clap-headers` one; they drifted (openmixer/plugin-qualify#30) and this catches it again.
 //
 //   node packaging/check-clap-floor.mjs
-import { readFileSync, realpathSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isMain } from "@openmixer/omx-contract/entry";
 
 /** `{ floor }` read from the spec's `pkgconfig(clap)` constraint, or null if absent. */
 export function specClapRange(spec) {
@@ -36,9 +37,7 @@ export function checkClapFloor(spec, control) {
   );
 }
 
-// Run only as the main script: compare REAL paths, so a symlink, a relative path or a path file URLs encode still runs it.
-const isMain = process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
-if (isMain) {
+if (isMain(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const spec = readFileSync(join(root, "packaging/plugin-qualify.spec"), "utf8");
   const control = readFileSync(join(root, "debian/control"), "utf8");
