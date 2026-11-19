@@ -253,6 +253,18 @@ class, so a reference figure and a local one are told apart. The record holds, f
 quantum, and the figures as measured. Exit `0` every plugin qualified, `1` some did not, `2` something could not
 be read or judged.
 
+The record also says which installed package the binary came from, in `package`: `format` (`deb` or `rpm`),
+`name`, `version`, `release`, `distro` and `arch`, as the package manager states them. They are read when the
+record is written, from the package manager's owner of `binary.path` (`dpkg-query -S` and `-W` on a Debian system,
+`rpm -qf` on an RPM one). A `deb` version `1.1.0-4` is `version` `1.1.0` and `release` `4`; `distro` is the
+distribution's own word (`trixie`, `fc44`): an RPM's dist tag, or a Debian system's release codename. A binary no
+package owns (one built by hand, one in a home directory) has `package: null`, and so has a field the manager
+does not state; nothing is guessed. The package never takes part in the record's identity, which is the binary's
+SHA-256. A record written before the field existed does not hold it and is not filled in afterwards. A `distro` or `arch` that those items do not hold (Ubuntu noble, `fc46`, an `armhf` package) is
+null, and the record is still written; the words are read from the installed domain, never a copy here. The words of
+`format`, `distro` and `arch` are the items `QUALIFICATION_PACKAGE_FORMATS`, `QUALIFICATION_PACKAGE_DISTROS` and
+`QUALIFICATION_PACKAGE_ARCHES` of the `qualification` contract domain.
+
 The verdict is the same one `plugin-qualify` gives CLAP plugins, the real-time-safety one, now for LV2 as
 well; cost is reported beside it, not folded into it. Cost is read at the profile's rate AND quantum: a pair the
 document does not hold reads `hosting.cost.unmeasured-at-rate-and-quantum`, and two quanta of one plugin that cost
