@@ -11,6 +11,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { ADAPTER_HOST, ADMITTED_HOSTS, admitPlugin, classifyJalvRun, classifyProtocolRun, type JalvRun, type ModHostRun } from "./host-admission.js";
+import { HISTORY_REASON } from "./history-adjust.js";
+import { PIN_VERDICTS } from "./pins-file.js";
 import { isOutOfMemory } from "./memory-bound.js";
 import { init } from "./qualification-domain.js";
 import { ISOLATED_CODE } from "./qualify-isolated.js";
@@ -132,6 +134,28 @@ describe("QUALIFICATION_ADAPTER_HOSTS", () => {
   });
 });
 
+describe("the pin and history items hold exactly the words plugin-qualify's code writes", () => {
+  const held = (item: string) => wordsOf(original, item).map((w) => w.const).sort();
+  const blockers = /function blockers\([\s\S]*?\n}\n/.exec(read("src/history-adjust.ts"))?.[0] ?? "";
+  const moves = /export type HistoryMove = ([^;]+);/.exec(read("src/history-adjust.ts"))?.[1] ?? "";
+  const words = (src: string) => [...src.matchAll(/"([a-z][a-z-]*)"/g)].map((m) => m[1] as string);
+  it("QUALIFICATION_PIN_VERDICTS is PIN_VERDICTS of pins-file.ts", () => {
+    expect(held("QUALIFICATION_PIN_VERDICTS")).toEqual([...PIN_VERDICTS].sort());
+  });
+  it("QUALIFICATION_HISTORY_MOVES is the HistoryMove type of history-adjust.ts", () => {
+    expect(words(moves).length).toBe(3);
+    expect(held("QUALIFICATION_HISTORY_MOVES")).toEqual(words(moves).sort());
+  });
+  it("QUALIFICATION_HISTORY_REASONS is the codes of HISTORY_REASON", () => {
+    expect(held("QUALIFICATION_HISTORY_REASONS")).toEqual(Object.values(HISTORY_REASON).sort());
+  });
+  it("QUALIFICATION_HISTORY_BLOCKERS is the words blockers() writes that are no reason code", () => {
+    const written = [...blockers.matchAll(/\["([a-z-]+)"\]/g)].map((m) => m[1] as string);
+    expect(written.sort()).toEqual(["no-deciding-reason", "refused", "unknown"]);
+    expect(held("QUALIFICATION_HISTORY_BLOCKERS")).toEqual(written);
+  });
+});
+
 describe("QUALIFICATION_STEP_CODES", () => {
   it("holds every code the isolated and the pool step tables hold, read from the producers", () => {
     const produced = [...Object.values(ISOLATED_CODE), ...Object.values(POOL_CODE)];
@@ -174,7 +198,7 @@ describe("x-since names the version of the domain document that first carried th
     "RUN_STEPS", "STEP_RESULTS", "STEP_CODES", "REJUDGE_OWES", "REJUDGE_MEASUREMENTS",
   ].map((n) => `QUALIFICATION_${n}`);
   const V130 = [KINDS, OUTCOMES];
-  const V140 = ["QUALIFICATION_ADAPTER_HOSTS"];
+  const V140 = ["ADAPTER_HOSTS", "PIN_VERDICTS", "HISTORY_MOVES", "HISTORY_REASONS", "HISTORY_BLOCKERS"].map((n) => `QUALIFICATION_${n}`);
   const semver = (v: string) => v.split(".").map(Number);
   const above = (a: string, b: string) => {
     const [x, y] = [semver(a), semver(b)];
