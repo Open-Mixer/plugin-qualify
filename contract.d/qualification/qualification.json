@@ -3,7 +3,7 @@
   "$id": "https://openmixer.org/contract/qualification",
   "info": {
     "title": "What a qualification measures and records",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "x-owner": "plugin-qualify",
     "x-stability": "experimental"
   },
@@ -1390,6 +1390,169 @@
             "description": "The isolated step.",
             "x-code": 0,
             "x-text": "The isolated step."
+          }
+        ]
+      },
+      "QUALIFICATION_ADAPTER_HOSTS": {
+        "description": "The hosts a plugin RAN UNDER: the host of an adapter code, <host>.<kind>[-<parameter>], and a record's adapter host. Not a judge profile.",
+        "x-since": "1.4.0",
+        "oneOf": [
+          {
+            "const": "omx-clap-host",
+            "title": "omxClapHost",
+            "description": "The CLAP host of the console, which runs an LV2 plugin once as an adapter.",
+            "x-code": 0,
+            "x-text": "The CLAP host of the console, which runs an LV2 plugin once as an adapter."
+          },
+          {
+            "const": "mod-host",
+            "title": "modHost",
+            "description": "mod-host, run on an LV2 plugin through its socket.",
+            "x-code": 1,
+            "x-text": "mod-host, run on an LV2 plugin through its socket."
+          },
+          {
+            "const": "jalv",
+            "title": "jalv",
+            "description": "jalv, run headless on an LV2 plugin.",
+            "x-code": 2,
+            "x-text": "jalv, run headless on an LV2 plugin."
+          }
+        ]
+      },
+      "QUALIFICATION_PIN_VERDICTS": {
+        "description": "The verdict words of a pins file, as plugin-hostd knows them.",
+        "x-since": "1.4.0",
+        "oneOf": [
+          {
+            "const": "in-process",
+            "title": "inProcess",
+            "description": "The plugin runs inside the engine.",
+            "x-code": 0,
+            "x-text": "The plugin runs inside the engine."
+          },
+          {
+            "const": "isolated",
+            "title": "isolated",
+            "description": "The plugin runs in a process of its own.",
+            "x-code": 1,
+            "x-text": "The plugin runs in a process of its own."
+          },
+          {
+            "const": "refused",
+            "title": "refused",
+            "description": "The plugin is not hosted.",
+            "x-code": 2,
+            "x-text": "The plugin is not hosted."
+          }
+        ]
+      },
+      "QUALIFICATION_HISTORY_MOVES": {
+        "description": "What the history of a plugin does to its measured verdict.",
+        "x-since": "1.4.0",
+        "oneOf": [
+          {
+            "const": "demote",
+            "title": "demote",
+            "description": "History moved the verdict to a more cautious one.",
+            "x-code": 0,
+            "x-text": "History moved the verdict to a more cautious one."
+          },
+          {
+            "const": "promote",
+            "title": "promote",
+            "description": "History moved the verdict to a less cautious one.",
+            "x-code": 1,
+            "x-text": "History moved the verdict to a less cautious one."
+          },
+          {
+            "const": "none",
+            "title": "none",
+            "description": "History left the verdict as measured.",
+            "x-code": 2,
+            "x-text": "History left the verdict as measured."
+          }
+        ]
+      },
+      "QUALIFICATION_HISTORY_REASONS": {
+        "description": "The codes that say why the history verdict is what it is.",
+        "x-since": "1.4.0",
+        "oneOf": [
+          {
+            "const": "history.crashed",
+            "title": "historyCrashed",
+            "description": "The plugin crashed, so it is isolated.",
+            "x-code": 0,
+            "x-text": "The plugin crashed, so it is isolated."
+          },
+          {
+            "const": "history.xruns-grouped",
+            "title": "historyXrunsGrouped",
+            "description": "The plugin raises xruns in a group, so it is isolated.",
+            "x-code": 1,
+            "x-text": "The plugin raises xruns in a group, so it is isolated."
+          },
+          {
+            "const": "history.crashed-alone",
+            "title": "historyCrashedAlone",
+            "description": "The plugin crashed alone, so it is refused.",
+            "x-code": 2,
+            "x-text": "The plugin crashed alone, so it is refused."
+          },
+          {
+            "const": "history.steady",
+            "title": "historySteady",
+            "description": "The plugin ran steady, so it is lifted to in-process.",
+            "x-code": 3,
+            "x-text": "The plugin ran steady, so it is lifted to in-process."
+          },
+          {
+            "const": "history.no-record",
+            "title": "historyNoRecord",
+            "description": "History has no line for this plugin binary on this host class; the measured verdict stands.",
+            "x-code": 4,
+            "x-text": "History has no line for this plugin binary on this host class; the measured verdict stands."
+          },
+          {
+            "const": "history.no-change",
+            "title": "historyNoChange",
+            "description": "The record was read and no rule moves the verdict.",
+            "x-code": 5,
+            "x-text": "The record was read and no rule moves the verdict."
+          },
+          {
+            "const": "history.not-liftable",
+            "title": "historyNotLiftable",
+            "description": "The record would promote, but the measured verdict is a fact about the plugin and history does not lift it.",
+            "x-code": 6,
+            "x-text": "The record would promote, but the measured verdict is a fact about the plugin and history does not lift it."
+          }
+        ]
+      },
+      "QUALIFICATION_HISTORY_BLOCKERS": {
+        "description": "The words that say why history cannot lift a verdict, beside the reason codes that also do.",
+        "x-since": "1.4.0",
+        "oneOf": [
+          {
+            "const": "unknown",
+            "title": "unknown",
+            "description": "There is no measured verdict.",
+            "x-code": 0,
+            "x-text": "There is no measured verdict."
+          },
+          {
+            "const": "refused",
+            "title": "refused",
+            "description": "The measured verdict is refused.",
+            "x-code": 1,
+            "x-text": "The measured verdict is refused."
+          },
+          {
+            "const": "no-deciding-reason",
+            "title": "noDecidingReason",
+            "description": "The verdict is isolated and no reason explains it.",
+            "x-code": 2,
+            "x-text": "The verdict is isolated and no reason explains it."
           }
         ]
       },

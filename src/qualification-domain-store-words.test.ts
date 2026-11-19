@@ -39,8 +39,16 @@ const held: Record<string, (rec: { dir: string; offer: string; record: Obj }) =>
       ...arr(r.verdicts).map((v) => v.host),
       ...arr(r.cost).map((c) => c.host),
       ...tierRows(r).map((t) => t.row.host),
-      obj(r.adapter).host,
     ]);
+  },
+  // The host a plugin RAN UNDER, not a judge profile: record.adapter_host and the <host> of an adapter code `<host>.<kind>[-<parameter>]`.
+  QUALIFICATION_ADAPTER_HOSTS: (x) => {
+    const r = x.record;
+    const codes = [...arr(obj(r.run).steps).map((s) => s.code), ...reasons(r).map((q) => q.code)];
+    // An adapter code is `<host>.<kind>[-<parameter>]`, the kind a word of QUALIFICATION_ADAPTER_CODE_KINDS; other codes are other items' words.
+    const kinds = wordsOf("QUALIFICATION_ADAPTER_CODE_KINDS");
+    const adapterCodes = strs(codes).filter((c) => kinds.some((k) => new RegExp(`^[a-z][a-z-]*\\.${k}(-[A-Za-z0-9]+)?$`).test(c)));
+    return strs([obj(r.adapter).host, ...adapterCodes.map((c) => c.split(".")[0])]);
   },
   QUALIFICATION_VERDICT_HOSTINGS: (x) => strs(arr(x.record.verdicts).map((v) => v.hosting)),
   QUALIFICATION_VERDICT_ARMS: (x) => strs(arr(x.record.verdicts).map((v) => v.arm)),

@@ -14,7 +14,7 @@ sudo dnf install https://www.openmixer.org/rpm/openmixer-release.noarch.rpm
 sudo dnf install plugin-qualify
 ```
 
-Debian bookworm and trixie, including Raspberry Pi OS (amd64, arm64):
+Debian trixie, including Raspberry Pi OS (arm64):
 
 ```
 curl -fsSLO https://www.openmixer.org/deb/openmixer-release.deb && sudo apt install ./openmixer-release.deb

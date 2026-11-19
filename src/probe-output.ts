@@ -84,6 +84,9 @@ export interface ProbeRtSafety {
   readonly threadViolations?: number;
   readonly processErrors?: number;
   readonly events?: readonly string[];
+  /** D20: the threads the plugin started, and what other threads did while the audio thread was armed (a figure). */
+  readonly ownThreads?: number;
+  readonly otherThreads?: { readonly allocations: number; readonly locks: number; readonly syscalls: number };
 }
 
 export interface ProbeNoteSweep {
@@ -301,7 +304,15 @@ function readRtSafety(v: unknown, where: string): ProbeRtSafety {
     ...optional("threadViolations", optCount(o, "threadViolations", where)),
     ...optional("processErrors", optCount(o, "processErrors", where)),
     ...optional("events", events),
+    ...optional("ownThreads", optCount(o, "ownThreads", where)),
+    ...optional("otherThreads", o["otherThreads"] === undefined ? undefined : readOtherThreads(o["otherThreads"], `${where} otherThreads`)),
   };
+}
+
+function readOtherThreads(v: unknown, where: string): { allocations: number; locks: number; syscalls: number } {
+  const o = record(v, where);
+  const n = (k: string): number => optCount(o, k, where) ?? invalid(`${where} has no ${k}`);
+  return { allocations: n("allocations"), locks: n("locks"), syscalls: n("syscalls") };
 }
 
 function readNoteSweep(v: unknown, where: string): ProbeNoteSweep {
