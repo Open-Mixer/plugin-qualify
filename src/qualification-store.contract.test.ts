@@ -81,7 +81,7 @@ describe("plugin-qualification-db-write put and delete, in a layer of the test's
   });
 
   it("a refusal writes nothing: the layer holds no record of it", () => {
-    const r = record();
+    const r = JSON.parse(JSON.stringify(record())) as { binary: { path: string } };
     r.binary.path = `/usr/lib/${r.binary.path}`;
     const before = readdirSync(root).sort();
     expect(put(r).status).toBe(1);
