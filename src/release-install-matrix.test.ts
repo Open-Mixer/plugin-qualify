@@ -80,4 +80,12 @@ describe('release.yml reads one declaration of its targets (#98)', () => {
     expect(m.installRpmArches).toEqual(['x86_64']);
     expect(m.installDebArches).toEqual(['arm64']);
   });
+
+  it('the rpm target is Fedora 45 alone, and its built artifact is fc45 (no fc44)', () => {
+    const m = deriveMatrix(DECL, { arm: true });
+    expect(m.rpmFedora).toEqual(['45']);
+    const built = builtArtifacts(m);
+    expect(built).toContain('plugin-qualify-rpms-fc45-x86_64');
+    expect(built.some((a: string) => a.includes('fc44'))).toBe(false);
+  });
 });

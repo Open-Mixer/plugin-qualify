@@ -5,7 +5,7 @@
 #
 #   podman build -t plugin-qualify -f Containerfile .
 #   podman run --rm -v /usr/lib64/lv2:/usr/lib64/lv2:ro plugin-qualify <uri|bundle-path>
-FROM registry.fedoraproject.org/fedora:44
+FROM registry.fedoraproject.org/fedora:45
 
 RUN dnf -y install --setopt=install_weak_deps=False \
       nodejs npm python3 python3-lilv python3-jsonschema lilv lv2 mod-host \

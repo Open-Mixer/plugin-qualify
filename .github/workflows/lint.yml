@@ -46,6 +46,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Open-Mixer/.github/.github/actions/deps-render@openmixer-v1
 
+  # Fedora 45 only: a workflow that names the dropped release is refused here
+  fedora:
+    name: no Fedora 44 reference in the workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: tools/test/workflow-fedora-check.sh --self-test
+      - run: tools/test/workflow-fedora-check.sh .
+
   # the spec and debian/control declare the same CLAP floor (packaging/check-clap-floor.mjs, which decides that it was
   # run with omx-contract's isMain, @openmixer/omx-contract/entry: the dependencies are installed first)
   clap-floor:
