@@ -48,7 +48,9 @@ function record() {
   if (!probe.ok) throw new Error(probe.problem);
   const exported = storeExport(rec, probe.output).record;
   // the store requires the load the probe started under; a fixture of an older release holds none
-  return { ...exported, probe: { ...exported.probe, load: exported.probe.load ?? { loadavg1: 0.5, cores: 4 } } };
+  // and only the host profiles the qualification domain names (a record of that release was also judged for mod-host)
+  const hosts = ["omx-clap-host", "openmixer-console"];
+  return { ...exported, probe: { ...exported.probe, load: exported.probe.load ?? { loadavg1: 0.5, cores: 4 } }, verdicts: exported.verdicts.filter((v) => hosts.includes(v.host)), cost: exported.cost.filter((c) => hosts.includes(c.host)) };
 }
 
 /** The writer is told to keep its layer under a directory of the test's own (`--root`, for tests): no run here touches a user's layer. */
