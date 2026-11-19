@@ -140,6 +140,16 @@ jobs:
           spec: packaging/plugin-qualify.spec
           gate: tools/catalogs-gate.sh
 
+  # Fedora 45 only: a workflow that names Fedora 44 (fedora:44, fc44) is refused here
+  fedora:
+    name: no Fedora 44 reference in the workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: tools/test/workflow-fedora-check.sh --self-test
+      - run: tools/test/workflow-fedora-check.sh .
+
   # the RPM and the DEB are built, linted and assembled into unsigned trees; nothing is published
   packages:
     name: packages, dry run
