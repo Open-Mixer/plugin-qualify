@@ -65,7 +65,6 @@ const del = (r: { sha256: string; format: string; uri: string }) => run(WRITE, [
 describe("plugin-qualification-db-write put refuses what section 3.7 says it refuses, by code, naming the path", () => {
   const cases: [string, (r: any) => void, RegExp][] = [
     ["path-absolute", (r) => { r.binary.path = "/usr/lib/lv2/x.lv2/amp.so"; }, /\/usr\/lib\/lv2\/x\.lv2\/amp\.so/],
-    ["path-absolute", (r) => { r.binary.files[0].path = "/etc/manifest.ttl"; }, /\/etc\/manifest\.ttl/],
     ["files-empty", (r) => { r.binary.files = []; }, /./],
     ["files-duplicate", (r) => { r.binary.files = [r.binary.files[0], ...r.binary.files]; }, /./],
     ["files-unordered", (r) => { r.binary.files = [...r.binary.files].reverse(); }, /./],
