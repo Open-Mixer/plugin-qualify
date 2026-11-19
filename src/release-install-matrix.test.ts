@@ -28,7 +28,7 @@ function builtArtifacts(m: ReturnType<typeof deriveMatrix>): string[] {
 describe('release.yml reads one declaration of its targets (#98)', () => {
   it('the workflow lists no install cell of its own: build and install read the matrix job', () => {
     expect(text).not.toMatch(/^\s*- \{ image: /m);
-    expect(text).toMatch(/matrix: \$\{\{ fromJSON\(needs\.matrix\.outputs\.install\) \}\}/);
+    expect(text).toMatch(/cell: \$\{\{ fromJSON\(needs\.matrix\.outputs\.cells\) \}\}/);
     expect(text).toMatch(/suite-matrix: \$\{\{ needs\.matrix\.outputs\.deb-suites \}\}/);
     expect(text).toMatch(/fedora-versions: \$\{\{ needs\.matrix\.outputs\.rpm-fedora \}\}/);
     expect(text).toMatch(/arch-matrix: \$\{\{ needs\.matrix\.outputs\.deb-arches \}\}/);
@@ -49,13 +49,34 @@ describe('release.yml reads one declaration of its targets (#98)', () => {
     expect(before.install.map((c) => c.image)).toContain('debian:bookworm');
     const after = deriveMatrix(DECL, { arm: true });
     expect(after.install.map((c) => c.image)).not.toContain('debian:bookworm');
-    expect(after.install.map((c) => c.artifact)).toEqual(['plugin-qualify-rpms-fc44-x86_64', 'plugin-qualify-debs-trixie-amd64']);
+    expect(after.install.map((c) => c.artifact)).toEqual(['plugin-qualify-rpms-fc44-x86_64', 'plugin-qualify-debs-trixie-arm64']);
   });
 
   it('a pull request without arm builds the first architecture alone, and the install still has its cell', () => {
     const m = deriveMatrix(DECL, { arm: false });
-    expect(m.debArches).toEqual(['amd64']);
+    expect(m.debArches).toEqual(['arm64']);
     expect(m.rpmArches).toEqual(['x86_64']);
     expect(m.install).toHaveLength(2);
+  });
+
+  it('the install job takes its cells, and the runner of each, from check-matrix (#130)', () => {
+    expect(text).toMatch(/uses: Open-Mixer\/\.github\/\.github\/actions\/check-matrix@openmixer-v1/);
+    expect(text).toMatch(/runs-on: \$\{\{ matrix\.cell\.runner \}\}/);
+    expect(text).toMatch(/x86-runner: \$\{\{ vars\.OMX_RUNNER \|\| 'ubuntu-latest' \}\}/);
+    expect(text).not.toMatch(/amd64\.deb|plugin-qualify-debs-trixie-amd64/);
+  });
+
+  it('the declaration lists arm64 first, so the quick build and the install cell are arm64 (#130)', () => {
+    expect(DECL.deb.arches[0]).toBe('arm64');
+    expect(deriveMatrix(DECL, { arm: false }).install.find((c) => c.image.startsWith('debian'))?.artifact).toBe('plugin-qualify-debs-trixie-arm64');
+    // fixture: amd64 first is the case the quick set never builds ("Artifact not found")
+    const planted = deriveMatrix({ ...DECL, deb: { ...DECL.deb, arches: ['amd64', 'arm64'] } }, { arm: false });
+    expect(planted.install.find((c) => c.image.startsWith('debian'))?.artifact).toBe('plugin-qualify-debs-trixie-amd64');
+  });
+
+  it('the install cells name the first architecture of each kind, for check-matrix to give a runner', () => {
+    const m = deriveMatrix(DECL, { arm: true });
+    expect(m.installRpmArches).toEqual(['x86_64']);
+    expect(m.installDebArches).toEqual(['arm64']);
   });
 });

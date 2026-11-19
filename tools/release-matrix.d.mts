@@ -11,6 +11,8 @@ export interface DerivedMatrix {
   debSuites: string[];
   debArches: string[];
   install: Array<{ image: string; artifact: string }>;
+  installRpmArches: string[];
+  installDebArches: string[];
 }
 /** What the builds and the install job read, derived from the one declaration. */
 export function deriveMatrix(decl: ReleaseMatrixDeclaration, opts: { arm: boolean }): DerivedMatrix;

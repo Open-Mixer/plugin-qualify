@@ -69,7 +69,8 @@ jobs:
       rpm-arches: ${{ steps.derive.outputs.rpm-arches }}
       deb-suites: ${{ steps.derive.outputs.deb-suites }}
       deb-arches: ${{ steps.derive.outputs.deb-arches }}
-      install: ${{ steps.derive.outputs.install }}
+      cells: ${{ steps.cells.outputs.cells }}
+      count: ${{ steps.cells.outputs.count }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,6 +78,17 @@ jobs:
       - id: derive
         # only a pull request's dry run (arm: false) builds the first architecture alone
         run: node tools/release-matrix.mjs "${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && 'false' || 'true' }}" >> "$GITHUB_OUTPUT"
+      # the install cells, each with the runner of its own architecture, and only those the release set builds: the quick
+      # set holds trixie arm64 alone, so no amd64 deb cell is asked for while it is quick (#130)
+      - id: cells
+        uses: Open-Mixer/.github/.github/actions/check-matrix@openmixer-v1
+        with:
+          wave: ${{ vars.OMX_RELEASE_MATRIX }}
+          rpm-releases: ${{ steps.derive.outputs.rpm-fedora }}
+          rpm-arches: ${{ steps.derive.outputs.install-rpm-arches }}
+          deb-releases: ${{ steps.derive.outputs.deb-suites }}
+          deb-arches: ${{ steps.derive.outputs.install-deb-arches }}
+          x86-runner: ${{ vars.OMX_RUNNER || 'ubuntu-latest' }}
 
   rpm:
     needs: matrix
@@ -122,22 +134,23 @@ jobs:
   # the built package, installed in its own distribution, qualifies the fixture plugins with no
   # OMX_* setting: the prober, the measurer and the interposer are found where the package put them
   installed:
-    name: Install and qualify (${{ matrix.image }})
+    name: Install and qualify (${{ matrix.cell.image }}, ${{ matrix.cell.arch }})
     needs: [matrix, rpm, deb]
-    # not on a staged run: it reads packages a staged run does not build
-    if: ${{ !cancelled() && inputs.staged != true }}
-    runs-on: ubuntu-latest
+    # not on a staged run: it reads packages a staged run does not build; no cell, no job
+    if: ${{ !cancelled() && inputs.staged != true && needs.matrix.outputs.count != '0' }}
+    runs-on: ${{ matrix.cell.runner }}
     timeout-minutes: 20
     permissions:
       contents: read
     container:
-      image: ${{ matrix.image }}
+      image: ${{ matrix.cell.image }}
     defaults:
       run:
         shell: bash
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.matrix.outputs.install) }}
+      matrix:
+        cell: ${{ fromJSON(needs.matrix.outputs.cells) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -149,13 +162,13 @@ jobs:
         uses: actions/download-artifact@v4
         continue-on-error: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
         with:
-          name: ${{ matrix.artifact }}
+          name: ${{ matrix.cell.fedora && format('plugin-qualify-rpms-fc{0}-{1}', matrix.cell.fedora, matrix.cell.arch) || format('plugin-qualify-debs-{0}-{1}', matrix.cell.suite, matrix.cell.arch) }}
           path: pkgs
 
       - name: Say a cell the catch-up did not build is skipped
         if: steps.pkgs.outcome != 'success'
         env:
-          ARTIFACT: ${{ matrix.artifact }}
+          ARTIFACT: ${{ matrix.cell.fedora && format('plugin-qualify-rpms-fc{0}-{1}', matrix.cell.fedora, matrix.cell.arch) || format('plugin-qualify-debs-{0}-{1}', matrix.cell.suite, matrix.cell.arch) }}
         run: |
           echo "::notice::catch-up: $ARTIFACT was not built by this run (the channel serves that cell), so it is not installed here"
 
@@ -164,11 +177,13 @@ jobs:
       # against on Debian. The package alone pulls no development package; the fixtures' build tools
       # come after that check.
       - name: Add the OpenMixer channel (Fedora)
-        if: startsWith(matrix.image, 'fedora') && steps.pkgs.outcome == 'success'
+        if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Fedora)
-        if: startsWith(matrix.image, 'fedora') && steps.pkgs.outcome == 'success'
+        if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
+        env:
+          ARCH: ${{ matrix.cell.arch }}
         run: |
           set -euo pipefail
           # a mirror that fails in mid-transfer (curl 56, zchunk checksums) is tried again; a real install error fails the
@@ -182,7 +197,7 @@ jobs:
             return 1
           }
           # the main package requires plugin-qualify-contract of the same version: both files, from the same build
-          dnf_retry ./pkgs/plugin-qualify-[0-9]*.x86_64.rpm ./pkgs/plugin-qualify-contract-[0-9]*.noarch.rpm
+          dnf_retry ./pkgs/plugin-qualify-[0-9]*."$ARCH".rpm ./pkgs/plugin-qualify-contract-[0-9]*.noarch.rpm
           rpm -q omx-clap-host
           rpm -qf /usr/share/omx-clap-core/ts | grep -q '^omx-clap-core-[0-9]'
           if rpm -qa --qf '%{NAME}\n' | grep -E -- '-devel$'; then echo "plugin-qualify pulled a -devel package"; exit 1; fi
@@ -194,23 +209,22 @@ jobs:
           dnf_retry --setopt=install_weak_deps=False gcc make pkgconf-pkg-config clap-devel lv2-devel
 
       - name: Prepare the container (Debian)
-        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
+        if: matrix.cell.suite && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
           apt-get update -qq
           apt-get install -y --no-install-recommends ca-certificates curl
 
       - name: Add the OpenMixer channel (Debian)
-        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
+        if: matrix.cell.suite && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
       - name: Install the package (Debian)
-        if: startsWith(matrix.image, 'debian') && steps.pkgs.outcome == 'success'
+        if: matrix.cell.suite && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
-          suite=${IMAGE#debian:}
           # the main package depends on plugin-qualify-contract of the same version: both files, from the same build
-          apt-get install -y ./pkgs/"$suite"/plugin-qualify_*.deb ./pkgs/"$suite"/plugin-qualify-contract_*.deb
+          apt-get install -y ./pkgs/"$SUITE"/plugin-qualify_*.deb ./pkgs/"$SUITE"/plugin-qualify-contract_*.deb
           dpkg -s omx-clap-host >/dev/null
           dpkg -S /usr/share/omx-clap-core/ts | grep -q '^libomx-clap-core1'
           if dpkg-query -W -f '${Package}\n' | grep -E -- '-dev$'; then echo "plugin-qualify pulled a -dev package"; exit 1; fi
@@ -220,7 +234,7 @@ jobs:
           if dpkg -s mod-host >/dev/null 2>&1; then echo "plugin-qualify pulled mod-host"; exit 1; fi
           apt-get install -y --no-install-recommends gcc libc6-dev make pkgconf clap-headers lv2-dev
         env:
-          IMAGE: ${{ matrix.image }}
+          SUITE: ${{ matrix.cell.suite }}
 
       # a module the installed program imports at run time that the package does not carry (ajv, for the qualification
       # domain's reader) fails here by name, before any plugin is measured; the domain itself opens from the contract
