@@ -18,7 +18,7 @@ import { HOSTING_CODE } from "./hosting-codes.js";
 import { HOST_PROFILES, JALV_PROFILE, MOD_HOST_PROFILE, OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import type { AdmissionRuns } from "./host-admission.js";
 import { GRID_FULL, GRID_HOSTS, cellKey, gridCells, hostCells } from "./measurement-grid.js";
-import { MEMORY_BOUND_MECHANISM, MEMORY_CGROUP_MECHANISM, PROBE_MEMORY_LIMIT, PROBE_OOM, memoryBoundOf, outOfMemory, parseMemoryLimit, defaultMemoryLimit } from "./memory-bound.js";
+import { MEMORY_BOUND_MECHANISM, MEMORY_CGROUP_MECHANISM, PROBE_MEMORY_LIMIT, probeOom, memoryBoundOf, outOfMemory, parseMemoryLimit, defaultMemoryLimit } from "./memory-bound.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { mergeProbeRuns } from "./probe-merge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
@@ -123,7 +123,7 @@ describe("the verdict reads the host's own cell", () => {
     d.grid = [
       { ...structuredClone(point), rate: 48000, quantum: 128 },
       { ...structuredClone(point), rate: 96000, quantum: 512 },
-      { rate: 48000, quantum: 256, outcome: PROBE_OOM, memoryLimit: { bytes: 2 ** 31, mechanism: MEMORY_BOUND_MECHANISM } },
+      { rate: 48000, quantum: 256, outcome: probeOom(), memoryLimit: { bytes: 2 ** 31, mechanism: MEMORY_BOUND_MECHANISM } },
     ];
     const r = readProbeOutput(JSON.stringify(d));
     if (!r.ok) throw new Error(r.problem);
@@ -195,12 +195,12 @@ describe("the verdict reads the host's own cell", () => {
   it("a cell that outgrew the bound is named by its outcome, with the limit, and leaves the other hosts judged", () => {
     const j = judgeProbeOutput(doc(), [JALV_PROFILE, OMX_CLAP_HOST_PROFILE]);
     const jalv = j.hosts.find((h) => h.verdict.host === "jalv")!;
-    expect(jalv.cost.reasons).toEqual([{ dimension: "cost", rating: "unknown", code: PROBE_OOM, params: { rate: 48000, quantum: 256, memoryLimitBytes: 2 ** 31, memoryLimitMechanism: MEMORY_BOUND_MECHANISM } }]);
+    expect(jalv.cost.reasons).toEqual([{ dimension: "cost", rating: "unknown", code: probeOom(), params: { rate: 48000, quantum: 256, memoryLimitBytes: 2 ** 31, memoryLimitMechanism: MEMORY_BOUND_MECHANISM } }]);
     expect(jalv.verdict.rating).toBe("unknown");
-    expect(jalv.reasons.some((r) => r.dimension === "memory" && r.code === PROBE_OOM)).toBe(true);
+    expect(jalv.reasons.some((r) => r.dimension === "memory" && r.code === probeOom())).toBe(true);
     const clapHost = j.hosts.find((h) => h.verdict.host === "omx-clap-host")!;
     expect(clapHost.verdict.measured).toBe(true);
-    expect(clapHost.reasons.some((r) => r.code === PROBE_OOM)).toBe(false);
+    expect(clapHost.reasons.some((r) => r.code === probeOom())).toBe(false);
   });
 });
 
@@ -245,13 +245,13 @@ describe("the memory bound", () => {
       const w = writeQualification(join(scratch, `oom-${String(n)}`), run!.bytes, run!.judgment);
       expect(existsSync(w.recordPath)).toBe(true);
       const at = (key: string) => w.record.measurements.grid.find((p) => cellKey(p) === key);
-      expect(at("192000/512")).toMatchObject({ rate: 192000, quantum: 512, outcome: PROBE_OOM, memoryLimit: { bytes: bound.bytes, mechanism: MEMORY_BOUND_MECHANISM } });
+      expect(at("192000/512")).toMatchObject({ rate: 192000, quantum: 512, outcome: probeOom(), memoryLimit: { bytes: bound.bytes, mechanism: MEMORY_BOUND_MECHANISM } });
       expect(at("48000/128")?.outcome).toBe("probe.ok");
       expect(at("96000/256")?.outcome).toBe("probe.ok");
       expect(at("96000/1024")?.outcome).toBe("probe.ok");
       expect(w.record.probe.outcome).toBe("probe.ok");
       // every host's own cell was measured, so every host is judged on its figure
-      for (const c of w.record.cost) expect(c.reasons.map((r) => r.code)).not.toContain(PROBE_OOM);
+      for (const c of w.record.cost) expect(c.reasons.map((r) => r.code)).not.toContain(probeOom());
       expect(outOfMemory(run!.judgment.output, bound)).toBe(true);
     });
   }
@@ -267,12 +267,12 @@ describe("the memory bound", () => {
       exists,
       admissions: HOSTS_ADMIT,
     });
-    expect(pass.verdicts).toEqual([expect.objectContaining({ host: "omx-clap-host", rating: "unknown", deciding: PROBE_OOM })]);
+    expect(pass.verdicts).toEqual([expect.objectContaining({ host: "omx-clap-host", rating: "unknown", deciding: probeOom() })]);
     const [run] = mergeRunsByRecord(pass.runs);
     const w = writeQualification(join(scratch, `oom-all-${String(n)}`), run!.bytes, run!.judgment);
-    expect(w.record.probe.outcome).toBe(PROBE_OOM);
+    expect(w.record.probe.outcome).toBe(probeOom());
     expect(w.record.measurements.grid.length).toBeGreaterThan(0);
-    expect(w.record.measurements.grid.every((p) => p.outcome === PROBE_OOM)).toBe(true);
+    expect(w.record.measurements.grid.every((p) => p.outcome === probeOom())).toBe(true);
   });
 });
 
@@ -356,7 +356,7 @@ describe("live: the real runner measures the full grid, an LV2 plugin like a CLA
     expect(at("192000/128")).toMatchObject({
       rate: 192000,
       quantum: 128,
-      outcome: kernel ? PROBE_MEMORY_LIMIT : PROBE_OOM,
+      outcome: kernel ? PROBE_MEMORY_LIMIT : probeOom(),
       memoryLimit: { bytes: bound.bytes, mechanism: kernel ? MEMORY_CGROUP_MECHANISM : MEMORY_BOUND_MECHANISM },
     });
     const steps = run!.judgment.output.steps;

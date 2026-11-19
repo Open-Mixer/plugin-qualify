@@ -17,7 +17,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { ADAPTER_HOST, ADAPTER_SILENT_CODE, SPAWNED_ADMISSIONS, admitUnderAdapter, type AdmissionRuns, type HostAdmission } from "./host-admission.js";
+import { ADAPTER_HOST, SPAWNED_ADMISSIONS, adapterCode, adapterSilentCode, admitUnderAdapter, type AdmissionRuns, type HostAdmission } from "./host-admission.js";
 import { HOSTD_ENV } from "./hostd-pin-files.js";
 import { freeDeadJackSlots } from "./jack-registry.js";
 import { cellKey, type GridCell } from "./measurement-grid.js";
@@ -31,7 +31,7 @@ import { writeFileWhole } from "./whole-file.js";
 export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
 
 /** The code of a cell no private server could be had for: the run did not happen. */
-export const NO_PRIVATE_SERVER = `${ADAPTER_HOST}.no-private-server`;
+export const noPrivateServerCode = (): string => adapterCode(ADAPTER_HOST, "noPrivateServer");
 
 const RECORD_SUFFIX = ".qualification.json";
 const SERVER_WAIT_MS = 5000;
@@ -206,7 +206,7 @@ export function adapterFinished(record: QualificationRecord, versions: Readonly<
   const a = record.adapter;
   if (a === undefined || !a.measured || a.versions === undefined || a.cells === undefined) return false;
   // silence under the one key the run once played says nothing of a plugin that maps others: it is run again
-  if (a.cells.some((c) => c.code === ADAPTER_SILENT_CODE && c.params["notes"] === undefined)) return false;
+  if (a.cells.some((c) => c.code === adapterSilentCode() && c.params["notes"] === undefined)) return false;
   const same = Object.keys(versions).length === Object.keys(a.versions).length && Object.entries(versions).every(([k, v]) => a.versions![k] === v);
   return same && cells.every((c) => a.cells!.some((x) => cellKey(x) === cellKey(c)));
 }
@@ -248,7 +248,7 @@ const readRecord = (path: string): QualificationRecord | undefined => {
 export function adapterPass(ctx: SyncContext, state: SyncState, options: AdapterPassOptions = {}): AdapterPassResult {
   const read = hostVersions(ctx.env, options.versions);
   if (!read.ok) throw new AdapterPassRefused(read.error);
-  if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${NO_PRIVATE_SERVER}, and the device's own JACK server is never used for this`);
+  if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${noPrivateServerCode()}, and the device's own JACK server is never used for this`);
   const { versions } = read;
   const starter = options.jack ?? startPrivateJack;
   const runs = options.runs ?? SPAWNED_ADMISSIONS;
@@ -293,11 +293,11 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
         const started = Date.now();
         const done = ADAPTER_PASS_CELLS.map((cell) => {
           const server = serverFor(cell);
-          if (server === undefined) return { cell, run: { host: ADAPTER_HOST, measured: false, admitted: false, code: NO_PRIVATE_SERVER, params: {} } as HostAdmission };
+          if (server === undefined) return { cell, run: { host: ADAPTER_HOST, measured: false, admitted: false, code: noPrivateServerCode(), params: {} } as HostAdmission };
           const stateDir = mkdtempSync(join(tmpdir(), "plugin-qualify-adapter-state-"));
           try {
             const env = { ...ctx.env, ...limit, [ADMIT_STATE_DIR_ENV]: stateDir, LV2_PATH: ctx.settings.lv2Dirs.join(":"), JACK_DEFAULT_SERVER: server.name, JACK_NO_START_SERVER: "1" };
-            return { cell, run: admitUnderAdapter(record.plugin.id, runs, env) ?? ({ host: ADAPTER_HOST, measured: false, admitted: false, code: `${ADAPTER_HOST}.admission-failed`, params: {} } as HostAdmission) };
+            return { cell, run: admitUnderAdapter(record.plugin.id, runs, env) ?? ({ host: ADAPTER_HOST, measured: false, admitted: false, code: adapterCode(ADAPTER_HOST, "admissionFailed"), params: {} } as HostAdmission) };
           } finally {
             rmSync(stateDir, { recursive: true, force: true });
           }

@@ -14,7 +14,7 @@
  *
  * One run that ended well and needs nothing added is kept as the runner wrote it, byte for byte.
  */
-import { isOutOfMemory, MEMORY_CGROUP_MECHANISM, outOfMemory, PROBE_MEMORY_LIMIT, PROBE_OOM, type MemoryBound } from "./memory-bound.js";
+import { isOutOfMemory, MEMORY_CGROUP_MECHANISM, outOfMemory, PROBE_MEMORY_LIMIT, probeOom, type MemoryBound } from "./memory-bound.js";
 import { cellKey, type RunnerInvocation } from "./measurement-grid.js";
 import { PROBE_OK, readProbeOutput, type ProbeOutput } from "./probe-output.js";
 
@@ -37,7 +37,7 @@ type Json = Record<string, unknown>;
 export function mergeProbeRuns(parts: readonly ProbeRunPart[], bound: MemoryBound | undefined): { bytes: Buffer; output: ProbeOutput } {
   if (parts.length === 0) throw new ProbeMergeError("no run to merge");
   // the runner's own outcome when it says it (the kernel killed the child at memory.max), else what its exit means under the data limit
-  const outcomes = parts.map((p) => (p.output.run.outcome === PROBE_MEMORY_LIMIT ? PROBE_MEMORY_LIMIT : outOfMemory(p.output, bound) ? PROBE_OOM : p.output.run.outcome));
+  const outcomes = parts.map((p) => (p.output.run.outcome === PROBE_MEMORY_LIMIT ? PROBE_MEMORY_LIMIT : outOfMemory(p.output, bound) ? probeOom() : p.output.run.outcome));
   const first = parts[0]!;
   for (const p of parts.slice(1)) {
     if (p.output.plugin.id !== first.output.plugin.id || p.output.binary.sha256 !== first.output.binary.sha256 || p.output.offer.id !== first.output.offer.id) {
