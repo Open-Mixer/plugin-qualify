@@ -57,6 +57,8 @@ describe("the script runs, and fails, however it is invoked", () => {
     copyFileSync(join(ROOT, "packaging/check-clap-floor.mjs"), join(root, "packaging/check-clap-floor.mjs"));
     writeFileSync(join(root, "packaging/plugin-qualify.spec"), `BuildRequires: pkgconfig(clap) >= ${specFloor}\n`);
     writeFileSync(join(root, "debian/control"), "Build-Depends: clap-headers (>= 1.2.10~),\n");
+    // the script imports isMain from @openmixer/omx-contract: the copy resolves it through this tree's node_modules
+    symlinkSync(join(ROOT, "node_modules"), join(root, "node_modules"));
     return root;
   };
   const run = (arg: string, cwd: string) => spawnSync(process.execPath, [arg], { cwd, encoding: "utf8" });

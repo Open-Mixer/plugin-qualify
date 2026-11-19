@@ -20,6 +20,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { clapCoreTsDirCandidates, findClapCoreTsDir, flattenHostingTables, loadHostingTables } from './clap-core-tsdir.mjs';
+import { isMain } from '@openmixer/omx-contract/entry';
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT = join(PKG, 'src/hosting-codes.generated.ts');
@@ -89,4 +90,4 @@ async function main() {
   console.log(`gen-hosting-codes: ${onDisk === content ? 'up to date' : 'wrote'} ${OUT} from ${dir}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+if (isMain(import.meta.url)) await main();
