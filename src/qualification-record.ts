@@ -351,6 +351,12 @@ export interface QualificationRecord {
   /** The plugin's version when it was tested; a newer installed one is shown as "tested on X, installed Y". */
   readonly testedVersion?: string;
   readonly binary: ProbeOutput["binary"];
+  /**
+   * The host extensions the run offered a CLAP plugin (the probe output's `offer.clapExtensions`): a profile is judged
+   * only against the extensions it offers, so the row judge reads them from here. Always present on a CLAP record, empty
+   * when none was offered; absent on an LV2 record.
+   */
+  readonly hostExtensions?: readonly string[];
   readonly verdicts: readonly RecordVerdict[];
   /**
    * An LV2 plugin run under plugin-hostd's LV2 adapter (omx-clap-host), as under mod-host: admitted, or refused with
@@ -507,6 +513,17 @@ export const verdictRows = (judgment: Judgment): RecordVerdict[] =>
     reasons: h.reasons,
   }));
 
+const byBytes = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+/**
+ * The binary as the store holds it (the store spec's section 3.7): its path below the install root, never an absolute one,
+ * and the list of files in ascending byte order of their paths. The key is the entry at that path, which the probe
+ * output already names.
+ */
+export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
+  return { ...b, path: b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path, files: [...b.files].sort((x, y) => byBytes(x.path, y.path)) };
+}
+
 export function buildQualificationRecord(
   judgment: Judgment,
   copy: { file: string; sha256: string; bytes: number },
@@ -517,7 +534,8 @@ export function buildQualificationRecord(
     schema: QUALIFICATION_RECORD_SCHEMA,
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
-    binary: o.binary,
+    binary: storedBinary(o.binary),
+    ...(o.plugin.format === "clap" ? { hostExtensions: [...(o.offer.clapExtensions ?? [])] } : {}),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),
     tiers: tiersOf(judgment),
