@@ -162,9 +162,13 @@ export function stepsCalledFor(record: QualificationRecord): readonly string[] {
   ];
 }
 
-/** The steps a record that carries a `run` lacks, for the sync to refuse it by. A record from before the steps has none to lack. */
+/**
+ * The steps a record that carries a `run` lacks, for the sync to refuse it by. A record from before the steps has none to
+ * lack: it has no `run`, or, in the store (whose `run_id` column is required), a run with no step at all, which no sync
+ * ever writes.
+ */
 export function missingSteps(record: QualificationRecord): readonly string[] {
-  if (record.run === undefined) return [];
+  if (record.run === undefined || record.run.steps.length === 0) return [];
   const had = new Set(record.run.steps.map((s) => s.step));
   return stepsCalledFor(record).filter((s) => !had.has(s));
 }

@@ -353,8 +353,9 @@ export interface QualificationRecord {
   readonly binary: ProbeOutput["binary"];
   /**
    * The host extensions the run offered a CLAP plugin (the probe output's `offer.clapExtensions`): a profile is judged
-   * only against the extensions it offers, so the row judge reads them from here. Always present on a CLAP record, empty
-   * when none was offered; absent on an LV2 record.
+   * only against the extensions it offers, so the row judge reads them from here. Present on a CLAP record whose probe
+   * reached the offer, empty when none was offered; absent on an LV2 record, and on a CLAP record whose probe crashed or
+   * timed out first: absent is "not measured", never an empty set.
    */
   readonly hostExtensions?: readonly string[];
   readonly verdicts: readonly RecordVerdict[];
@@ -518,7 +519,8 @@ const byBytes = (a: string, b: string): number => Buffer.compare(Buffer.from(a),
 /**
  * The binary as the store holds it (the store spec's section 3.7): its path below the install root, never an absolute one,
  * and the list of files in ascending byte order of their paths. The key is the entry at that path, which the probe
- * output already names.
+ * output already names. The sync puts its records in this form; a record the `judge` command writes to a directory keeps
+ * the path the probe measured.
  */
 export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
   return { ...b, path: b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path, files: [...b.files].sort((x, y) => byBytes(x.path, y.path)) };
@@ -534,8 +536,8 @@ export function buildQualificationRecord(
     schema: QUALIFICATION_RECORD_SCHEMA,
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
-    binary: storedBinary(o.binary),
-    ...(o.plugin.format === "clap" ? { hostExtensions: [...(o.offer.clapExtensions ?? [])] } : {}),
+    binary: o.binary,
+    ...(o.plugin.format === "clap" && o.offer.clapExtensions !== undefined ? { hostExtensions: [...o.offer.clapExtensions] } : {}),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),
     tiers: tiersOf(judgment),

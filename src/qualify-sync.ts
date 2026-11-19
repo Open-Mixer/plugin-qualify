@@ -49,7 +49,7 @@ import { adapterPass, type AdapterPassOptions, type AdapterPassResult } from "./
 import { ISOLATED_RESULT, baseSteps, completeIsolated, isolatedCell, missingSteps, judgeIsolatedRun, owesIsolated, pinAfterStep, spawnedIsolatedRunner, type IsolatedRunner } from "./qualify-isolated.js";
 import { lv2World, rejudgeFromRows, rejudgeState, rejudgeToolName, memoryPass, type MemoryPassResult, type RejudgeResult } from "./qualify-rejudge.js";
 import { memoryBoundOf, parseMemoryLimit, type MemoryBound } from "./memory-bound.js";
-import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, descriptorNamePart, latencyNeverTaken, probeCopyFileName, type NotMeasured, type QualificationRecord } from "./qualification-record.js";
+import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, descriptorNamePart, latencyNeverTaken, probeCopyFileName, storedBinary, type NotMeasured, type QualificationRecord } from "./qualification-record.js";
 import { sha256Hex } from "./probe-output.js";
 import { ADMIT_STEP_MS_ENV, DESCRIPTOR_DIR_STATE_SUBDIR, DESCRIPTOR_DIR_SYSTEM, MEMORY_PASS_PROBE_NOTES, QUALIFY_QUANTA, QUALIFY_RATES } from "./qualify-declarations.js";
 import { toolsDir } from "./tool-paths.js";
@@ -778,7 +778,10 @@ function judgedPlugins(ctx: SyncContext, item: SyncItem, runs: readonly { bytes:
       steps.push(step);
       pin = pinAfterPool(pin, step);
     }
-    ctx.store.put(key, { ...record, run: { id: judgment.output.run.id, steps } });
+    // the record's list is the files of the pin as plugin-hostd names them (the store spec's section 3.7), the probe's own
+    // when plugin-hostd could not name them
+    const files = pin?.integrity.files ?? record.binary.files;
+    ctx.store.put(key, { ...record, binary: storedBinary({ ...record.binary, files }), run: { id: judgment.output.run.id, steps } });
     const plugin: SyncPlugin = { uri: pin?.uri ?? judgment.output.plugin.id, outcome, ...(code === undefined ? {} : { code }), ...(pin === undefined ? {} : { pin }), record: key };
     return { plugin, judgedHere: judgment.hosts.some((h) => h.verdict.host === host) };
   });

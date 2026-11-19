@@ -336,7 +336,8 @@ export function rejudgeState(ctx: SyncContext, state: SyncState, now: () => stri
     const plugins = entry.plugins.map((plugin) => {
       const record = plugin.record === undefined ? undefined : judged.get(keyId(plugin.record));
       const v = record?.verdicts.find((x) => x.host === hostProfile.id);
-      if (v !== undefined) return pluginWithVerdict(plugin, v, record?.run);
+      // a run with no step is the store's form of a record from before the steps (its run id column is required)
+      if (v !== undefined) return pluginWithVerdict(plugin, v, record?.run?.steps.length === 0 ? undefined : record?.run);
       if (record === undefined && plugin.outcome === "unmeasured" && plugin.record === undefined) {
         owing.push({ plugin: plugin.uri, owes: [{ measurement: "qualification", code: OWED_CODE.noFigures }] });
       }
