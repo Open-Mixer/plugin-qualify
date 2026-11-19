@@ -7,7 +7,7 @@ plugin installed on a machine, rescanning when a plugin directory changes.
 
 ## Install
 
-Fedora 44 (x86_64, aarch64):
+Fedora 45 (x86_64):
 
 ```
 sudo dnf install https://www.openmixer.org/rpm/openmixer-release.noarch.rpm
