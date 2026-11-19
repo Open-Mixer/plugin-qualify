@@ -17,12 +17,8 @@ export function deriveMatrix(decl, { arm }) {
   const first = (arches) => (arm ? arches : arches.slice(0, 1));
   const rpmArches = first(decl.rpm.arches);
   const debArches = first(decl.deb.arches);
-  const install = [
-    ...decl.rpm.fedora.map((f) => ({ image: `fedora:${f}`, artifact: `plugin-qualify-rpms-fc${f}-${rpmArches[0]}` })),
-    ...decl.deb.suites.map((s) => ({ image: `debian:${s}`, artifact: `plugin-qualify-debs-${s}-${debArches[0]}` })),
-  ];
   // the install cells are the first architecture of each kind; check-matrix gives each cell its image and its runner
-  return { rpmFedora: decl.rpm.fedora, rpmArches, debSuites: decl.deb.suites, debArches, install, installRpmArches: rpmArches.slice(0, 1), installDebArches: debArches.slice(0, 1) };
+  return { rpmFedora: decl.rpm.fedora, rpmArches, debSuites: decl.deb.suites, debArches, installRpmArches: rpmArches.slice(0, 1), installDebArches: debArches.slice(0, 1) };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
