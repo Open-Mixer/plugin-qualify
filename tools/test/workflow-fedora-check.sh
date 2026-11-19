@@ -17,7 +17,10 @@ check() {
 		return 2
 	fi
 	local hits
-	hits=$(grep -rnE 'fedora:44|fc44|fedora.*[^0-9]44([^0-9]|$)' "$wf" || true)
+	local decl=$1/.github/release-matrix.json
+	local scan=("$wf")
+	[ -f "$decl" ] && scan+=("$decl")
+	hits=$(grep -rnE 'fedora:44|fc44|fedora.*[^0-9]44([^0-9]|$)' "${scan[@]}" || true)
 	local blocks
 	blocks=$(find "$wf" -type f \( -name '*.yml' -o -name '*.yaml' \) -exec awk '
 		FNR == 1 { fed = 0 }
@@ -60,11 +63,20 @@ if [ "${1:-}" = "--self-test" ]; then
   - 44
   - 45'
 	plant not144 0 'fedora: [45, 144]'
+	# the one declaration of the release targets is scanned too
+	for c in 'clean 0 ["45"]' 'decl44 1 ["44"]' 'decl4445 1 ["45", "44"]'; do
+		set -- $c
+		d=$t/rm-$1
+		mkdir -p "$d/.github/workflows"
+		printf '{ "rpm": { "fedora": %s, "arches": ["x86_64"] } }\n' "${c#* * }" > "$d/.github/release-matrix.json"
+		rc=0; "$self" "$d" >/dev/null 2>&1 || rc=$?
+		if [ "$rc" != "$2" ]; then echo "self-test FAIL release-matrix $1: rc $rc, want $2" >&2; fails=$((fails + 1)); fi
+	done
 	mkdir -p "$t/nodir"
 	rc=0; "$self" "$t/nodir" >/dev/null 2>&1 || rc=$?
 	if [ "$rc" != 2 ]; then echo "self-test FAIL missing dir: rc $rc, want 2" >&2; fails=$((fails + 1)); fi
 	if [ "$fails" != 0 ]; then echo "workflow-fedora-check: self-test $fails red" >&2; exit 1; fi
-	echo "workflow-fedora-check: self-test green (10 planted trees)"
+	echo "workflow-fedora-check: self-test green (13 planted trees)"
 	exit 0
 fi
 

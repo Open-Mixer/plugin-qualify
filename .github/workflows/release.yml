@@ -57,7 +57,29 @@ permissions:
   actions: read
 
 jobs:
+  # the targets are declared ONCE, in .github/release-matrix.json: this job derives what the rpm and deb builds and the
+  # install job read, so a target dropped there is dropped from the install with it (#98)
+  matrix:
+    name: Derive the build and install matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      rpm-fedora: ${{ steps.derive.outputs.rpm-fedora }}
+      rpm-arches: ${{ steps.derive.outputs.rpm-arches }}
+      deb-suites: ${{ steps.derive.outputs.deb-suites }}
+      deb-arches: ${{ steps.derive.outputs.deb-arches }}
+      install: ${{ steps.derive.outputs.install }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref && format('refs/tags/{0}', inputs.source-ref) || '' }}
+      - id: derive
+        # only a pull request's dry run (arm: false) builds the first architecture alone
+        run: node tools/release-matrix.mjs "${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && 'false' || 'true' }}" >> "$GITHUB_OUTPUT"
+
   rpm:
+    needs: matrix
     uses: Open-Mixer/.github/.github/workflows/build-rpm.yml@openmixer-v1
     with:
       staged: ${{ inputs.staged == true }}
@@ -70,11 +92,13 @@ jobs:
       # plugin-db-devel, whose pin.h the CLAP prober builds against, plugin-hostd-protocol-devel, and omx-clap-lv2-devel, the
       # LV2 measurer's host features
       channel-deps: true
-      arch-matrix: '["x86_64"]'  # x86_64 only: Fedora 45 aarch64 is not built
+      fedora-versions: ${{ needs.matrix.outputs.rpm-fedora }}
+      arch-matrix: ${{ needs.matrix.outputs.rpm-arches }}
     secrets: inherit
 
   # beside the RPMs: the two publish jobs share one concurrency group, so their pushes never race
   deb:
+    needs: matrix
     # only after the RPM passed: a DEB never ships beside a failed RPM (the shared release-order check)
     uses: Open-Mixer/.github/.github/workflows/build-deb.yml@openmixer-v1
     with:
@@ -86,22 +110,20 @@ jobs:
       catch-up: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
       # the CLAP headers from the pin, plugin-db-dev (pin.h) and libplugin-hostd-protocol-dev from the channel: the CLAP prober's build;
       # libomx-clap-lv2-dev from the channel: the LV2 measurer's host features
-      # the Debian suites the build makes: the one declaration the install matrix below is held to by
-      # src/release-install-matrix.test.ts (a cell for a suite not listed here finds no artifact)
-      suite-matrix: '["trixie"]'
       dependencies: 'clap-headers'
       requires: ''
       # the release-notes filter of the build (changelog.sh) runs python3, which the debian: image does not carry
       build-packages: python3
       channel-deps: true
-      arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && '["amd64"]' || '["amd64", "arm64"]' }}
+      suite-matrix: ${{ needs.matrix.outputs.deb-suites }}
+      arch-matrix: ${{ needs.matrix.outputs.deb-arches }}
     secrets: inherit
 
   # the built package, installed in its own distribution, qualifies the fixture plugins with no
   # OMX_* setting: the prober, the measurer and the interposer are found where the package put them
   installed:
     name: Install and qualify (${{ matrix.image }})
-    needs: [rpm, deb]
+    needs: [matrix, rpm, deb]
     # not on a staged run: it reads packages a staged run does not build
     if: ${{ !cancelled() && inputs.staged != true }}
     runs-on: ubuntu-latest
@@ -115,10 +137,7 @@ jobs:
         shell: bash
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { image: 'fedora:45', artifact: plugin-qualify-rpms-fc45-x86_64 }
-          - { image: 'debian:trixie', artifact: plugin-qualify-debs-trixie-amd64 }
+      matrix: ${{ fromJSON(needs.matrix.outputs.install) }}
     steps:
       - uses: actions/checkout@v4
         with:

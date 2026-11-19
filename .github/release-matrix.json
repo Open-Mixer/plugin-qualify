@@ -1,0 +1,5 @@
+{
+  "comment": "The targets release.yml builds, declared ONCE: the matrix job derives what the rpm and deb builds and the install-and-qualify job read from this (tools/release-matrix.mjs). Drop a target here and its install cell goes with it. The install cells are the first architecture of each target.",
+  "rpm": { "fedora": ["45"], "arches": ["x86_64"] },
+  "deb": { "suites": ["trixie"], "arches": ["amd64", "arm64"] }
+}
