@@ -136,8 +136,8 @@ describe("C6: qualify-rejudge on the store", () => {
     expect(JSON.stringify(fake.base)).toBe(baseBefore);
   });
 
-  it("owes figures-unreadable for a CLAP record whose rows lack host_extensions, and does not judge it again", () => {
-    const clap = exported(CLAP_RT, "record_extension");
+  it("owes figures-unreadable for a record whose rows lack a count under an interposer, and does not judge it again", () => {
+    const clap = exported(CLAP_RT, "cell.rt_syscalls");
     const fake = fakeStore();
     const store = new QualificationStore("user", { run: fake.run });
     store.put(keyed(clap), clap.record);

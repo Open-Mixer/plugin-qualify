@@ -72,7 +72,7 @@ export function matchStored(
   if (atCell.length > 0 && judged.length === 0) say(`stored: ${storedUri(item, atCell[0]![0]!)}: no verdict for ${host}`);
   const unmeasured = judged.find((cellsOf) => {
     const v = cellsOf[0]!.verdicts.find((x) => x.host === host)!;
-    return outcomeOfVerdict({ measured: v.measured, rating: v.rating, ...(v.deciding === null ? {} : { deciding: v.deciding }) }) === "unmeasured";
+    return outcomeOfVerdict({ measured: v.measured === 1, rating: v.rating, ...(v.deciding === null ? {} : { deciding: v.deciding }) }) === "unmeasured";
   });
   if (unmeasured !== undefined) {
     say(`stored: ${storedUri(item, unmeasured[0]!)}: unmeasured at the source, measured here`);
@@ -89,7 +89,7 @@ export function matchStored(
 export function pinOfStored(item: SyncItem, r: StoredResult, host: string): PinEntry | undefined {
   if (r.unpinnable === 1 || r.layout_scheme === null || r.layout_sha256 === null) return undefined;
   const v = r.verdicts.find((x) => x.host === host);
-  const word = v !== undefined && v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+  const word = v !== undefined && v.measured === 1 ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
   return {
     uri: storedUri(item, r),
     integrity: {

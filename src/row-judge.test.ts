@@ -129,7 +129,7 @@ async function firstDifference(e: Entry, omit?: string): Promise<string | undefi
       run: o.run.outcome,
       plugin: { format: o.plugin.format, id: o.plugin.id, version: o.plugin.version ?? null },
       offer: o.offer.id,
-      ext: o.offer.clapExtensions ?? null,
+      ext: o.plugin.format === "clap" ? (o.offer.clapExtensions ?? []) : null,
       grid: o.grid.map((p) => ({
         rate: p.rate, quantum: p.quantum, outcome: p.outcome,
         latency: p.latency === undefined ? null : { d: p.latency.declaredFrames ?? null, m: p.latency.measuredFrames ?? null },
@@ -193,11 +193,11 @@ describe("C6b: the row judge equals the probe judge over the corpus", () => {
 describe("C6: a record whose rows lack a figure the judge needs is not judged again", () => {
   const clap = () => corpus().find((e) => e.record.plugin.format === "clap" && e.name.includes("every figure set"))!;
 
-  it("a CLAP record without host_extensions owes figures-unreadable", async () => {
+  it("a CLAP record without host_extensions is no gap: the judge reads it as an empty list, as it reads the probe output's", async () => {
     const e = clap();
     const j = await judges();
-    expect(j.unreadable(storeExport(e.record, e.probe))).toBeUndefined();
-    expect(j.unreadable(storeExport(e.record, e.probe, "record_extension"))).toMatch(/host_extensions|hostExtensions/);
+    expect(j.unreadable(storeExport(e.record, e.probe, "record_extension"))).toBeUndefined();
+    expect(j.outputOfRows(storeExport(e.record, e.probe, "record_extension")).offer.clapExtensions).toEqual([]);
   });
 
   it("a NULL cell.rt_syscalls under an interposer owes figures-unreadable", async () => {
@@ -215,7 +215,7 @@ describe("C6: a record whose rows lack a figure the judge needs is not judged ag
   });
 });
 
-describe("host_extensions NULL is not measured, never an empty set", () => {
+describe("host_extensions NULL reads as an empty list, byte-equal to the probe judge", () => {
   /** A CLAP plugin whose probe crashed before the offer: no extension list, and every cell lost. */
   const crashed = (): Entry => {
     const doc = fixtureJson("success-msi");
@@ -235,7 +235,18 @@ describe("host_extensions NULL is not measured, never an empty set", () => {
     expect(recordOf(none, Buffer.from("{}")).hostExtensions).toEqual([]);
   });
 
-  it("the row judge reads such a record as it is: not unreadable, and equal to the probe judge", async () => {
+  it("a CLAP probe that ended well but whose offer holds no list: the same, with the verdicts of an empty offer", async () => {
+    const doc = fixtureJson("success-msi");
+    doc["offer"] = { id: "default", realtime: "none" };
+    const probe = probeOf(doc);
+    const entry: Entry = { name: "a CLAP probe with no offer list", probe, record: recordOf(probe, Buffer.from(JSON.stringify(doc))) };
+    expect(entry.record.hostExtensions).toBeUndefined();
+    const j = await judges();
+    expect(j.unreadable(storeExport(entry.record, probe))).toBeUndefined();
+    expect(await firstDifference(entry)).toBeUndefined();
+  });
+
+  it("the row judge reads a crashed probe's record as it is: not unreadable, and equal to the probe judge", async () => {
     const c = crashed();
     const j = await judges();
     const stored = storeExport(c.record, c.probe);
@@ -244,11 +255,12 @@ describe("host_extensions NULL is not measured, never an empty set", () => {
     expect(await firstDifference(c)).toBeUndefined();
   });
 
-  it("an empty list is data: a finished probe's record with it is readable, and without it is not", async () => {
+  it("an empty list and a NULL give the same judgment; a list that the run offered does not", async () => {
     const c = corpus().find((e) => e.name === "success-msi")!;
     const j = await judges();
     const stored = storeExport(c.record, c.probe);
-    expect(j.unreadable({ ...stored, record: { ...stored.record, hostExtensions: [] } })).toBeUndefined();
-    expect(j.unreadable({ ...stored, record: { ...stored.record, hostExtensions: undefined } })).toMatch(/host_extensions/);
+    const text = (h: readonly string[] | undefined) => JSON.stringify(j.fromRows({ ...stored, record: { ...stored.record, hostExtensions: h } }, OPTIONS).record.verdicts);
+    expect(text(undefined)).toBe(text([]));
+    expect(text(c.probe.offer.clapExtensions)).not.toBe(text([]));
   });
 });

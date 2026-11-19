@@ -10,14 +10,12 @@ import type { ProbeGridPoint, ProbeOutput } from "./probe-output.js";
 import type { StoredRecord } from "./qualification-store.js";
 
 /**
- * Why a record's rows cannot be judged again, or `undefined` when they can: a CLAP record of a finished probe without
- * `host_extensions` (a profile is judged only against the extensions the run offered), and a cell under an interposer with a NULL count the
- * judge reads. The words are the columns'.
+ * Why a record's rows cannot be judged again, or `undefined` when they can: a cell under an interposer with a NULL count the
+ * judge reads. The words are the columns'. A NULL `host_extensions` is no gap: a CLAP record whose probe ended before the offer
+ * holds none, and the judge reads a missing list as an empty one, as it does the probe output's.
  */
 export function rowsUnreadable(s: StoredRecord): string | undefined {
   const r = s.record;
-  // a probe that crashed or timed out never reached the offer and the judge reads no extension of it: not measured, not unreadable
-  if (r.plugin.format === "clap" && r.hostExtensions === undefined && r.probe.outcome === "probe.ok") return "a CLAP record without host_extensions (record_extension)";
   for (const p of r.measurements.grid) {
     if (p.outcome !== "probe.ok" || p.rtSafety?.interposer !== true) continue;
     for (const [column, value] of [["rt_allocations", p.rtSafety.allocations], ["rt_locks", p.rtSafety.locks], ["rt_syscalls", p.rtSafety.syscalls]] as const) {
@@ -46,7 +44,7 @@ export function outputOfRows(s: StoredRecord): ProbeOutput {
     plugin: { format: r.plugin.format as "clap" | "lv2", id: r.plugin.id, ...(r.plugin.name === undefined ? {} : { name: r.plugin.name }), ...(r.testedVersion === undefined ? {} : { version: r.testedVersion }) },
     binary: r.binary,
     machine: { class: r.probe.machineClass, profile: { governor: null, cpuidle: [], meetsProtocol: r.probe.meetsProtocol, unmet: [] }, pinnedCpus: "" },
-    offer: { id: s.offer, ...(r.hostExtensions === undefined ? {} : { clapExtensions: r.hostExtensions }) },
+    offer: { id: s.offer, ...(r.plugin.format === "clap" ? { clapExtensions: r.hostExtensions ?? [] } : {}) },
     steps: [],
     grid: r.measurements.grid.map(pointOf),
     ...(r.measurements.behaviour === undefined ? {} : { behaviour: r.measurements.behaviour }),

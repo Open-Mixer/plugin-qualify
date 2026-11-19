@@ -26,7 +26,7 @@ function result(over: Partial<StoredResult> & { files: { path: string; sha256: s
   return {
     layer: "base", sha256: over.files.find((f) => f.path === over.binary_path)!.sha256, offer: "default", host_class: "x86-64", set: "s1",
     layout_scheme: "omx-layout/1", layout_sha256: sha("9"), tested_version: "1.0", unpinnable: 0, rate: 48000, quantum: 512, outcome: "probe.ok",
-    verdicts: [{ host: "omx-clap-host", rating: "suitable", deciding: null, measured: true, qualified: true }],
+    verdicts: [{ host: "omx-clap-host", rating: "suitable", deciding: null, measured: 1, qualified: 1 }],
     ...over,
   } as StoredResult;
 }
@@ -100,7 +100,7 @@ describe("the cells and the verdict of the host", () => {
     expect(matchStored([r], item, "jalv", d, CELLS).status).toBe("ignored");
   });
   it("a verdict the source could not measure is measured here", () => {
-    const u = { ...r, verdicts: [{ host: "omx-clap-host", rating: "unknown", deciding: "probe.not-attempted", measured: false, qualified: false }] };
+    const u = { ...r, verdicts: [{ host: "omx-clap-host", rating: "unknown", deciding: "probe.not-attempted", measured: 0, qualified: 0 }] };
     expect(matchStored([u as StoredResult], item, "omx-clap-host", d, CELLS).status).toBe("ignored");
   });
   it("no result for the plugin says nothing and is measured", () => {

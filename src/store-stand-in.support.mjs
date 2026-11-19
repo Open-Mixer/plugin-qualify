@@ -38,7 +38,7 @@ if (tool === "write" && verb === "put") {
   if (args.includes("--records")) out = found.map((r) => `${JSON.stringify(r)}\n`).join("");
   else
     out = found
-      .flatMap((r) => r.record.measurements.grid.map((c) => ({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: null, binary_path: r.record.binary.path, layout_scheme: r.record.binary.layout?.scheme ?? null, layout_sha256: r.record.binary.layout?.sha256 ?? null, tested_version: r.record.testedVersion ?? null, unpinnable: r.record.binary.unpinnable === undefined ? 0 : 1, files: r.record.binary.files, rate: c.rate, quantum: c.quantum, outcome: c.outcome, verdicts: r.record.verdicts.map((v) => ({ host: v.host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured, qualified: v.qualified })) })))
+      .flatMap((r) => r.record.measurements.grid.map((c) => ({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: null, binary_path: r.record.binary.path, layout_scheme: r.record.binary.layout?.scheme ?? null, layout_sha256: r.record.binary.layout?.sha256 ?? null, tested_version: r.record.testedVersion ?? null, unpinnable: r.record.binary.unpinnable === undefined ? 0 : 1, files: r.record.binary.files, rate: c.rate, quantum: c.quantum, outcome: c.outcome, verdicts: r.record.verdicts.map((v) => ({ host: v.host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 })) })))
       .map((l) => `${JSON.stringify(l)}\n`)
       .join("");
 } else {

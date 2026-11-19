@@ -100,7 +100,8 @@ export interface StoredResult {
   readonly rate: number;
   readonly quantum: number;
   readonly outcome: string;
-  readonly verdicts: readonly { readonly host: string; readonly rating: string; readonly deciding: string | null; readonly measured: boolean; readonly qualified: boolean }[];
+  /** An array in the record's order of the reader's `pqdb_verdict` fields: `measured` and `qualified` are 0 or 1, `deciding` a word or null. */
+  readonly verdicts: readonly { readonly host: string; readonly rating: string; readonly deciding: string | null; readonly measured: 0 | 1; readonly qualified: 0 | 1 }[];
 }
 
 export interface StoreCounts {

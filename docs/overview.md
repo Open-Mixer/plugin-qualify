@@ -975,8 +975,8 @@ replaces `probe.sha256`: nothing matches on, checks against or builds a pin from
 
 **Rejudge from rows.** `plugin-qualify-sync --rejudge` judges every record of the scope's user layer again from the
 record the reader exports and nothing else; probe bytes are not kept beside the store. Every field the judge reads has a
-column in the spec's section 6.2 table. A record that lacks a figure the judge needs (a CLAP record without
-`hostExtensions`; a missing count under an interposer) owes `qualify.sync.figures-unreadable` and is not judged again;
+column in the spec's section 6.2 table. A record that lacks a figure the judge needs (a missing count under an
+interposer) owes `qualify.sync.figures-unreadable` and is not judged again;
 nothing is guessed. The proof is the case C6b: over a corpus of records, the verdicts, tiers and cost of the row judge
 are byte-equal to those of the probe judge, and leaving out any one mapped column makes it differ.
 
@@ -986,5 +986,6 @@ the base; the descriptor half is unchanged. `pluginCounts` is `counts --layer us
 unchanged.
 
 **Record writer.** A CLAP record carries `hostExtensions`, the extensions the run offered the plugin, which the judge reads
-(a profile is judged only against the extensions it offers). The thread fields of the real-time probe
+(a profile is judged only against the extensions it offers). A CLAP record whose probe ended before the offer holds none,
+and the judge reads a missing list as an empty one, as it does the probe output's. The thread fields of the real-time probe
 (`ownThreads`, `otherThreads`) follow when the probe change that adds them lands.

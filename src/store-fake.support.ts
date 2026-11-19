@@ -115,7 +115,7 @@ export function fakeStore(options: { readonly absent?: boolean; readonly base?: 
           tested_version: r.record.testedVersion ?? null, unpinnable: r.record.binary.unpinnable === undefined ? 0 : 1,
           files: r.record.binary.files.map((f) => ({ path: f.path, sha256: f.sha256 })),
           rate: cell.rate, quantum: cell.quantum, outcome: cell.outcome,
-          verdicts: r.record.verdicts.map((v) => ({ host: v.host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured, qualified: v.qualified })),
+          verdicts: r.record.verdicts.map((v) => ({ host: v.host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 })),
         })),
       );
       return ok(lines.map((l) => `${JSON.stringify(l)}\n`).join(""));
