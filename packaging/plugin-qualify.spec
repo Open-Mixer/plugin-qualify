@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.6
+Version:        0.20.7
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -246,6 +246,16 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Thu Nov 19 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.7-1
+- the qualification domain (1.3.0) holds the words of the record store, the 14 kinds
+  of an adapter code and the memory-bound outcome; the adapter codes and the
+  memory-bound outcome are read from it, not spelled in the program (#113, #115)
+- the audio thread decides: plugin-qualify's own threads are conditional and
+  groupable (#119)
+- packages are built for Fedora 45, RPM for x86_64 only (#121)
+- the release workflow's install matrix is derived from its build matrix (#117)
+- floors unchanged, no ceilings
+
 * Wed Nov 18 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.6-1
 - the qualification domain ships in the new plugin-qualify-contract package and is
   read at run time (#105, #109)
