@@ -39,7 +39,7 @@ describe("an entry point run through a symlink", () => {
 
 // Every entry point decides that it was run, not imported, with omx-contract's isMain (real paths on both sides):
 // comparing process.argv[1] with import.meta.url by hand misses a symlinked path.
-it("no entry point compares process.argv[1] with import.meta.url by hand", () => {
+it("no entry point compares argv[1] with its own module URL by hand", () => {
   const files: string[] = [];
   const walk = (dir: string) => {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
