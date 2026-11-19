@@ -7,7 +7,7 @@ name: release
 # and checks the tarball, and publishes nothing. The RPM and DEB builds are in Open-Mixer/.github; the
 # secrets are the organisation's. The npm registry has its own workflow, publish.yml.
 
-# A manual run with staged on (never a tag) builds fc44 x86_64 and trixie amd64 only, against the staging channel, and
+# A manual run with staged on (never a tag) builds fc44 x86_64 and trixie arm64 only, against the staging channel, and
 # publishes them, signed, to the staging channel (staging/rpm and staging/deb of the channel repository), where the
 # next layer of the release chain finds them by adding the staging channel beside the real one. Nothing reaches the
 # real channel, and the real release still publishes once from the v<version> tag (Open-Mixer/.github build-rpm.yml
@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
       staged:
-        description: 'Build fc44 x86_64 and trixie amd64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
+        description: 'Build fc44 x86_64 and trixie arm64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
         type: boolean
         default: false
       catch-up:
