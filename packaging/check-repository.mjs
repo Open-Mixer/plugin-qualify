@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isMain } from "@openmixer/omx-contract/entry";
 
 /** null when `pkg.repository.url` (git+ prefix aside) names `githubRepository`; the failure message otherwise. */
 export function checkRepository(pkg, githubRepository) {
@@ -21,7 +22,7 @@ export function checkRepository(pkg, githubRepository) {
   return `package.json: "repository.url" is "${url}", expected to match "${want}" (GITHUB_REPOSITORY=${githubRepository})`;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const repo = process.env.GITHUB_REPOSITORY;
   if (!repo) {
     console.error("check-repository: GITHUB_REPOSITORY is not set");

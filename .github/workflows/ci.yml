@@ -87,20 +87,20 @@ jobs:
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           node packaging/check-tarball.mjs "$RUNNER_TEMP"/pack/openmixer-plugin-qualify-*.tgz
 
-  # the test files of .github/container-tests.txt: they need omx-contract 3.20.0 as a system package (the installer's
-  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora; the build and test job above leaves them out
+  # the test files of .github/container-tests.txt: they need omx-contract 3.20.2 as a system package (the installer's
+  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora 45; the build and test job above leaves them out
   container-tests:
     name: tests that need omx-contract installed
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
       - uses: actions/checkout@v4
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.0' 'omx-contract-devel >= 3.20.0' 'omx-contract-data >= 3.20.0'
+      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.2' 'omx-contract-devel >= 3.20.2' 'omx-contract-data >= 3.20.0'
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: Install

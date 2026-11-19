@@ -32,6 +32,8 @@ jobs:
   # local copy of either (Open-Mixer/.github's public-sources-check)
   public-sources:
     uses: Open-Mixer/.github/.github/workflows/public-sources-check.yml@openmixer-v1
+    with:
+      commit-identity: true
 
   # the dependency floors: the spec, debian/control and the workflows' install lines state floors and no ceiling. This
   # repository has no packaging/deps.txt, so the shared deps-render action only refuses ceilings (Open-Mixer/.github's
@@ -44,12 +46,18 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Open-Mixer/.github/.github/actions/deps-render@openmixer-v1
 
-  # the spec and debian/control declare the same CLAP floor (packaging/check-clap-floor.mjs; needs only node, which the
-  # runner image carries)
+  # the spec and debian/control declare the same CLAP floor (packaging/check-clap-floor.mjs, which decides that it was
+  # run with omx-contract's isMain, @openmixer/omx-contract/entry: the dependencies are installed first)
   clap-floor:
     name: the spec and debian/control agree on the CLAP floor
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: node packaging/check-clap-floor.mjs

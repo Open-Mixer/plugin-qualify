@@ -11,6 +11,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '@openmixer/omx-contract/entry';
 
 /** What the builds and the install job read, derived from the one declaration. */
 export function deriveMatrix(decl, { arm }) {
@@ -21,7 +22,7 @@ export function deriveMatrix(decl, { arm }) {
   return { rpmFedora: decl.rpm.fedora, rpmArches, debSuites: decl.deb.suites, debArches, installRpmArches: rpmArches.slice(0, 1), installDebArches: debArches.slice(0, 1) };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const arg = process.argv[2];
   if (!['true', 'false'].includes(arg)) {
     console.error('usage: node tools/release-matrix.mjs true|false');
