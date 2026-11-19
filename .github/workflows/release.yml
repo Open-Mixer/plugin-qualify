@@ -1,13 +1,13 @@
 name: release
 
-# A version tag builds the RPM (Fedora 44, x86_64 and aarch64) and the DEB (Debian trixie,
+# A version tag builds the RPM (Fedora 45, x86_64 only; no Fedora aarch64 RPM) and the DEB (Debian trixie,
 # amd64 and arm64), signs them, publishes them into the rpm/ and deb/ trees of the OpenMixer Pages
 # repository and attaches them to the GitHub release, beside the `pnpm pack` tarball
 # openmixer-plugin-qualify-<version>.tgz (dist/ built in). Anything else builds unsigned trees and packs
 # and checks the tarball, and publishes nothing. The RPM and DEB builds are in Open-Mixer/.github; the
 # secrets are the organisation's. The npm registry has its own workflow, publish.yml.
 
-# A manual run with staged on (never a tag) builds fc44 x86_64 and trixie amd64 only, against the staging channel, and
+# A manual run with staged on (never a tag) builds fc45 x86_64 and trixie amd64 only, against the staging channel, and
 # publishes them, signed, to the staging channel (staging/rpm and staging/deb of the channel repository), where the
 # next layer of the release chain finds them by adding the staging channel beside the real one. Nothing reaches the
 # real channel, and the real release still publishes once from the v<version> tag (Open-Mixer/.github build-rpm.yml
@@ -31,7 +31,7 @@ on:
         type: boolean
         default: false
       staged:
-        description: 'Build fc44 x86_64 and trixie amd64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
+        description: 'Build fc45 x86_64 and trixie amd64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
         type: boolean
         default: false
       catch-up:
@@ -46,7 +46,7 @@ on:
       arm:
         type: boolean
         default: true
-        description: 'Build the aarch64/arm64 packages too; the pull-request dry run passes false (arm builds run at release only)'
+        description: 'Build the arm64 DEBs too (no Fedora aarch64 RPM is built); the pull-request dry run passes false (arm builds run at release only)'
       staged:
         type: boolean
         default: false
@@ -70,7 +70,7 @@ jobs:
       # plugin-db-devel, whose pin.h the CLAP prober builds against, plugin-hostd-protocol-devel, and omx-clap-lv2-devel, the
       # LV2 measurer's host features
       channel-deps: true
-      arch-matrix: ${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && '["x86_64"]' || '["x86_64", "aarch64"]' }}
+      arch-matrix: '["x86_64"]'  # x86_64 only: Fedora 45 aarch64 is not built
     secrets: inherit
 
   # beside the RPMs: the two publish jobs share one concurrency group, so their pushes never race
@@ -117,7 +117,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { image: 'fedora:44', artifact: plugin-qualify-rpms-fc44-x86_64 }
+          - { image: 'fedora:45', artifact: plugin-qualify-rpms-fc45-x86_64 }
           - { image: 'debian:trixie', artifact: plugin-qualify-debs-trixie-amd64 }
     steps:
       - uses: actions/checkout@v4

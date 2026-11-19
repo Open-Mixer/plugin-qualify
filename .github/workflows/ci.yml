@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
       - uses: actions/checkout@v4
@@ -119,7 +119,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs
       - uses: actions/checkout@v4
@@ -140,7 +140,7 @@ jobs:
           spec: packaging/plugin-qualify.spec
           gate: tools/catalogs-gate.sh
 
-  # Fedora 45 only: a workflow that names Fedora 44 (fedora:44, fc44) is refused here
+  # Fedora 45 only: a workflow that names Fedora 44 (fedora:45, fc45) is refused here
   fedora:
     name: no Fedora 44 reference in the workflows
     runs-on: ubuntu-latest
@@ -162,7 +162,7 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       publish: false
-      arm: false  # aarch64/arm64 build at release only
+      arm: false  # the arm64 DEBs build at release only; no Fedora aarch64 RPM
 
   # the dependency floors: the spec, debian/control and the workflows' install lines state floors and no ceiling. This
   # repository has no packaging/deps.txt, so the shared deps-render action only refuses ceilings (Open-Mixer/.github's
