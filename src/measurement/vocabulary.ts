@@ -252,6 +252,13 @@ export type MeasurementDimension = "latency" | "cost" | "stability" | "rtSafety"
 const DIMENSIONS: readonly MeasurementDimension[] = ["latency", "cost", "stability", "rtSafety", "features"];
 
 /**
+ * The dimensions of the same item that no measurement document holds a key for: a record's reasons and its unmeasured
+ * entries name them (the record store checks them), so the document declares them and this build knows them by name,
+ * but `MEASUREMENT_DIMENSIONS` stays the keys of a measurement document.
+ */
+export const RECORD_ONLY_DIMENSIONS: readonly string[] = ["memory", "hostAdmission", "memoryGrowth"];
+
+/**
  * The dimensions the standalone prober (`scan.py` + `benchmark.py`, driven by `lv2-measure.mjs`
  * and the console's Setup analysis) can measure. The three hosting dimensions come from a
  * different tool — the native measurer `native/lv2-measure.c`, read by `sweep-jsonl.ts` — so a
@@ -305,7 +312,9 @@ export function buildVocabulary(domain: QualificationDomain) {
     EXCLUSION_TERMS: described(domain, "QUALIFICATION_MEASUREMENT_LATENCY_EXCLUSIONS", EXCLUSION_DESCRIPTIONS) as readonly ScalingTerm[],
     METHOD_TERMS: method as readonly ScalingTerm[],
     METHOD_CODES: new Set<string>(method.map((t) => t.code)),
-    MEASUREMENT_DIMENSIONS: checked(domain, "QUALIFICATION_MEASUREMENT_DIMENSIONS", DIMENSIONS),
+    MEASUREMENT_DIMENSIONS: checked(domain, "QUALIFICATION_MEASUREMENT_DIMENSIONS", [...DIMENSIONS, ...RECORD_ONLY_DIMENSIONS]).filter(
+      (w): w is MeasurementDimension => !RECORD_ONLY_DIMENSIONS.includes(w),
+    ),
     VERDICT_RATINGS: checked(domain, "QUALIFICATION_MEASUREMENT_VERDICT_RATINGS", RATINGS),
     HOST_ISOLATIONS: domain.words("QUALIFICATION_RESOURCE_HOST_ISOLATIONS"),
     HOST_LATENCY_HANDLING: domain.words("QUALIFICATION_RESOURCE_HOST_LATENCY_HANDLING"),

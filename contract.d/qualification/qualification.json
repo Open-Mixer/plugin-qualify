@@ -3,7 +3,7 @@
   "$id": "https://openmixer.org/contract/qualification",
   "info": {
     "title": "What a qualification measures and records",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "x-owner": "plugin-qualify",
     "x-stability": "experimental"
   },
@@ -42,6 +42,27 @@
             "title": "features",
             "x-code": 4,
             "x-text": "What capabilities a plugin declares and a prober can confirm, beside latency, cost, stability and RT safety."
+          },
+          {
+            "const": "memory",
+            "title": "memory",
+            "description": "How much memory a plugin holds at rest and per instance.",
+            "x-code": 5,
+            "x-text": "How much memory a plugin holds at rest and per instance."
+          },
+          {
+            "const": "hostAdmission",
+            "title": "hostAdmission",
+            "description": "Whether the host admitted the plugin and its cells.",
+            "x-code": 6,
+            "x-text": "Whether the host admitted the plugin and its cells."
+          },
+          {
+            "const": "memoryGrowth",
+            "title": "memoryGrowth",
+            "description": "How the memory of a plugin grows over a long run.",
+            "x-code": 7,
+            "x-text": "How the memory of a plugin grows over a long run."
           }
         ]
       },
@@ -584,6 +605,673 @@
             "description": "A Raspberry Pi 5, aarch64.",
             "x-code": 2,
             "x-text": "A Raspberry Pi 5, aarch64."
+          }
+        ]
+      },
+      "QUALIFICATION_HOST_CLASSES": {
+        "description": "The classes of machine a record set was measured on, the directory a record lives in.",
+        "oneOf": [
+          {
+            "const": "rpi5",
+            "title": "rpi5",
+            "description": "A Raspberry Pi 5, aarch64.",
+            "x-code": 0,
+            "x-text": "A Raspberry Pi 5, aarch64."
+          },
+          {
+            "const": "x86-64",
+            "title": "x8664",
+            "description": "An x86-64 machine.",
+            "x-code": 1,
+            "x-text": "An x86-64 machine."
+          }
+        ]
+      },
+      "QUALIFICATION_SET_TIERS": {
+        "description": "How far a record set's measurements are settled.",
+        "oneOf": [
+          {
+            "const": "reference",
+            "title": "reference",
+            "description": "A set measured as the reference the others are compared with.",
+            "x-code": 0,
+            "x-text": "A set measured as the reference the others are compared with."
+          },
+          {
+            "const": "provisional",
+            "title": "provisional",
+            "description": "A set measured against provisional budgets: its verdicts may change when the budgets settle.",
+            "x-code": 1,
+            "x-text": "A set measured against provisional budgets: its verdicts may change when the budgets settle."
+          },
+          {
+            "const": "hardware",
+            "title": "hardware",
+            "description": "A set measured on the target hardware itself.",
+            "x-code": 2,
+            "x-text": "A set measured on the target hardware itself."
+          }
+        ]
+      },
+      "QUALIFICATION_HOST_PROFILES": {
+        "description": "The host profiles a verdict, a cost entry, a tier or a record's adapter is judged for.",
+        "oneOf": [
+          {
+            "const": "omx-clap-host",
+            "title": "omxClapHost",
+            "description": "The CLAP host the console runs plugins in.",
+            "x-code": 0,
+            "x-text": "The CLAP host the console runs plugins in."
+          },
+          {
+            "const": "openmixer-console",
+            "title": "openmixerConsole",
+            "description": "The console's own hosting, a plugin run in process or isolated.",
+            "x-code": 1,
+            "x-text": "The console's own hosting, a plugin run in process or isolated."
+          },
+          {
+            "const": "openmixer-pi-4gb",
+            "title": "openmixerPi4gb",
+            "description": "The console on a Raspberry Pi with 4 GB of memory.",
+            "x-code": 2,
+            "x-text": "The console on a Raspberry Pi with 4 GB of memory."
+          },
+          {
+            "const": "openmixer-pi-8gb",
+            "title": "openmixerPi8gb",
+            "description": "The console on a Raspberry Pi with 8 GB of memory.",
+            "x-code": 3,
+            "x-text": "The console on a Raspberry Pi with 8 GB of memory."
+          }
+        ]
+      },
+      "QUALIFICATION_SYNC_SETTINGS": {
+        "description": "The setting keys a record set's provenance names for the sync run that measured it.",
+        "oneOf": [
+          {
+            "const": "host_class",
+            "title": "hostClass",
+            "description": "The class of machine the run measured on.",
+            "x-code": 0,
+            "x-text": "The class of machine the run measured on."
+          },
+          {
+            "const": "clap_extra",
+            "title": "clapExtra",
+            "description": "The extra CLAP directories the run scanned.",
+            "x-code": 1,
+            "x-text": "The extra CLAP directories the run scanned."
+          },
+          {
+            "const": "memory_limit",
+            "title": "memoryLimit",
+            "description": "The memory limit the run's isolated step applied.",
+            "x-code": 2,
+            "x-text": "The memory limit the run's isolated step applied."
+          },
+          {
+            "const": "hostd_port",
+            "title": "hostdPort",
+            "description": "The port of the plugin host daemon the run used.",
+            "x-code": 3,
+            "x-text": "The port of the plugin host daemon the run used."
+          }
+        ]
+      },
+      "QUALIFICATION_OFFERS": {
+        "description": "Which preset offer of a plugin a record measures.",
+        "oneOf": [
+          {
+            "const": "default",
+            "title": "default",
+            "description": "The plugin as it loads with its own defaults.",
+            "x-code": 0,
+            "x-text": "The plugin as it loads with its own defaults."
+          },
+          {
+            "const": "custom",
+            "title": "custom",
+            "description": "The plugin loaded with the console's custom state.",
+            "x-code": 1,
+            "x-text": "The plugin loaded with the console's custom state."
+          }
+        ]
+      },
+      "QUALIFICATION_PACKAGE_FORMATS": {
+        "description": "The package formats a binary can be installed from.",
+        "oneOf": [
+          {
+            "const": "deb",
+            "title": "deb",
+            "description": "A Debian package.",
+            "x-code": 0,
+            "x-text": "A Debian package."
+          },
+          {
+            "const": "rpm",
+            "title": "rpm",
+            "description": "An RPM package.",
+            "x-code": 1,
+            "x-text": "An RPM package."
+          }
+        ]
+      },
+      "QUALIFICATION_PACKAGE_DISTROS": {
+        "description": "The distribution releases a package is built for.",
+        "oneOf": [
+          {
+            "const": "trixie",
+            "title": "trixie",
+            "description": "Debian 13, trixie.",
+            "x-code": 0,
+            "x-text": "Debian 13, trixie."
+          },
+          {
+            "const": "fc44",
+            "title": "fc44",
+            "description": "Fedora 44.",
+            "x-code": 1,
+            "x-text": "Fedora 44."
+          },
+          {
+            "const": "fc45",
+            "title": "fc45",
+            "description": "Fedora 45.",
+            "x-code": 2,
+            "x-text": "Fedora 45."
+          }
+        ]
+      },
+      "QUALIFICATION_PACKAGE_ARCHES": {
+        "description": "The architecture words of a package, in the spelling of its format.",
+        "oneOf": [
+          {
+            "const": "arm64",
+            "title": "arm64",
+            "description": "The Debian spelling of the 64-bit ARM architecture.",
+            "x-code": 0,
+            "x-text": "The Debian spelling of the 64-bit ARM architecture."
+          },
+          {
+            "const": "amd64",
+            "title": "amd64",
+            "description": "The Debian spelling of the 64-bit x86 architecture.",
+            "x-code": 1,
+            "x-text": "The Debian spelling of the 64-bit x86 architecture."
+          },
+          {
+            "const": "all",
+            "title": "all",
+            "description": "The Debian word for a package that holds no machine code.",
+            "x-code": 2,
+            "x-text": "The Debian word for a package that holds no machine code."
+          },
+          {
+            "const": "aarch64",
+            "title": "aarch64",
+            "description": "The RPM spelling of the 64-bit ARM architecture.",
+            "x-code": 3,
+            "x-text": "The RPM spelling of the 64-bit ARM architecture."
+          },
+          {
+            "const": "x86_64",
+            "title": "x8664",
+            "description": "The RPM spelling of the 64-bit x86 architecture.",
+            "x-code": 4,
+            "x-text": "The RPM spelling of the 64-bit x86 architecture."
+          },
+          {
+            "const": "noarch",
+            "title": "noarch",
+            "description": "The RPM word for a package that holds no machine code.",
+            "x-code": 5,
+            "x-text": "The RPM word for a package that holds no machine code."
+          }
+        ]
+      },
+      "QUALIFICATION_VERDICT_HOSTINGS": {
+        "description": "The hosting a verdict was judged for.",
+        "oneOf": [
+          {
+            "const": "isolated",
+            "title": "isolated",
+            "description": "The plugin runs in a process of its own, away from the console's audio thread.",
+            "x-code": 0,
+            "x-text": "The plugin runs in a process of its own, away from the console's audio thread."
+          },
+          {
+            "const": "in-process",
+            "title": "inProcess",
+            "description": "The plugin runs inside the console's own process.",
+            "x-code": 1,
+            "x-text": "The plugin runs inside the console's own process."
+          }
+        ]
+      },
+      "QUALIFICATION_VERDICT_ARMS": {
+        "description": "The evidence a verdict rests on.",
+        "oneOf": [
+          {
+            "const": "declaration",
+            "title": "declaration",
+            "description": "The verdict follows what the plugin declares, no run behind it.",
+            "x-code": 0,
+            "x-text": "The verdict follows what the plugin declares, no run behind it."
+          },
+          {
+            "const": "run",
+            "title": "run",
+            "description": "The verdict follows what a measured run showed.",
+            "x-code": 1,
+            "x-text": "The verdict follows what a measured run showed."
+          }
+        ]
+      },
+      "QUALIFICATION_REASON_PARAMS": {
+        "description": "The names of the figures a reason carries beside its code.",
+        "oneOf": [
+          {
+            "const": "rate",
+            "title": "rate",
+            "description": "The sample rate the figure was measured at.",
+            "x-code": 0,
+            "x-text": "The sample rate the figure was measured at."
+          },
+          {
+            "const": "quantum",
+            "title": "quantum",
+            "description": "The block size the figure was measured at.",
+            "x-code": 1,
+            "x-text": "The block size the figure was measured at."
+          },
+          {
+            "const": "blocks",
+            "title": "blocks",
+            "description": "How many blocks the figure covers.",
+            "x-code": 2,
+            "x-text": "How many blocks the figure covers."
+          },
+          {
+            "const": "allocations",
+            "title": "allocations",
+            "description": "How many allocations the audio thread made.",
+            "x-code": 3,
+            "x-text": "How many allocations the audio thread made."
+          },
+          {
+            "const": "syscalls",
+            "title": "syscalls",
+            "description": "How many system calls the audio thread made.",
+            "x-code": 4,
+            "x-text": "How many system calls the audio thread made."
+          },
+          {
+            "const": "locks",
+            "title": "locks",
+            "description": "How many locks the audio thread took.",
+            "x-code": 5,
+            "x-text": "How many locks the audio thread took."
+          },
+          {
+            "const": "ceilingKb",
+            "title": "ceilingKb",
+            "description": "The memory ceiling the figure is held to, in kilobytes.",
+            "x-code": 6,
+            "x-text": "The memory ceiling the figure is held to, in kilobytes."
+          },
+          {
+            "const": "provisional",
+            "title": "provisional",
+            "description": "Whether the ceiling is provisional.",
+            "x-code": 7,
+            "x-text": "Whether the ceiling is provisional."
+          },
+          {
+            "const": "perInstanceKb",
+            "title": "perInstanceKb",
+            "description": "The memory each further instance costs, in kilobytes.",
+            "x-code": 8,
+            "x-text": "The memory each further instance costs, in kilobytes."
+          },
+          {
+            "const": "firstInstanceKb",
+            "title": "firstInstanceKb",
+            "description": "The memory the first instance costs, in kilobytes.",
+            "x-code": 9,
+            "x-text": "The memory the first instance costs, in kilobytes."
+          },
+          {
+            "const": "consoleCeilingKb",
+            "title": "consoleCeilingKb",
+            "description": "The console's own memory ceiling, in kilobytes.",
+            "x-code": 10,
+            "x-text": "The console's own memory ceiling, in kilobytes."
+          },
+          {
+            "const": "events",
+            "title": "events",
+            "description": "How many real-time safety events the run recorded.",
+            "x-code": 11,
+            "x-text": "How many real-time safety events the run recorded."
+          },
+          {
+            "const": "ceiling",
+            "title": "ceiling",
+            "description": "The ceiling the figure is held to.",
+            "x-code": 12,
+            "x-text": "The ceiling the figure is held to."
+          },
+          {
+            "const": "coreFractionP95",
+            "title": "coreFractionP95",
+            "description": "The 95th percentile of the share of a core a block takes.",
+            "x-code": 13,
+            "x-text": "The 95th percentile of the share of a core a block takes."
+          },
+          {
+            "const": "tailRatio",
+            "title": "tailRatio",
+            "description": "The ratio of the slowest blocks to the median block.",
+            "x-code": 14,
+            "x-text": "The ratio of the slowest blocks to the median block."
+          },
+          {
+            "const": "peak",
+            "title": "peak",
+            "description": "The highest value reached.",
+            "x-code": 15,
+            "x-text": "The highest value reached."
+          },
+          {
+            "const": "notes",
+            "title": "notes",
+            "description": "How many notes the sweep played.",
+            "x-code": 16,
+            "x-text": "How many notes the sweep played."
+          },
+          {
+            "const": "step",
+            "title": "step",
+            "description": "The qualification step the reason concerns.",
+            "x-code": 17,
+            "x-text": "The qualification step the reason concerns."
+          },
+          {
+            "const": "resp",
+            "title": "resp",
+            "description": "The response code the host answered with.",
+            "x-code": 18,
+            "x-text": "The response code the host answered with."
+          },
+          {
+            "const": "figure",
+            "title": "figure",
+            "description": "The figure the reason concerns.",
+            "x-code": 19,
+            "x-text": "The figure the reason concerns."
+          },
+          {
+            "const": "kb",
+            "title": "kb",
+            "description": "An amount of memory, in kilobytes.",
+            "x-code": 20,
+            "x-text": "An amount of memory, in kilobytes."
+          }
+        ]
+      },
+      "QUALIFICATION_REASON_PARAM_WORDS": {
+        "description": "The words a reason's figure can carry instead of a number.",
+        "oneOf": [
+          {
+            "const": "yes",
+            "title": "yes",
+            "description": "The condition holds.",
+            "x-code": 0,
+            "x-text": "The condition holds."
+          },
+          {
+            "const": "add",
+            "title": "add",
+            "description": "The figure is that of the add step.",
+            "x-code": 1,
+            "x-text": "The figure is that of the add step."
+          },
+          {
+            "const": "perInstance",
+            "title": "perInstance",
+            "description": "The figure is the memory of each instance.",
+            "x-code": 2,
+            "x-text": "The figure is the memory of each instance."
+          }
+        ]
+      },
+      "QUALIFICATION_RECORD_TIERS": {
+        "description": "The hosting tiers a record judges a plugin for.",
+        "oneOf": [
+          {
+            "const": "inProcess",
+            "title": "inProcess",
+            "description": "The plugin runs inside the host's own process.",
+            "x-code": 0,
+            "x-text": "The plugin runs inside the host's own process."
+          },
+          {
+            "const": "isolated",
+            "title": "isolated",
+            "description": "The plugin runs in a process of its own.",
+            "x-code": 1,
+            "x-text": "The plugin runs in a process of its own."
+          }
+        ]
+      },
+      "QUALIFICATION_MEMORY_LIMIT_MECHANISMS": {
+        "description": "How a memory limit was applied to a measured run.",
+        "oneOf": [
+          {
+            "const": "rlimit-data",
+            "title": "rlimitData",
+            "description": "The data segment of the process was limited with a resource limit.",
+            "x-code": 0,
+            "x-text": "The data segment of the process was limited with a resource limit."
+          }
+        ]
+      },
+      "QUALIFICATION_NOTE_SWEEP_DIALECTS": {
+        "description": "The kind of note events a note sweep plays.",
+        "oneOf": [
+          {
+            "const": "midi",
+            "title": "midi",
+            "description": "MIDI note events.",
+            "x-code": 0,
+            "x-text": "MIDI note events."
+          },
+          {
+            "const": "clap",
+            "title": "clap",
+            "description": "CLAP note events.",
+            "x-code": 1,
+            "x-text": "CLAP note events."
+          }
+        ]
+      },
+      "QUALIFICATION_RUN_STEPS": {
+        "description": "The steps of a qualification run.",
+        "oneOf": [
+          {
+            "const": "scan",
+            "title": "scan",
+            "description": "Find the plugin and read what it declares.",
+            "x-code": 0,
+            "x-text": "Find the plugin and read what it declares."
+          },
+          {
+            "const": "describe",
+            "title": "describe",
+            "description": "Describe the plugin's ports and parameters.",
+            "x-code": 1,
+            "x-text": "Describe the plugin's ports and parameters."
+          },
+          {
+            "const": "probe",
+            "title": "probe",
+            "description": "Load the plugin in a probe process and drive it.",
+            "x-code": 2,
+            "x-text": "Load the plugin in a probe process and drive it."
+          },
+          {
+            "const": "rt-safety",
+            "title": "rtSafety",
+            "description": "Check the audio thread for calls a real-time thread must not make.",
+            "x-code": 3,
+            "x-text": "Check the audio thread for calls a real-time thread must not make."
+          },
+          {
+            "const": "isolated",
+            "title": "isolated",
+            "description": "Run the plugin in a process of its own.",
+            "x-code": 4,
+            "x-text": "Run the plugin in a process of its own."
+          },
+          {
+            "const": "pool",
+            "title": "pool",
+            "description": "Run the plugin on the console's worker pool.",
+            "x-code": 5,
+            "x-text": "Run the plugin on the console's worker pool."
+          }
+        ]
+      },
+      "QUALIFICATION_STEP_RESULTS": {
+        "description": "What a run step ended with, beside the probe's own outcomes.",
+        "oneOf": [
+          {
+            "const": "ok",
+            "title": "ok",
+            "description": "The step ran and found nothing wrong.",
+            "x-code": 0,
+            "x-text": "The step ran and found nothing wrong."
+          },
+          {
+            "const": "safe",
+            "title": "safe",
+            "description": "The step ran and the plugin is safe for real-time use.",
+            "x-code": 1,
+            "x-text": "The step ran and the plugin is safe for real-time use."
+          },
+          {
+            "const": "unsafe",
+            "title": "unsafe",
+            "description": "The step ran and the plugin is not safe for real-time use.",
+            "x-code": 2,
+            "x-text": "The step ran and the plugin is not safe for real-time use."
+          },
+          {
+            "const": "refused",
+            "title": "refused",
+            "description": "The step was refused.",
+            "x-code": 3,
+            "x-text": "The step was refused."
+          },
+          {
+            "const": "not-asked",
+            "title": "notAsked",
+            "description": "The step was not asked for.",
+            "x-code": 4,
+            "x-text": "The step was not asked for."
+          },
+          {
+            "const": "isolated",
+            "title": "isolated",
+            "description": "The plugin ran in a process of its own.",
+            "x-code": 5,
+            "x-text": "The plugin ran in a process of its own."
+          },
+          {
+            "const": "not-run",
+            "title": "notRun",
+            "description": "The step was asked for and did not run.",
+            "x-code": 6,
+            "x-text": "The step was asked for and did not run."
+          },
+          {
+            "const": "off",
+            "title": "off",
+            "description": "The step is switched off.",
+            "x-code": 7,
+            "x-text": "The step is switched off."
+          }
+        ]
+      },
+      "QUALIFICATION_STEP_CODES": {
+        "description": "The codes a run step gives for what it found.",
+        "oneOf": [
+          {
+            "const": "isolated.not-added",
+            "title": "isolatedNotAdded",
+            "description": "The plugin was not added to the isolated step.",
+            "x-code": 0,
+            "x-text": "The plugin was not added to the isolated step."
+          },
+          {
+            "const": "isolated.silent-output",
+            "title": "isolatedSilentOutput",
+            "description": "The isolated plugin produced silence.",
+            "x-code": 1,
+            "x-text": "The isolated plugin produced silence."
+          },
+          {
+            "const": "pool.not-watched",
+            "title": "poolNotWatched",
+            "description": "The pool did not watch the plugin.",
+            "x-code": 2,
+            "x-text": "The pool did not watch the plugin."
+          },
+          {
+            "const": "isolated.crashed",
+            "title": "isolatedCrashed",
+            "description": "The isolated plugin crashed.",
+            "x-code": 3,
+            "x-text": "The isolated plugin crashed."
+          },
+          {
+            "const": "isolated.non-finite-output",
+            "title": "isolatedNonFiniteOutput",
+            "description": "The isolated plugin produced output that is not finite.",
+            "x-code": 4,
+            "x-text": "The isolated plugin produced output that is not finite."
+          },
+          {
+            "const": "pool.not-rt-safe",
+            "title": "poolNotRtSafe",
+            "description": "The plugin is not real-time safe on the pool.",
+            "x-code": 5,
+            "x-text": "The plugin is not real-time safe on the pool."
+          }
+        ]
+      },
+      "QUALIFICATION_REJUDGE_OWES": {
+        "description": "What a rejudged record still owes.",
+        "oneOf": [
+          {
+            "const": "qualify.sync.isolated-step-owed",
+            "title": "qualifySyncIsolatedStepOwed",
+            "description": "The isolated step was owed when the record was rejudged.",
+            "x-code": 0,
+            "x-text": "The isolated step was owed when the record was rejudged."
+          }
+        ]
+      },
+      "QUALIFICATION_REJUDGE_MEASUREMENTS": {
+        "description": "The measurement a rejudged record owes.",
+        "oneOf": [
+          {
+            "const": "isolated-step",
+            "title": "isolatedStep",
+            "description": "The isolated step.",
+            "x-code": 0,
+            "x-text": "The isolated step."
           }
         ]
       }
