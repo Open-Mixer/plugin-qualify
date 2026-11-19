@@ -114,6 +114,7 @@ export function storeExport(record: QualificationRecord, probe: ProbeOutput, omi
   // the fields the store maps to no column
   delete doc.latencyLineMs;
   delete doc.rules;
+  doc.notMeasured ??= [];
   delete doc.provenance;
   delete doc.history;
   delete doc.tiers?.dimmed;

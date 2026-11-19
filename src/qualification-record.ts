@@ -534,7 +534,8 @@ export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
  */
 export function storedForm(record: QualificationRecord): QualificationRecord {
   const { latencyLineMs: _line, rules: _rules, ...rest } = record;
-  return { ...rest, binary: storedBinary(record.binary), measurements: { ...record.measurements, grid: record.measurements.grid.map(({ latencyMs: _ms, ...cell }) => cell) } };
+  // the store always has the list of what was not measured, empty when nothing was left out
+  return { ...rest, notMeasured: record.notMeasured ?? [], binary: storedBinary(record.binary), measurements: { ...record.measurements, grid: record.measurements.grid.map(({ latencyMs: _ms, ...cell }) => cell) } };
 }
 
 export function buildQualificationRecord(
