@@ -22,8 +22,15 @@ import { storeExport } from "./store-export.support.js";
 const WRITE = process.env["PLUGIN_QUALIFICATION_DB_WRITE"] ?? "plugin-qualification-db-write";
 const READ = process.env["PLUGIN_QUALIFICATION_DB"] ?? "plugin-qualification-db";
 
+/** The commands read the installed contract directory: the test setup's own override (this package's one domain) is not theirs. */
+const commandEnv = (): NodeJS.ProcessEnv => {
+  const env = { ...process.env };
+  delete env["OMX_CONTRACT_PATH"];
+  return env;
+};
+
 function run(command: string, args: string[], input?: string) {
-  const r = spawnSync(command, args, { encoding: "utf8", timeout: 30_000, ...(input === undefined ? {} : { input }) });
+  const r = spawnSync(command, args, { encoding: "utf8", timeout: 30_000, env: commandEnv(), ...(input === undefined ? {} : { input }) });
   if ((r.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") throw new Error(`command missing: ${command}`);
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
