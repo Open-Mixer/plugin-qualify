@@ -32,7 +32,6 @@ export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
 /** The code of a cell no private server could be had for: the run did not happen. */
 export const noPrivateServerCode = (): string => adapterCode(ADAPTER_HOST, "noPrivateServer");
 
-const RECORD_SUFFIX = ".qualification.json";
 const SERVER_WAIT_MS = 5000;
 const SERVER_SETTLE_MS = 300;
 // a TERM is waited for this long: jackd on a Pi can take seconds to end, and a jackd that is KILLed keeps its row in

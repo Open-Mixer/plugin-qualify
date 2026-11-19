@@ -12,7 +12,7 @@ import { cellKey, type GridCell } from "./measurement-grid.js";
 import { clapPinUri, pinVerdictOf, type PinEntry } from "./pins-file.js";
 import type { ShadowKey, StoredResult } from "./qualification-store.js";
 import { outcomeOfVerdict } from "./distributed-records.js";
-import type { FileDigest, SyncItem } from "./qualify-sync.js";
+import type { SyncItem } from "./qualify-sync.js";
 import type { SuitabilityRating } from "./rating.js";
 
 export type StoredMatch =
@@ -30,15 +30,15 @@ const idOf = (r: StoredResult): string => [r.layer, r.sha256, r.uri, r.offer, r.
 export const storedUri = (item: SyncItem, r: Pick<StoredResult, "uri" | "format">): string => (item.format === "clap" ? clapPinUri(join(item.root, item.files[0]!), `urn:clap:${r.uri}`) : r.uri);
 
 /**
- * Whether the item is taken from the records the reader gave for it. A record counts only when the files of the item
- * are exactly its list; the cells of the sync must all be held; the host must have a verdict, and one the source could
+ * Whether the item is taken from the records the reader gave for it. A record counts only when the files plugin-hostd
+ * names for the item's pin (`--pin-files`, as `withHostdFiles` takes them; not the sync's own discovery) are exactly its list; the cells of the sync must all be held; the host must have a verdict, and one the source could
  * measure. The first record of the order that counts applies, with every record of the same bytes.
  */
 export function matchStored(
   results: readonly StoredResult[],
   item: SyncItem,
   host: string,
-  digest: (files: readonly string[]) => readonly FileDigest[] | undefined,
+  pinFiles: readonly { readonly path: string; readonly sha256: string }[] | undefined,
   cells: readonly GridCell[] = [],
 ): StoredMatch {
   const found = results.filter((r) => r.format === item.format);
@@ -50,12 +50,13 @@ export function matchStored(
   const records = new Map<string, StoredResult[]>();
   for (const r of found) records.set(idOf(r), [...(records.get(idOf(r)) ?? []), r]);
   const mine = new Map<string, StoredResult[]>();
-  const now = digest(item.files);
+  const now = pinFiles;
   for (const [id, cellsOf] of records) {
     const r = cellsOf[0]!;
     const named = item.format === "clap" ? r.binary_path === item.files[0] : true;
     const same = now !== undefined && named && r.files.length === now.length && r.files.every((f) => now.find((d) => d.path === f.path)?.sha256 === f.sha256);
     if (!same) {
+      if (now === undefined) say(`stored: ${storedUri(item, r)}: plugin-hostd named no files for it`);
       say(`stored: ${storedUri(item, r)}: binary differs`);
       continue;
     }

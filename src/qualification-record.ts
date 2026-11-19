@@ -542,12 +542,12 @@ export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
 
 /**
  * The record as the store takes it: its binary in the store's form (`storedBinary`) and without the fields the store maps to
- * no column, which a reader derives or states itself: `latencyLineMs` (a constant of the judge), `rules` (the rules the
+ * no column, which a reader derives or states itself: `provenance` (a record's provenance is its set's; a layer's own record has none), `latencyLineMs` (a constant of the judge), `rules` (the rules the
  * verdicts were judged by) and a cell's `latencyMs` (its measured frames over its rate). The writer refuses an unmapped field by
  * name (`field-unmapped`), so the sync puts none.
  */
 export function storedForm(record: QualificationRecord): QualificationRecord {
-  const { latencyLineMs: _line, rules: _rules, ...rest } = record;
+  const { latencyLineMs: _line, rules: _rules, provenance: _set, ...rest } = record;
   // the store always has the list of what was not measured, empty when nothing was left out
   return { ...rest, notMeasured: record.notMeasured ?? [], binary: storedBinary(record.binary), measurements: { ...record.measurements, grid: record.measurements.grid.map(({ latencyMs: _ms, ...cell }) => cell) } };
 }

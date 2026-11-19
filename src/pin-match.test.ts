@@ -10,17 +10,11 @@ import { describe, expect, it } from "vitest";
 
 import { matchStored, pinOfStored } from "./pin-match.js";
 import type { StoredResult } from "./qualification-store.js";
-import type { FileDigest, SyncItem } from "./qualify-sync.js";
+import type { SyncItem } from "./qualify-sync.js";
 
 const sha = (c: string): string => c.repeat(64);
-const digestOf = (files: Record<string, string>) => (paths: readonly string[]): FileDigest[] | undefined => {
-  const out: FileDigest[] = [];
-  for (const p of paths) {
-    if (files[p] === undefined) return undefined;
-    out.push({ path: p, sha256: files[p]!, size: 1, mtimeMs: 1, ino: 1 });
-  }
-  return out;
-};
+/** plugin-hostd's pin list for the item, as the test says it is. */
+const digestOf = (files: Record<string, string>) => Object.entries(files).map(([path, sha256]) => ({ path, sha256 }));
 
 function result(over: Partial<StoredResult> & { files: { path: string; sha256: string }[]; format: "clap" | "lv2"; uri: string; binary_path: string }): StoredResult {
   return {
@@ -62,7 +56,7 @@ describe("C2: one file differs", () => {
     expect(matchStored([r], lv2Item(["manifest.ttl", "amp.ttl", "amp.so", "presets.ttl"]), "omx-clap-host", digestOf({ ...files, "presets.ttl": sha("e") }), CELLS).status).toBe("ignored");
   });
   it("a pin that holds one file FEWER (the list names a file the pin lacks) is measured", () => {
-    expect(matchStored([r], lv2Item(["manifest.ttl", "amp.so"]), "omx-clap-host", digestOf(files), CELLS).status).toBe("ignored");
+    expect(matchStored([r], lv2Item(["manifest.ttl", "amp.so"]), "omx-clap-host", digestOf({ "amp.so": sha("a"), "manifest.ttl": sha("c") }), CELLS).status).toBe("ignored");
   });
 });
 

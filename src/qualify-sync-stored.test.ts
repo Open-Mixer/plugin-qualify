@@ -8,7 +8,7 @@
  */
 import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { FIXTURE_CLAP_ID, storedFixture, writeFakeClap } from "./distributed-records.support.js";
@@ -44,10 +44,16 @@ function machine(name: string, flags: readonly string[] = []): { root: string; c
 
 async function sync(settings: SyncSettings, fake: FakeStore, force = false) {
   const lines: string[] = [];
-  const summary = await runSync(settings, { force, env: {}, log: (l) => lines.push(l), qualificationStore: new QualificationStore("user", { run: fake.run }) });
+  const summary = await runSync(settings, { force, env: {}, log: (l) => lines.push(l), qualificationStore: new QualificationStore("user", { run: fake.run }), pinFilesRun: hostdStandIn });
   if (summary === undefined) throw new Error("the run held no lock");
   return { summary, lines };
 }
+
+/** plugin-hostd's --pin-files for the `.clap` of the uri: the file, and the resources directory file a real daemon adds when there is one. */
+const hostdStandIn = (uri: string) => {
+  const path = uri.replace(/^clap:/, "").replace(/#.*$/, "");
+  return { status: 0, stdout: `root ${dirname(path)}\nfile ${basename(path)}\n`, stderr: "" };
+};
 
 const measured = (s: { qualified: number; refused: number; crashed: number; hung: number; unmeasured: number }): number => s.qualified + s.refused + s.crashed + s.hung + s.unmeasured;
 
