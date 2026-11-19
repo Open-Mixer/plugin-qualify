@@ -12,8 +12,10 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { buildVocabulary } from "./measurement/vocabulary.js";
 import { openInstalledQualificationDomain, openQualificationDomainAt } from "./qualification-domain-node.js";
+import { TEST_CONTRACT_DIR } from "./test-contract-dir.js";
 
-const CONTRACT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "contract.d");
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const CONTRACT_DIR = TEST_CONTRACT_DIR;
 
 describe("the package reads its words from the installed JSON", () => {
   const fixture = (edit: (d: { components: { schemas: Record<string, { oneOf: object[] }> } }) => void): string => {
@@ -113,7 +115,7 @@ describe("a page hands the document", () => {
   });
   it("no browser-reachable module imports the Node reader", () => {
     for (const f of ["qualification-domain.ts", "measurement/vocabulary.ts", "qualification-record.ts"]) {
-      expect(readFileSync(join(CONTRACT_DIR, "..", "src", f), "utf8"), f).not.toContain("qualification-domain-node");
+      expect(readFileSync(join(ROOT, "src", f), "utf8"), f).not.toContain("qualification-domain-node");
     }
   });
 });
@@ -143,7 +145,7 @@ describe("OMX_CONTRACT_PATH belongs to the CLI entry, never to the library", () 
     }
   });
   it("every CLI entry names it in --help and starts by reading it", () => {
-    const root = join(CONTRACT_DIR, "..");
+    const root = ROOT;
     for (const bin of ["plugin-qualify", "plugin-qualify-sync", "plugin-qualify-records-package"]) {
       const out = spawnSync(process.execPath, [join(root, "bin", `${bin}.mjs`), "--help"], { encoding: "utf8" });
       expect(`${out.stdout}${out.stderr}`, bin).toContain("OMX_CONTRACT_PATH");

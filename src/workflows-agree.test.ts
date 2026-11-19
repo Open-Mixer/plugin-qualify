@@ -7,7 +7,7 @@
  * src/pins-file.test.ts, #84). This test reads both workflows as text and fails on that drift, and on an action
  * that no longer sets the variables the suite asks for.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string): string => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -62,22 +62,12 @@ describe('ci.yml and publish.yml prepare the runner alike', () => {
     expect(action).toMatch(/apt-get install[^\n]*python3-lilv[^\n]*omx-clap-host-tests/);
   });
 
-  it('the test files left out of an ordinary run are the ones the container job runs', () => {
-    const list = read('.github/container-tests.txt')
-      .split('\n')
-      .filter((l) => l.trim() !== '' && !l.startsWith('#'));
-    expect(list.length).toBeGreaterThan(0);
-    for (const file of list) expect(() => read(file), `${file} is listed and must exist`).not.toThrow();
-    // one definition: the config reads the list for the exclusion, the container job reads it for what it runs
-    expect(read('vitest.config.ts')).toContain('.github/container-tests.txt');
-    const ci = read('.github/workflows/ci.yml');
-    const job = ci.slice(ci.indexOf('\n  container-tests:'), ci.indexOf('\n  catalogs:'));
-    expect(job).toMatch(/OMX_CONTAINER_TESTS: '1'/);
-    expect(job).toContain(`grep -v '^#' .github/container-tests.txt`);
-    expect(job).not.toMatch(/src\/[\w.-]+\.test\.ts/);
-    // the other workflows run the ordinary suite: neither names the files itself
-    for (const w of WORKFLOWS) expect(read(`.github/workflows/${w}`)).not.toMatch(new RegExp(list.map((f) => f.replace(/[.]/g, '\\.')).join('|')));
-    expect(read('.github/workflows/publish.yml')).toContain('.github/container-tests.txt');
+  it('no test needs omx-contract installed as a system package: there is no container list, job or exclusion', () => {
+    // the one file the list held read the domain installer, which is plugin-hostd's now
+    expect(existsSync(new URL('../.github/container-tests.txt', import.meta.url))).toBe(false);
+    for (const f of ['vitest.config.ts', '.github/workflows/ci.yml', '.github/workflows/publish.yml']) {
+      expect(read(f), f).not.toMatch(/container-tests|OMX_CONTAINER_TESTS/);
+    }
   });
 
   it('publish.yml publishes by OIDC: no token, no secret', () => {

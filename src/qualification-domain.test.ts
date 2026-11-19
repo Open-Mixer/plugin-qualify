@@ -9,9 +9,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { TEST_CONTRACT_DIR } from "./test-contract-dir.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CONTRACT_DIR = join(PKG, "contract.d");
+const CONTRACT_DIR = TEST_CONTRACT_DIR;
 const DOC = join(CONTRACT_DIR, "qualification", "qualification.json");
 const doc = JSON.parse(readFileSync(DOC, "utf8")) as {
   $schema?: string;
