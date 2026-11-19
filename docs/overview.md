@@ -255,7 +255,8 @@ record is written, from the package manager's owner of `binary.path` (`dpkg-quer
 distribution's own word (`trixie`, `fc44`): an RPM's dist tag, or a Debian system's release codename. A binary no
 package owns (one built by hand, one in a home directory) has `package: null`, and so has a field the manager
 does not state; nothing is guessed. The package never takes part in the record's identity, which is the binary's
-SHA-256. A record written before the field existed does not hold it and is not filled in afterwards. The words of
+SHA-256. A record written before the field existed does not hold it and is not filled in afterwards. A `distro` or `arch` that those items do not hold (Ubuntu noble, `fc46`, an `armhf` package) is
+null, and the record is still written; the words are read from the installed domain, never a copy here. The words of
 `format`, `distro` and `arch` are the items `QUALIFICATION_PACKAGE_FORMATS`, `QUALIFICATION_PACKAGE_DISTROS` and
 `QUALIFICATION_PACKAGE_ARCHES` of the `qualification` contract domain.
 
