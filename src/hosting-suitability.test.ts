@@ -278,6 +278,27 @@ describe("the disqualifiers", () => {
     expect(pinVerdictOf(both.rating)).toBe("refused");
   });
 
+  it("D20: a plugin that started threads of its own is conditional under own-threads, and still groupable (#53)", () => {
+    // the audio thread clean, the plugin's worker allocating while it was armed: a figure, never the verdict
+    const v = classify(measured({}, { rtSafety: { ownThreads: 2, otherThreads: { allocationsInRun: 60, locksInRun: 3, syscallsInRun: 1 } } }));
+    expect(v.rating).toBe("conditional");
+    expect(v.deciding?.code).toBe(HOSTING_CODE.rtSafetyOwnThreads);
+    expect(v.deciding?.params).toEqual({ threads: 2 });
+    // only an RT-unsafe reason pins isolated: threads of its own share a worker
+    expect(pinVerdictOf(v.rating, v.reasons)).toBe("in-process");
+    // the other threads' figures alone, with no thread of the plugin's own, decide nothing
+    const busy = classify(measured({}, { rtSafety: { ownThreads: 0, otherThreads: { allocationsInRun: 60, locksInRun: 0, syscallsInRun: 0 } } }));
+    expect(busy.rating).toBe("suitable");
+  });
+
+  it("D20: the audio thread's own calls stay violations-in-run, isolated, whatever threads the plugin started (#53)", () => {
+    const v = classify(measured({}, { rtSafety: { allocationsInRun: 3, ownThreads: 2 } }));
+    expect(v.rating).toBe("conditional");
+    expect(v.deciding?.code).toBe(HOSTING_CODE.rtSafetyViolations);
+    expect(v.reasons.map((r) => r.code)).not.toContain(HOSTING_CODE.rtSafetyOwnThreads);
+    expect(pinVerdictOf(v.rating, v.reasons)).toBe("isolated");
+  });
+
   it("a crash attributed to the PLUGIN is unsuitable", () => {
     const v = classify(measured({}, { stability: { crashes: [{ topFrame: "lilv_instance_instantiate" }] } }));
     expect(v.rating).toBe("unsuitable");

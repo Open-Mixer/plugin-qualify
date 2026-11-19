@@ -22,6 +22,9 @@
  * LSP limiters' did on a Raspberry Pi 5 (d15): in assembly, after the C run has returned, since no C function can.
  * needs-display.lv2: built with -DFIXTURE_NEEDS_DISPLAY, instantiate() aborts when no display and no Qt platform is
  * named, as a Qt plugin does (synthv1, samplv1, padthv1, drumkv1: "no Qt platform plugin could be initialized").
+ * worker-allocates.lv2: built with -DFIXTURE_WORKER, the rt-safe gain with a thread of its own from instantiate to
+ *   cleanup that allocates every 100 us, while run() spins 2 ms with no call, so the worker's calls land in the window
+ *   the audio thread arms: the LV2 twin of worker-allocates.clap (D20, #53).
  * keeps-memory.lv2: built with -DFIXTURE_KEEPS_MB, instantiate() takes that many MiB, touched, and NEVER gives them
  * back, not at cleanup either: what Surge XT's loaded content does to a process that makes instance after instance
  * (plugin-qualify#28), so a measurer that runs every pass in one process grows by that much per instance. */
@@ -44,8 +47,19 @@
 /* through a volatile pointer, so the compiler cannot pair the malloc with the free and drop both */
 static void *(*volatile fixture_malloc)(size_t) = malloc;
 static void (*volatile fixture_free)(void *) = free;
+#elif defined FIXTURE_WORKER
+#define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-worker-allocates"
 #else
 #define FIXTURE_URI "urn:plugin-qualify:fixture:lv2-rt-safe"
+#endif
+
+#ifdef FIXTURE_WORKER
+#include <pthread.h>
+#include <stdatomic.h>
+#include <time.h>
+/* through volatile pointers, so the compiler cannot pair the malloc with the free and drop both */
+static void *(*volatile worker_malloc)(size_t) = malloc;
+static void (*volatile worker_free)(void *) = free;
 #endif
 
 enum { PORT_GAIN, PORT_IN, PORT_OUT };
@@ -57,7 +71,24 @@ struct gain {
 #ifdef FIXTURE_ACTIVATE_MB
   char *held;
 #endif
+#ifdef FIXTURE_WORKER
+  pthread_t worker;
+  int started;
+  _Atomic int stop;
+#endif
 };
+
+#ifdef FIXTURE_WORKER
+static void *worker_main(void *arg) {
+  struct gain *g = arg;
+  const struct timespec tick = { 0, 100000 };
+  while (!atomic_load(&g->stop)) {
+    worker_free(worker_malloc(64));
+    nanosleep(&tick, NULL);
+  }
+  return NULL;
+}
+#endif
 
 static LV2_Handle instantiate(const LV2_Descriptor *d, double rate, const char *path, const LV2_Feature *const *features) {
   (void)d; (void)rate; (void)path; (void)features;
@@ -75,6 +106,14 @@ static LV2_Handle instantiate(const LV2_Descriptor *d, double rate, const char *
     if (k == NULL) return NULL;
     for (size_t i = 0; i < bytes; i += 4096) k[i] = 1;
     if (n_kept < sizeof kept / sizeof kept[0]) kept[n_kept++] = (void *)k;
+  }
+#endif
+#ifdef FIXTURE_WORKER
+  {
+    struct gain *g = calloc(1, sizeof(struct gain));
+    if (g == NULL) return NULL;
+    g->started = pthread_create(&g->worker, NULL, worker_main, g) == 0;
+    return g;
   }
 #endif
   return calloc(1, sizeof(struct gain));
@@ -121,12 +160,30 @@ static void run(LV2_Handle h, uint32_t frames) {
 #ifdef FIXTURE_ALLOCATES
   fixture_free(fixture_malloc(frames * sizeof(float)));
 #endif
+#ifdef FIXTURE_WORKER
+  {
+    /* 2 ms with no call the interposer counts (clock_gettime is the vDSO's), so the worker runs in the armed window */
+    struct timespec t0, t;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    do clock_gettime(CLOCK_MONOTONIC, &t);
+    while ((t.tv_sec - t0.tv_sec) * 1000000000L + (t.tv_nsec - t0.tv_nsec) < 2000000L);
+  }
+#endif
   const float k = *g->gain;
   for (uint32_t i = 0; i < frames; i++) g->out[i] = g->in[i] * k;
 }
 
 static void deactivate(LV2_Handle h) { (void)h; }
-static void cleanup(LV2_Handle h) { free(h); }
+static void cleanup(LV2_Handle h) {
+#ifdef FIXTURE_WORKER
+  struct gain *g = h;
+  if (g->started) {
+    atomic_store(&g->stop, 1);
+    pthread_join(g->worker, NULL);
+  }
+#endif
+  free(h);
+}
 static const void *extension_data(const char *uri) { (void)uri; return NULL; }
 
 #ifdef FIXTURE_ABI_BREAKER
