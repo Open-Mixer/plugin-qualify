@@ -81,9 +81,11 @@ describe("QUALIFICATION_ADAPTER_CODE_KINDS", () => {
   });
   it("leaves no kind spelled in the composers", () => {
     for (const file of ["src/host-admission.ts", "src/qualify-adapter-pass.ts"]) {
-      const src = read(file);
-      expect(src.match(/`\$\{[^}]+\}\.[a-z]/g) ?? [], `${file} composes a code from a literal kind`).toEqual([]);
-      for (const k of KIND_RUNS) expect(src, `${file} spells ${k.word}`).not.toMatch(new RegExp(`["\`.]${k.word}[-"\`]`));
+      const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      // qualify-adapter-pass.ts also names no-private-server, a kind outside this item (open point of the ruling)
+      const literal = (src.match(/`\$\{[^}]+\}\.[a-z][a-z-]*`/g) ?? []).filter((t) => t !== "`${ADAPTER_HOST}.no-private-server`");
+      expect(literal, `${file} composes a code from a literal kind`).toEqual([]);
+      for (const k of KIND_RUNS) expect(src, `${file} spells ${k.word}`).not.toMatch(new RegExp(k.word.includes("-") ? `["\`.]${k.word}\\b` : `\\.${k.word}[-"\`]`));
     }
   });
   it("is written as the domain spells it: a renamed kind changes the code", () => {

@@ -17,7 +17,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { ADAPTER_HOST, ADAPTER_SILENT_CODE, SPAWNED_ADMISSIONS, admitUnderAdapter, type AdmissionRuns, type HostAdmission } from "./host-admission.js";
+import { ADAPTER_HOST, SPAWNED_ADMISSIONS, adapterCode, adapterSilentCode, admitUnderAdapter, type AdmissionRuns, type HostAdmission } from "./host-admission.js";
 import { HOSTD_ENV } from "./hostd-pin-files.js";
 import { freeDeadJackSlots } from "./jack-registry.js";
 import { cellKey, type GridCell } from "./measurement-grid.js";
@@ -206,7 +206,7 @@ export function adapterFinished(record: QualificationRecord, versions: Readonly<
   const a = record.adapter;
   if (a === undefined || !a.measured || a.versions === undefined || a.cells === undefined) return false;
   // silence under the one key the run once played says nothing of a plugin that maps others: it is run again
-  if (a.cells.some((c) => c.code === ADAPTER_SILENT_CODE && c.params["notes"] === undefined)) return false;
+  if (a.cells.some((c) => c.code === adapterSilentCode() && c.params["notes"] === undefined)) return false;
   const same = Object.keys(versions).length === Object.keys(a.versions).length && Object.entries(versions).every(([k, v]) => a.versions![k] === v);
   return same && cells.every((c) => a.cells!.some((x) => cellKey(x) === cellKey(c)));
 }
@@ -297,7 +297,7 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
           const stateDir = mkdtempSync(join(tmpdir(), "plugin-qualify-adapter-state-"));
           try {
             const env = { ...ctx.env, ...limit, [ADMIT_STATE_DIR_ENV]: stateDir, LV2_PATH: ctx.settings.lv2Dirs.join(":"), JACK_DEFAULT_SERVER: server.name, JACK_NO_START_SERVER: "1" };
-            return { cell, run: admitUnderAdapter(record.plugin.id, runs, env) ?? ({ host: ADAPTER_HOST, measured: false, admitted: false, code: `${ADAPTER_HOST}.admission-failed`, params: {} } as HostAdmission) };
+            return { cell, run: admitUnderAdapter(record.plugin.id, runs, env) ?? ({ host: ADAPTER_HOST, measured: false, admitted: false, code: adapterCode(ADAPTER_HOST, "admissionFailed"), params: {} } as HostAdmission) };
           } finally {
             rmSync(stateDir, { recursive: true, force: true });
           }
