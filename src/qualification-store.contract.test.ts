@@ -15,7 +15,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { FIXTURES, LV2_CLEAN, stored } from "./qualify-rejudge.support.js";
+import { FIXTURES, LV2_CLEAN } from "./qualify-rejudge.support.js";
+import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
+import { judgeProbeOutput } from "./probe-judge.js";
+import { buildQualificationRecord } from "./qualification-record.js";
 import { readProbeOutput } from "./probe-output.js";
 import { storeExport } from "./store-export.support.js";
 
@@ -41,16 +44,15 @@ function run(command: string, args: string[], input?: string) {
   return { status: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-/** A valid LV2 record of the fixtures as the store holds it: relative paths, in order, the key the binary's own. */
+/** A valid LV2 record as the store holds it: today's writer over a fixture probe output, judged for the profiles the domain names. */
 function record() {
-  const rec = stored(LV2_CLEAN);
   const probe = readProbeOutput(readFileSync(join(FIXTURES, `${LV2_CLEAN}.probe.json`), "utf8"));
   if (!probe.ok) throw new Error(probe.problem);
-  const exported = storeExport(rec, probe.output).record;
-  // the store requires the load the probe started under; a fixture of an older release holds none
-  // and only the host profiles the qualification domain names (a record of that release was also judged for mod-host)
-  const hosts = ["omx-clap-host", "openmixer-console"];
-  return { ...exported, probe: { ...exported.probe, load: exported.probe.load ?? { loadavg1: 0.5, cores: 4 } }, verdicts: exported.verdicts.filter((v) => hosts.includes(v.host)), cost: exported.cost.filter((c) => hosts.includes(c.host)) };
+  const profiles = ["omx-clap-host", "openmixer-console"].map((id) => shippedHostProfile(id)).filter((p): p is HostProfile => p !== undefined);
+  const made = buildQualificationRecord(judgeProbeOutput(probe.output, profiles), { file: "x.default.probe.json", sha256: "0".repeat(64), bytes: 1 });
+  const exported = storeExport(made, probe.output).record;
+  // the store requires the load the probe started under, which a fixture's run may not have taken
+  return { ...exported, probe: { ...exported.probe, load: exported.probe.load ?? { loadavg1: 0.5, cores: 4 } } };
 }
 
 /** The writer is told to keep its layer under a directory of the test's own (`--root`, for tests): no run here touches a user's layer. */
