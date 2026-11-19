@@ -4,7 +4,7 @@
  * The record's `package` object (#123): read from the package manager's owner of `binary.path` when the record is
  * written, null when no package owns the binary. The package managers here are stubs on PATH.
  */
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,7 +39,13 @@ function stubs(name: string, scripts: Record<string, string>): { dir: string; en
 const BIN = "/usr/lib/clap/dexed.clap";
 const DPKG = `case "$1" in
   -S) [ "$2" = ${BIN} ] && { echo "clap-dexed:amd64: ${BIN}"; exit 0; }; echo "dpkg-query: no path found matching pattern $2" >&2; exit 1;;
-  -W) printf 'clap-dexed\\t1.1.0-4\\tamd64\\n'; exit 0;;
+  -W) for last; do :; done
+      case "$last" in
+        clap-dexed:amd64) printf 'clap-dexed\\t1.1.0-4\\tamd64\\n';;
+        clap-dexed) printf 'clap-dexed\\t1.1.0-4\\tarm64\\nclap-dexed\\t1.1.0-4\\tamd64\\n';;
+        *) exit 1;;
+      esac
+      exit 0;;
 esac
 exit 2`;
 const RPM = `[ "$1" = -qf ] || exit 2
@@ -78,6 +84,22 @@ describe("the package that owns a binary", () => {
     expect(packageOwnerOf(BIN, none.env)).toBeNull();
   });
 
+  it("takes the arch of the owning package's own architecture when the package is installed for several", () => {
+    const { env } = stubs("deb-multiarch", { "dpkg-query": DPKG });
+    expect(packageOwnerOf(BIN, env, osRelease("VERSION_CODENAME=trixie\n"))?.arch).toBe("amd64");
+  });
+
+  it("gives null for a distro or an arch the qualification domain does not hold, the rest still filled", () => {
+    const noble = stubs("deb-noble", { "dpkg-query": DPKG });
+    expect(packageOwnerOf(BIN, noble.env, osRelease("VERSION_CODENAME=noble\n"))).toMatchObject({ name: "clap-dexed", distro: null, arch: "amd64" });
+    const fc46 = stubs("rpm-fc46", { rpm: RPM.replace("4.fc44", "4.fc46") });
+    expect(packageOwnerOf(BIN, fc46.env)).toMatchObject({ release: "4.fc46", distro: null, arch: "x86_64" });
+    const el9 = stubs("rpm-el9", { rpm: RPM.replace("4.fc44", "4.el9_3") });
+    expect(packageOwnerOf(BIN, el9.env)).toMatchObject({ release: "4.el9_3", distro: null });
+    const armhf = stubs("rpm-armhf", { rpm: RPM.replace("x86_64", "armv7hl") });
+    expect(packageOwnerOf(BIN, armhf.env)).toMatchObject({ distro: "fc44", arch: null });
+  });
+
   it("states no distro it does not know: a Debian system with no codename, an RPM with no dist tag", () => {
     const deb = stubs("deb-nocodename", { "dpkg-query": DPKG });
     expect(packageOwnerOf(BIN, deb.env, osRelease("ID=debian\n"))?.distro).toBeNull();
@@ -108,6 +130,16 @@ describe("the record writes the package at measurement time", () => {
     const b = writeQualification(join(scratch, "w2"), Buffer.from(text), judgment);
     expect(b.record.package).toBeNull();
     expect(JSON.parse(readFileSync(b.recordPath, "utf8")).package).toBeNull();
+  });
+
+  it("still writes the record when the package's distro is one the domain does not hold", () => {
+    const text = fixtureText("success-msi");
+    const judgment = judge(text);
+    const fc46 = stubs("write-fc46", { rpm: RPM.split(BIN).join(judgment.output.binary.path).replace("4.fc44", "4.fc46") });
+    process.env["PATH"] = fc46.dir;
+    const w = writeQualification(join(scratch, "w4"), Buffer.from(text), judgment);
+    expect(existsSync(w.recordPath)).toBe(true);
+    expect(JSON.parse(readFileSync(w.recordPath, "utf8")).package).toMatchObject({ name: "clap-dexed", distro: null, arch: "x86_64" });
   });
 
   it("writes no crash and a null package when neither dpkg-query nor rpm exists", () => {
