@@ -249,7 +249,8 @@ describe("--rejudge: what it cannot stand on is left alone", () => {
   it("a record whose rows lack a figure the judge needs: the same, owing figures-unreadable, and no probe output is looked for", async () => {
     const d = device([CLAP_RT]);
     const own = d.fake.user()[0]!;
-    d.store.put(shadowKeyOf(own), { ...own.record, hostExtensions: undefined });
+    const grid = own.record.measurements.grid.map((p) => (p.rtSafety === undefined ? p : { ...p, rtSafety: { ...p.rtSafety, syscalls: undefined } }));
+    d.store.put(shadowKeyOf(own), { ...own.record, measurements: { ...own.record.measurements, grid } });
     const before = JSON.stringify(d.fake.user());
     await rejudge(d);
     expect(JSON.stringify(d.fake.user())).toBe(before);
