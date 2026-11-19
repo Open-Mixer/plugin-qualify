@@ -80,6 +80,7 @@ const ADAPTER_KIND_TITLES = [
   "admissionFailed",
   "unknownPortType",
   "exit",
+  "noPrivateServer",
 ] as const;
 export type AdapterKind = (typeof ADAPTER_KIND_TITLES)[number];
 const KINDS_ITEM = "QUALIFICATION_ADAPTER_CODE_KINDS";

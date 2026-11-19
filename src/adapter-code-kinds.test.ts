@@ -13,6 +13,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ADAPTER_HOST, admitPlugin, classifyJalvRun, classifyProtocolRun, type JalvRun, type ModHostRun } from "./host-admission.js";
 import { isOutOfMemory } from "./memory-bound.js";
 import { init } from "./qualification-domain.js";
+import { ISOLATED_CODE } from "./qualify-isolated.js";
+import { POOL_CODE } from "./qualify-pool.js";
+import { noPrivateServerCode } from "./qualify-adapter-pass.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(PKG, rel), "utf8");
@@ -61,12 +64,13 @@ const KIND_RUNS: { title: string; word: string; code: string; run: () => string 
       }).code,
   },
   { title: "unknownPortType", word: "unknown-port-type", code: "jalv.unknown-port-type", run: () => classifyJalvRun(jalv({ status: 1, stderr: 'Mandatory port "p" has unknown type' })).code },
+  { title: "noPrivateServer", word: "no-private-server", code: `${A}.no-private-server`, run: () => noPrivateServerCode() },
   { title: "exit", word: "exit", code: "jalv.exit-3", run: () => classifyJalvRun(jalv({ status: 3 })).code },
 ];
 
 describe("QUALIFICATION_ADAPTER_CODE_KINDS", () => {
-  it("holds every kind host-admission.ts composes, read from its source", () => {
-    const titles = [...read("src/host-admission.ts").matchAll(/adapterCode\(\s*[^,()]+,\s*"([A-Za-z]+)"/g)].map((m) => m[1] as string);
+  it("holds every kind host-admission.ts and qualify-adapter-pass.ts compose, read from their source", () => {
+    const titles = [...(read("src/host-admission.ts") + read("src/qualify-adapter-pass.ts")).matchAll(/adapterCode\(\s*[^,()]+,\s*"([A-Za-z]+)"/g)].map((m) => m[1] as string);
     expect(titles.length).toBeGreaterThan(0);
     const item = wordsOf(original, KINDS);
     expect(item.length, `${KINDS} is not an item of the domain`).toBeGreaterThan(0);
@@ -82,8 +86,7 @@ describe("QUALIFICATION_ADAPTER_CODE_KINDS", () => {
   it("leaves no kind spelled in the composers", () => {
     for (const file of ["src/host-admission.ts", "src/qualify-adapter-pass.ts"]) {
       const src = read(file).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
-      // qualify-adapter-pass.ts also names no-private-server, a kind outside this item (open point of the ruling)
-      const literal = (src.match(/`\$\{[^}]+\}\.[a-z][a-z-]*`/g) ?? []).filter((t) => t !== "`${ADAPTER_HOST}.no-private-server`");
+      const literal = src.match(/`\$\{[^}]+\}\.[a-z][a-z-]*`/g) ?? [];
       expect(literal, `${file} composes a code from a literal kind`).toEqual([]);
       for (const k of KIND_RUNS) expect(src, `${file} spells ${k.word}`).not.toMatch(new RegExp(k.word.includes("-") ? `["\`.]${k.word}\\b` : `\\.${k.word}[-"\`]`));
     }
@@ -101,6 +104,16 @@ describe("QUALIFICATION_ADAPTER_CODE_KINDS", () => {
       init(doc);
       expect(() => k.run(), k.title).toThrow(new RegExp(`${KINDS}.*${k.title}`));
     }
+  });
+});
+
+describe("QUALIFICATION_STEP_CODES", () => {
+  it("holds every code the isolated and the pool step tables hold, read from the producers", () => {
+    const produced = [...Object.values(ISOLATED_CODE), ...Object.values(POOL_CODE)];
+    expect(produced.length).toBeGreaterThan(0);
+    const held = wordsOf(original, "QUALIFICATION_STEP_CODES").map((w) => w.const);
+    expect(produced.filter((c) => !held.includes(c))).toEqual([]);
+    expect(held.filter((c) => !produced.includes(c as never))).toEqual([]);
   });
 });
 

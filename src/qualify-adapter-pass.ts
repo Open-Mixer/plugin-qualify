@@ -31,7 +31,7 @@ import { writeFileWhole } from "./whole-file.js";
 export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
 
 /** The code of a cell no private server could be had for: the run did not happen. */
-export const NO_PRIVATE_SERVER = `${ADAPTER_HOST}.no-private-server`;
+export const noPrivateServerCode = (): string => adapterCode(ADAPTER_HOST, "noPrivateServer");
 
 const RECORD_SUFFIX = ".qualification.json";
 const SERVER_WAIT_MS = 5000;
@@ -248,7 +248,7 @@ const readRecord = (path: string): QualificationRecord | undefined => {
 export function adapterPass(ctx: SyncContext, state: SyncState, options: AdapterPassOptions = {}): AdapterPassResult {
   const read = hostVersions(ctx.env, options.versions);
   if (!read.ok) throw new AdapterPassRefused(read.error);
-  if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${NO_PRIVATE_SERVER}, and the device's own JACK server is never used for this`);
+  if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${noPrivateServerCode()}, and the device's own JACK server is never used for this`);
   const { versions } = read;
   const starter = options.jack ?? startPrivateJack;
   const runs = options.runs ?? SPAWNED_ADMISSIONS;
@@ -293,7 +293,7 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
         const started = Date.now();
         const done = ADAPTER_PASS_CELLS.map((cell) => {
           const server = serverFor(cell);
-          if (server === undefined) return { cell, run: { host: ADAPTER_HOST, measured: false, admitted: false, code: NO_PRIVATE_SERVER, params: {} } as HostAdmission };
+          if (server === undefined) return { cell, run: { host: ADAPTER_HOST, measured: false, admitted: false, code: noPrivateServerCode(), params: {} } as HostAdmission };
           const stateDir = mkdtempSync(join(tmpdir(), "plugin-qualify-adapter-state-"));
           try {
             const env = { ...ctx.env, ...limit, [ADMIT_STATE_DIR_ENV]: stateDir, LV2_PATH: ctx.settings.lv2Dirs.join(":"), JACK_DEFAULT_SERVER: server.name, JACK_NO_START_SERVER: "1" };
