@@ -70,14 +70,14 @@ export function isolatedArgv(iso: { readonly cpus: readonly number[] }, argv: re
   return ["taskset", "-c", iso.cpus.join(","), "ionice", "-c", "3", "chrt", "-i", "0", ...argv];
 }
 
-export type ProbeEnd =
+export type SpoolProbeEnd =
   | { readonly kind: "exited"; readonly code: number; readonly stdout?: string; readonly pinsText?: string }
   | { readonly kind: "signaled"; readonly signal: string }
   | { readonly kind: "memory-limit" }
   | { readonly kind: "timeout" };
 
 /** Start `argv` isolated and wait for its end: the budget kills the whole process group; a kill that is not ours is the memory limit. */
-export function spawnIsolated(iso: { readonly cpus: readonly number[] }, argv: readonly string[], opts: { readonly timeoutMs: number; readonly env?: NodeJS.ProcessEnv }): Promise<ProbeEnd & { stdout: string }> {
+export function spawnIsolated(iso: { readonly cpus: readonly number[] }, argv: readonly string[], opts: { readonly timeoutMs: number; readonly env?: NodeJS.ProcessEnv }): Promise<SpoolProbeEnd & { stdout: string }> {
   return new Promise((resolve) => {
     const [cmd, ...args] = isolatedArgv(iso, argv);
     const child = spawn(cmd!, args, { detached: true, stdio: ["ignore", "pipe", "ignore"], env: opts.env ?? process.env });
@@ -134,7 +134,7 @@ export interface SpoolDeps {
   readonly audioCpus: () => readonly number[] | undefined;
   readonly onlineCpus: () => readonly number[];
   /** Runs the isolated check of one request; the default starts the quick check, isolated. */
-  readonly probe: (request: SpoolRequest, iso: { readonly cpus: readonly number[] }, cfg: SpoolConfig) => Promise<ProbeEnd>;
+  readonly probe: (request: SpoolRequest, iso: { readonly cpus: readonly number[] }, cfg: SpoolConfig) => Promise<SpoolProbeEnd>;
 }
 
 export type SpoolOutcome =
@@ -148,7 +148,7 @@ const VERDICT_FILE = "90-qualify-spool.pins";
 /** hostd's `PHD_PIN_LAYOUT_UNKNOWN`: a verdict about files whose layout no worker has read yet. */
 const LAYOUT_UNKNOWN = "-";
 
-function outcomeOf(end: ProbeEnd): { verdict: "in-process" | "isolated" | "refused"; reason?: string; line?: string } {
+function outcomeOf(end: SpoolProbeEnd): { verdict: "in-process" | "isolated" | "refused"; reason?: string; line?: string } {
   switch (end.kind) {
     case "signaled": return { verdict: "refused", reason: "probe.crashed" };
     case "memory-limit": return { verdict: "refused", reason: "probe.memory-limit" };
