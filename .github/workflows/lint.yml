@@ -43,3 +43,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: Open-Mixer/.github/.github/actions/deps-render@openmixer-v1
+
+  # the spec and debian/control declare the same CLAP floor (packaging/check-clap-floor.mjs; needs only node, which the
+  # runner image carries)
+  clap-floor:
+    name: the spec and debian/control agree on the CLAP floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: node packaging/check-clap-floor.mjs

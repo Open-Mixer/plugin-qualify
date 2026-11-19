@@ -23,6 +23,7 @@ import type { Adjustment } from "./history-adjust.js";
 import type { Judgment, RecordReason } from "./probe-judge.js";
 import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import type { VoicesHeld } from "./measurement/format.js";
+import { packageOwnerOf, type PackageOwner } from "./package-owner.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { qualificationDomain } from "./qualification-domain.js";
@@ -352,6 +353,12 @@ export interface QualificationRecord {
   /** The plugin's version when it was tested; a newer installed one is shown as "tested on X, installed Y". */
   readonly testedVersion?: string;
   readonly binary: ProbeOutput["binary"];
+  /**
+   * The installed package the binary came from (format, name, version, release, distro, arch), read from the package
+   * manager's owner of `binary.path` when the record was written: null when no package owns it or a field is not stated.
+   * Absent on a record written before the field existed, which is not filled in afterwards. Never part of the identity.
+   */
+  readonly package?: PackageOwner | null;
   readonly verdicts: readonly RecordVerdict[];
   /**
    * An LV2 plugin run under plugin-hostd's LV2 adapter (omx-clap-host), as under mod-host: admitted, or refused with
@@ -518,6 +525,7 @@ export function buildQualificationRecord(
   judgment: Judgment,
   copy: { file: string; sha256: string; bytes: number },
   notMeasured: readonly NotMeasured[] = [],
+  pkg?: PackageOwner | null,
 ): QualificationRecord {
   const o = judgment.output;
   return {
@@ -525,6 +533,7 @@ export function buildQualificationRecord(
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
     binary: o.binary,
+    ...(pkg === undefined ? {} : { package: pkg }),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),
     tiers: tiersOf(judgment),
@@ -597,7 +606,7 @@ export function writeQualification(
   const probePath = join(dir, probeCopyFileName(judgment.output));
   writeFileWhole(probePath, probeBytes);
   const copy = readFileSync(probePath);
-  const record = buildQualificationRecord(judgment, { file: probeCopyFileName(judgment.output), sha256: sha256Hex(copy), bytes: copy.length }, notMeasured);
+  const record = buildQualificationRecord(judgment, { file: probeCopyFileName(judgment.output), sha256: sha256Hex(copy), bytes: copy.length }, notMeasured, packageOwnerOf(judgment.output.binary.path));
   const recordPath = join(dir, recordFileName(judgment.output));
   writeFileWhole(recordPath, `${JSON.stringify(record, null, 2)}\n`);
   return { recordPath, probePath, record, stderrPaths };
