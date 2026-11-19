@@ -283,7 +283,7 @@ describe("the disqualifiers", () => {
     const v = classify(measured({}, { rtSafety: { ownThreads: 2, otherThreads: { allocationsInRun: 60, locksInRun: 3, syscallsInRun: 1 } } }));
     expect(v.rating).toBe("conditional");
     expect(v.deciding?.code).toBe(HOSTING_CODE.rtSafetyOwnThreads);
-    expect(v.deciding?.args).toEqual({ threads: 2 });
+    expect(v.deciding?.params).toEqual({ threads: 2 });
     // only an RT-unsafe reason pins isolated: threads of its own share a worker
     expect(pinVerdictOf(v.rating, v.reasons)).toBe("in-process");
     // the other threads' figures alone, with no thread of the plugin's own, decide nothing

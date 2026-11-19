@@ -16,6 +16,7 @@
  * - The note sweep's block count is the parameter sweep's: both run in one prober process at one
  *   block count, and the schema holds the note sweep's counts but not its blocks.
  */
+import { GROUPABLE_CONDITIONAL_CODES, sharesAWorker } from "./pin-grouping.js";
 import { DEFAULT_HOSTING_POLICY } from "./qualify-declarations.js";
 import {
   rtSafetyDocument,
@@ -208,7 +209,11 @@ export interface Judgment {
 
 function decidingOf(reasons: readonly RecordReason[], rating: SuitabilityRating): RecordReason | undefined {
   if (rating === "suitable") return undefined;
-  return [...reasons].sort((a, b) => RATING_SEVERITY[b.rating] - RATING_SEVERITY[a.rating]).find((r) => r.rating === rating);
+  // of equally rated reasons, a groupable one decides last (D20): a deciding own-threads then means nothing isolates
+  return [...reasons]
+    .sort((a, b) => RATING_SEVERITY[b.rating] - RATING_SEVERITY[a.rating]
+      || Number(GROUPABLE_CONDITIONAL_CODES.has(a.code)) - Number(GROUPABLE_CONDITIONAL_CODES.has(b.code)))
+    .find((r) => r.rating === rating);
 }
 
 /** The footprints of the cells that ran to their end, as the verdict reads them. */
@@ -338,7 +343,7 @@ export function judgeProbeOutput(output: ProbeOutput, profiles: readonly HostPro
         qualified: rating === "suitable",
         ...(deciding === undefined ? {} : { deciding: deciding.code }),
       },
-      hosting: rating === "suitable" && profile.isolation === "in-process" ? "in-process" : "isolated",
+      hosting: sharesAWorker(rating, reasons) && profile.isolation === "in-process" ? "in-process" : "isolated",
       arm: ran ? "run" : "declaration",
       reasons,
       cost: costOf(output, profile),
