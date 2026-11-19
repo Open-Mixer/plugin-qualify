@@ -942,3 +942,57 @@ The image has lilv, the distribution's mod-host and an AddressSanitizer build of
 verdict, the document and the exit code. The command-line entry point does not yet drive the
 measuring tools (`tools/lv2-measure.mjs`, the mod-host sweep). A run that would measure exits
 `2` and names the missing step, rather than rate a plugin on less than was asked.
+
+## The qualification store (plugin-qualify-sync)
+
+**Status:** designed here, implemented in the commits that follow; the contract is the qualification-store spec of
+Open-Mixer/plugin-db-qualification (`docs/design/specs/qualification-sqlite.md` at 13619143e: sections 3.7, 6.1, 6.2 and
+the cases C1 to C9 and C6b of section 8).
+
+The store replaces two things: the distributed JSON layer (`<dir>/<host class>/<set>/*.qualification.json`, read by
+`readDistributedLayer`) and the JSON files of `qualification_dir` (`*.qualification.json`, `*.probe.json`,
+`*.unmeasured.json`). After the switch no function reads or writes either; none reads the store and a directory together,
+and none falls back from one to the other.
+
+**Where the sync reads and writes.** The scope is the one of `--system`: the system layer
+(`/var/lib/omx/qualification/qualification.sqlite`) under `--system`, the user's layer otherwise, each beside the shipped
+base that the reader merges under it.
+
+- Writes go through `plugin-qualification-db-write`: `put --scope user|system` takes one record, the JSON document of
+  `plugin-qualify.qualification-record/1`, on standard input; `delete --scope user|system --sha256 .. --format .. --uri ..
+  --offer .. --host-class ..` removes the layer's record of that key. A refusal names its code, and the sync surfaces it
+  to the user as it was given.
+- Reads go through `plugin-qualification-db`: `query --json` (one line per cell, with the per-file list), `query --json
+  --records [--layer user]` (one line per record) and `counts --layer user --json`.
+- The record document is the interchange between the sync's judge and the writer. Nothing keeps it as a file.
+
+**Removed, with no alias:** the settings `qualification_dir` and `distributed_dir` (the places are the store's), the
+probe copy beside a record, the `.unmeasured.json` file (the plugin's outcome and code are in the sync state), and
+`readDistributedLayer`, `matchDistributed`, `applyDistributed` with the file `distributed-records.ts`. The state schema
+becomes `plugin-qualify.sync-state/2`: a state of the older schema is moved aside as an unreadable one is, and every plugin
+is qualified again. Records an older `qualification_dir` holds are not read, imported or removed.
+
+**The pin.** An item (one `.clap` file, or one LV2 plugin) has an install root: the directory of the `.clap`, or the
+bundle. Paths are relative to it, `/`-separated, with no leading `/` and no `.` or `..` segment; an absolute path is
+refused as `path-absolute`, and nothing makes one relative. A record matches an installed item when the format and the
+plugin agree (the uri for LV2; the id and the binary's path below the root for a `.clap`) and the item's files are EXACTLY
+the record's list: the same paths, the same SHA-256 for each as hashed on this machine, none missing and none beside them.
+The record's name, set, host class and measured path decide nothing. The key is the SHA-256 of the list's entry at the
+record's binary path. The pin handed to plugin-hostd is built from the record's list, layout and tested version. The pin
+replaces `probe.sha256`: nothing matches on, checks against or builds a pin from the probe output's bytes.
+
+**Rejudge from rows.** `plugin-qualify-sync --rejudge` judges every record of the scope's user layer again from the
+record the reader exports and nothing else; probe bytes are not kept beside the store. Every field the judge reads has a
+column in the spec's section 6.2 table. A record that lacks a figure the judge needs (a CLAP record without
+`hostExtensions`; a missing count under an interposer) owes `qualify.sync.figures-unreadable` and is not judged again;
+nothing is guessed. The proof is the case C6b: over a corpus of records, the verdicts, tiers and cost of the row judge
+are byte-equal to those of the probe judge, and leaving out any one mapped column makes it differ.
+
+**Prune and counts.** `pruneStale` lists the user layer's records, removes by `delete` those of a plugin that left the
+state and those of a kept plugin's other bytes, keeps a record another plugin of the state still names, and never touches
+the base; the descriptor half is unchanged. `pluginCounts` is `counts --layer user --json`, and the line it prints is
+unchanged.
+
+**Record writer.** A CLAP record carries `hostExtensions`, the extensions the run offered the plugin, which the judge reads
+(a profile is judged only against the extensions it offers). The thread fields of the real-time probe
+(`ownThreads`, `otherThreads`) follow when the probe change that adds them lands.
