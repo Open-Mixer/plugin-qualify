@@ -105,7 +105,7 @@ CFLAGS ?= -O2 -g
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type
 
 
-all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/describe_test $(BUILD)/rt_interpose_test $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap $(BUILD)/fixtures/worker-allocates.clap $(BUILD)/fixtures/worker-idle.clap \
+all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/describe_test $(BUILD)/rt_interpose_test $(BUILD)/no_task_dir.so $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap $(BUILD)/fixtures/worker-allocates.clap $(BUILD)/fixtures/worker-idle.clap \
 	$(BUILD)/fixtures/controls.clap $(BUILD)/fixtures/params-2048.clap $(BUILD)/fixtures/params-2049.clap \
 	$(BUILD)/fixtures/info-fails.clap $(BUILD)/fixtures/leaky-delay.clap $(BUILD)/fixtures/undeclared-delay.clap \
 	$(BUILD)/fixtures-faulty/crashes-at-load.clap $(BUILD)/fixtures-faulty/hangs.clap $(BUILD)/fixtures-faulty/rate-pinned.clap \
@@ -152,9 +152,12 @@ $(BUILD)/lv2_measure_options_test: lv2_measure_options.test.c lv2-measure-option
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CLAP_LV2_CFLAGS) $(LV2_CFLAGS) $(OMX_CONTRACT_CFLAGS) -I. $(LDFLAGS) -o $@ lv2_measure_options.test.c \
 		lv2-measure-options.c $(OMX_CLAP_LV2_LIBS) -ldl -lpthread
 
-# the interposer's counters for other threads, exact under N threads at once
+# the interposer's counters for other threads, exact under N threads at once; and a preload that hides /proc/self/task
 $(BUILD)/rt_interpose_test: rt_interpose.test.c rt-interpose.c rt-interpose.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -I. $(LDFLAGS) -o $@ rt_interpose.test.c -ldl -lpthread
+
+$(BUILD)/no_task_dir.so: fixtures/no-task-dir.c | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared -fPIC -o $@ $< -ldl
 
 # the search path's oracle, never installed
 $(BUILD)/lv2_measure_path_test: lv2_measure_path.test.c lv2-measure-path.c lv2-measure-path.h | $(BUILD)

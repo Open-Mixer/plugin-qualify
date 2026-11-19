@@ -2140,7 +2140,8 @@ int main(int argc, char **argv) {
     fprintf(jout, "]");
     /* D20: the threads the plugin started (after the first instantiate, less before), and what other threads did while
      * the audio thread was armed, the most any repeat saw: a figure, never the verdict */
-    fprintf(jout, ",\"ownThreads\":%d", threads_after_first > threads_before ? threads_after_first - threads_before : 0);
+    if (threads_before >= 0 && threads_after_first >= 0) /* a count /proc could not give is unknown, never none */
+      fprintf(jout, ",\"ownThreads\":%d", threads_after_first > threads_before ? threads_after_first - threads_before : 0);
     if (rt_other_counts)
       fprintf(jout, ",\"otherThreads\":{\"allocationsInRun\":%llu,\"locksInRun\":%llu,\"syscallsInRun\":%llu}",
               (unsigned long long)other_allocs, (unsigned long long)other_locks, (unsigned long long)other_syscalls);
