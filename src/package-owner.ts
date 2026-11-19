@@ -8,6 +8,8 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 
+import { qualificationDomain } from "./qualification-domain.js";
+
 /** The `package` object of a qualification record. */
 export interface PackageOwner {
   readonly format: "deb" | "rpm";
@@ -15,7 +17,7 @@ export interface PackageOwner {
   readonly version: string;
   readonly release: string | null;
   readonly distro: string | null;
-  readonly arch: string;
+  readonly arch: string | null;
 }
 
 const OS_RELEASE = "/etc/os-release";
@@ -41,9 +43,10 @@ function candidates(path: string): string[] {
 function debOwner(path: string, env: NodeJS.ProcessEnv, osRelease: string): PackageOwner | null {
   for (const p of candidates(path)) {
     const owner = run("dpkg-query", ["-S", p], env);
-    const name = owner?.split("\n")[0]?.split(": ")[0]?.split(":")[0];
-    if (name === undefined || name === "") continue;
-    const w = run("dpkg-query", ["-W", "-f=${Package}\t${Version}\t${Architecture}\n", name], env);
+    // `name` or `name:arch`: the architecture is asked for by the -S answer's own, never the first of several installed
+    const spec = owner?.split("\n")[0]?.split(": ")[0];
+    if (spec === undefined || spec === "") continue;
+    const w = run("dpkg-query", ["-W", "-f=${Package}\t${Version}\t${Architecture}\n", spec], env);
     const [pkg, ver, arch] = (w?.split("\n")[0] ?? "").split("\t");
     if (pkg === undefined || ver === undefined || arch === undefined || ver === "" || arch === "") continue;
     const dash = ver.lastIndexOf("-");
@@ -79,5 +82,16 @@ function rpmOwner(path: string, env: NodeJS.ProcessEnv): PackageOwner | null {
 
 /** The package that owns `binaryPath`, or null. `env` carries the PATH the managers are found on. */
 export function packageOwnerOf(binaryPath: string, env: NodeJS.ProcessEnv = process.env, osRelease: string = OS_RELEASE): PackageOwner | null {
-  return debOwner(binaryPath, env, osRelease) ?? rpmOwner(binaryPath, env);
+  const found = debOwner(binaryPath, env, osRelease) ?? rpmOwner(binaryPath, env);
+  if (found === null) return null;
+  // the store holds distro and arch to the qualification domain's words: one it does not hold is not stated, and the
+  // record is still written
+  const domain = qualificationDomain();
+  const distros = domain.words("QUALIFICATION_PACKAGE_DISTROS");
+  const arches = domain.words("QUALIFICATION_PACKAGE_ARCHES");
+  return {
+    ...found,
+    distro: found.distro !== null && distros.includes(found.distro) ? found.distro : null,
+    arch: found.arch !== null && arches.includes(found.arch) ? found.arch : null,
+  };
 }
