@@ -279,7 +279,7 @@ function pluginWithVerdict(plugin: SyncPlugin, v: RecordVerdict, run?: RunBlock)
 
 function pluginWithVerdictOnly(plugin: SyncPlugin, v: RecordVerdict, run?: RunBlock): SyncPlugin {
   const { pin, code: _code, ...rest } = plugin;
-  const word = v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+  const word = v.measured ? pinVerdictOf(v.rating as SuitabilityRating, v.reasons) : undefined;
   // a rating does not make a plugin isolated: a run seen alone does, and a re-judge measures nothing. A record from before
   // the steps keeps its word until a completion has run it.
   if (word === "isolated" && run !== undefined) {

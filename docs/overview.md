@@ -211,7 +211,12 @@ The prober runs each plugin headless at every cell of the grid (see "The measure
 allocations, locks and syscalls its `process()` makes while every parameter is swept, and prints
 the file's SHA-256 beside what it measured. The verdict is the real-time-safety one: **suitable**
 only on a clean count, **conditional** (isolated in the pin: it runs in a worker of its own, never refused) on any
-allocation, lock, syscall or main-thread host call from `process()`, **unsuitable** on `CLAP_PROCESS_ERROR`, **unknown** when it could not be counted. An instrument is
+allocation, lock, syscall or main-thread host call from `process()`, **unsuitable** on `CLAP_PROCESS_ERROR`, **unknown** when it could not be counted. Only the
+audio thread's calls decide: a call another thread makes while `process()` runs (a plugin's own worker, whose timing
+no run fixes) is counted apart, `otherThreads` in `rtSafety`, a figure and never the verdict. A clean plugin that
+started threads of its own (`ownThreads`, from `/proc/self/task` before it is created and after it runs, less the
+host's pool helpers) is **conditional** under `hosting.rt-safety.own-threads`: groupable, so it shares a worker,
+never runs alone and is offered on its tier; only an RT-unsafe reason isolates. An instrument is
 quiet until it is played, so a plugin with a note input is also played, at every rate and under a
 count of its own: a chord, the pitch bent and a controller moved, pressure, the chord let go, a
 burst of 32 note ons in one block and their offs, all notes off, in the dialect its note input
