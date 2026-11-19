@@ -74,6 +74,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref && format('refs/tags/{0}', inputs.source-ref) || '' }}
+      # tools/release-matrix.mjs decides that it was run with omx-contract's isMain (@openmixer/omx-contract/entry)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - id: derive
         # only a pull request's dry run (arm: false) builds the first architecture alone
         run: node tools/release-matrix.mjs "${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && 'false' || 'true' }}" >> "$GITHUB_OUTPUT"
