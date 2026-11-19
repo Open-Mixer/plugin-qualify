@@ -1987,6 +1987,12 @@ static int qualify_plugin(const clap_plugin_factory_t *factory, const clap_plugi
     if (ip.other_counts) {
       ip.other_counts(&f.other_allocations, &f.other_locks, &f.other_syscalls);
       f.other_counted = 1;
+      /* under a host's thread pool the helpers run the audio thread's own tasks, inside its call: what they do IS the
+       * audio path's, so it stays counted as the verdict's, not a figure of another thread (clap.thread-pool) */
+      if (o->pool_helpers) {
+        f.allocations += f.other_allocations, f.locks += f.other_locks, f.syscalls += f.other_syscalls;
+        f.other_allocations = f.other_locks = f.other_syscalls = 0;
+      }
     }
   }
   /* the threads the plugin started, instantiated and activated: those of the process now, less those before it was
