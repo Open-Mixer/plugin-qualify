@@ -256,7 +256,7 @@ const DIMENSIONS: readonly MeasurementDimension[] = ["latency", "cost", "stabili
  * entries name them (the record store checks them), so the document declares them and this build knows them by name,
  * but `MEASUREMENT_DIMENSIONS` stays the keys of a measurement document.
  */
-const RECORD_ONLY_DIMENSIONS: readonly string[] = ["memory", "hostAdmission", "memoryGrowth"];
+export const RECORD_ONLY_DIMENSIONS: readonly string[] = ["memory", "hostAdmission", "memoryGrowth"];
 
 /**
  * The dimensions the standalone prober (`scan.py` + `benchmark.py`, driven by `lv2-measure.mjs`

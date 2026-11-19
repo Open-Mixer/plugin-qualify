@@ -23,6 +23,7 @@ import {
   HOST_ISOLATIONS,
   HOST_LATENCY_HANDLING,
   MEASUREMENT_DIMENSIONS,
+  RECORD_ONLY_DIMENSIONS,
   METHOD_TERMS,
   SCALING_NOTE_TERMS,
   SCALING_TERMS,
@@ -180,7 +181,7 @@ describe("every measurement word list is the contract's, in its order", () => {
       "MEASUREMENT_DIMENSIONS",
       () => [...MEASUREMENT_DIMENSIONS],
       // memory, hostAdmission and memoryGrowth are words of a record's reasons, no key of a measurement document
-      words("QUALIFICATION_MEASUREMENT_DIMENSIONS").filter((w) => !["memory", "hostAdmission", "memoryGrowth"].includes(w)),
+      words("QUALIFICATION_MEASUREMENT_DIMENSIONS").filter((w) => !RECORD_ONLY_DIMENSIONS.includes(w)),
     ],
     ["VERDICT_RATINGS", () => [...VERDICT_RATINGS], words("QUALIFICATION_MEASUREMENT_VERDICT_RATINGS")],
     ["VOICE_BASES", () => [...VOICE_BASES], words("QUALIFICATION_MEASUREMENT_VOICE_BASES")],
