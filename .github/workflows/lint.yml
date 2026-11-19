@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: Open-Mixer/.github/.github/actions/deps-render@openmixer-v1
 
-  # Fedora 45 only: a workflow that names Fedora 44 (fedora:45, fc45) is refused here
+  # Fedora 45 only: a workflow that names Fedora 44 (fedora:44, fc44) is refused here
   fedora:
     name: no Fedora 44 reference in the workflows
     runs-on: ubuntu-latest
