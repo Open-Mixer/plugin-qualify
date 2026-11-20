@@ -294,6 +294,30 @@ describe("a record whose key no installed item holds", () => {
   });
 });
 
+describe("readRecords reads the scope's records, the user layer over the base", () => {
+  const stored = (key: ShadowKey, record: QualificationRecord, layer: "user" | "base"): StoredRecord => ({ layer, sha256: key.sha256, format: key.format, uri: key.uri, offer: key.offer, host_class: key.hostClass, record });
+  const OTHER: ShadowKey = { ...KEY, offer: "other" };
+
+  it("a base record no user record shadows is read; a user record replaces the base record of its key; one record a key", () => {
+    const fake = fakeStore({ validate: false, base: [stored(KEY, measured(), "base"), stored(OTHER, measured(), "base")] });
+    const store = new QualificationStore("user", { run: fake.run });
+    const mine = { ...measured(), measuredAt: "2030-01-01T00:00:00.000Z" };
+    store.put(KEY, mine);
+    const r = readRecords(store);
+    expect(r.records.map((x) => x.key)).toEqual([KEY, OTHER]);
+    expect(r.records[0]!.record.measuredAt).toBe("2030-01-01T00:00:00.000Z");
+    // the merged answer of the reader, no layer named: `query --json --records`
+    expect(fake.calls.filter((c) => c.startsWith("read "))).toEqual(["read query --scope user --json --records"]);
+  });
+
+  it("under --system the system layer over the base", () => {
+    const fake = fakeStore({ validate: false, base: [stored(KEY, measured(), "base")] });
+    const r = readRecords(new QualificationStore("system", { run: fake.run }));
+    expect(r.records.map((x) => x.key)).toEqual([KEY]);
+    expect(fake.calls).toEqual(["read query --scope system --json --records"]);
+  });
+});
+
 describe("readRecords and the table", () => {
   it("reads the records of the scope's user layer through the reader, and prints a row per plugin, host and class", () => {
     const fake = fakeStore({ validate: false });
