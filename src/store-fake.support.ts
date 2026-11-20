@@ -5,10 +5,17 @@
  * (`plugin-qualification-db-write put|delete`, `plugin-qualification-db query|counts`). It follows the interface the store
  * spec documents (sections 3.7 and 6) and nothing else: the layer a record is written to, the shadowing of a base record
  * by a user record of the same shadow key, the refusals of a record's list and path, and the JSON shapes each verb prints.
+ * The base's claim (section 4) is the test's to give: a base record claims the cells `claims` names, else every cell of
+ * its grid. A cell result is the claimant's, a record line names its `set`, and `query --json --records --rate R
+ * --quantum Q` prints the record that claims the cell, whole. The stand-in never decides a claim: who wins a cell is
+ * the store's rule, and the test states the store's answer.
  * It is a stand-in in tests only; the commands themselves are exercised by `qualification-store.contract.test.ts`.
  */
 import type { QualificationRecord } from "./qualification-record.js";
 import type { StoredRecord, StoreRun, StoreRunResult } from "./qualification-store.js";
+
+/** A base record as the test puts it: its set, and the cells the store's claim gives it (every cell of its grid when absent). */
+export type FakeBaseRecord = StoredRecord & { readonly set?: string | null; readonly claims?: readonly { readonly rate: number; readonly quantum: number }[] };
 
 const key = (s: Pick<StoredRecord, "sha256" | "format" | "uri" | "offer" | "host_class">): string => [s.sha256, s.format, s.uri, s.offer, s.host_class].join("\0");
 
@@ -19,7 +26,7 @@ export interface FakeStore {
   /** Every call, as `<tool> <args>`. */
   readonly calls: string[];
   /** The base, which only the test writes. */
-  readonly base: StoredRecord[];
+  readonly base: FakeBaseRecord[];
 }
 
 /** Where the reader opens the base, as it names it in the `base-absent` line. */
@@ -58,10 +65,21 @@ export function refusalOf(record: QualificationRecord): { code: string; path: st
  * (`qualification-db.unreadable`, `qualification-db.not-a-store`, `qualification-db.schema-other`); the writer is not
  * affected, since it never opens the base.
  */
-export function fakeStore(options: { readonly baseAbsent?: boolean; readonly baseRefused?: string; readonly base?: readonly StoredRecord[]; readonly validate?: boolean } = {}): FakeStore {
+export function fakeStore(options: { readonly baseAbsent?: boolean; readonly baseRefused?: string; readonly base?: readonly FakeBaseRecord[]; readonly validate?: boolean } = {}): FakeStore {
   const user: StoredRecord[] = [];
   const calls: string[] = [];
-  const base: StoredRecord[] = [...(options.base ?? [])];
+  const base: FakeBaseRecord[] = [...(options.base ?? [])];
+  const cellId = (c: { rate: number; quantum: number }): string => `${String(c.rate)}/${String(c.quantum)}`;
+  /** The cells a record claims: a user record every cell of its grid, a base record what the test gave it. */
+  const claimed = (r: FakeBaseRecord): { rate: number; quantum: number }[] => [...(r.claims ?? r.record.measurements.grid)].map((c) => ({ rate: c.rate, quantum: c.quantum }));
+  // the claim's primary key: one record per key and cell in the base (the store refuses two, claim-duplicate)
+  const owner = new Map<string, FakeBaseRecord>();
+  for (const b of base)
+    for (const c of claimed(b)) {
+      if (owner.has(`${key(b)}\0${cellId(c)}`)) throw new Error(`fakeStore: two base records claim ${b.uri} at ${cellId(c)}`);
+      owner.set(`${key(b)}\0${cellId(c)}`, b);
+    }
+  const line = (r: FakeBaseRecord): Record<string, unknown> => ({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: r.layer === "user" ? null : (r.set ?? null), record: r.record });
   const store: FakeStore = { run: undefined as unknown as StoreRun, user: () => [...user], calls, base };
   const ok = (stdout = ""): StoreRunResult => ({ status: 0, stdout, stderr: options.baseAbsent === true ? `${BASE_ABSENT_LINE}\n` : "" });
   const merged = (layer: string | undefined): StoredRecord[] => {
@@ -110,13 +128,17 @@ export function fakeStore(options: { readonly baseAbsent?: boolean; readonly bas
     }
     if (verb === "query") {
       const found = matching(merged(flag(args, "--layer")), args);
+      const rate = flag(args, "--rate");
+      const quantum = flag(args, "--quantum");
+      const at = (c: { rate: number; quantum: number }): boolean => (rate === undefined || c.rate === Number(rate)) && (quantum === undefined || c.quantum === Number(quantum));
+      const claims = (r: FakeBaseRecord): { rate: number; quantum: number }[] => claimed(r).filter(at);
       if (args.includes("--records")) {
-        if (args.includes("--rate") || args.includes("--quantum")) return { status: 2, stdout: "", stderr: "--rate and --quantum are refused with --records" };
-        return ok(found.map((r) => `${JSON.stringify(r)}\n`).join(""));
+        // a record claiming a cell the filters name; with --rate and --quantum, the one record that claims that cell
+        return ok(found.filter((r) => claims(r).length > 0).map((r) => `${JSON.stringify(line(r))}\n`).join(""));
       }
       const lines = found.flatMap((r) =>
-        r.record.measurements.grid.map((cell) => ({
-          layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: null,
+        r.record.measurements.grid.filter((cell) => claims(r).some((c) => cellId(c) === cellId(cell))).map((cell) => ({
+          layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: r.layer === "user" ? null : ((r as FakeBaseRecord).set ?? null),
           pkg_format: null, pkg_name: null, pkg_version: null, pkg_release: null, pkg_distro: null, pkg_arch: null,
           binary_path: r.record.binary.path, layout_scheme: r.record.binary.layout?.scheme ?? null, layout_sha256: r.record.binary.layout?.sha256 ?? null,
           tested_version: r.record.testedVersion ?? null, unpinnable: r.record.binary.unpinnable === undefined ? 0 : 1,

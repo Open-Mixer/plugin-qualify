@@ -16,7 +16,7 @@ import { parsePinLine } from "./pins-file.js";
 import { QualificationStore, shadowKeyOf, type StoredRecord } from "./qualification-store.js";
 import { parseSyncArgs, resolveSyncSettings, runSync, summaryLine, type SyncSettings } from "./qualify-sync.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
-import { fakeStore, type FakeStore } from "./store-fake.support.js";
+import { fakeStore, type FakeBaseRecord, type FakeStore } from "./store-fake.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "stored-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -184,6 +184,61 @@ describe("a stored record", () => {
     expect(lines.some((l) => l.startsWith(`stored: clap:${m.clap}#${FIXTURE_CLAP_ID}: measured at `) && l.includes("48000/128"))).toBe(true);
     expect(summary.distributed).toBe(0);
     expect(measured(summary)).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Two sets of the base hold one plugin's record at one cell (#152). The store's claim (its spec, section 4) names the record
+ * that answers each cell: the reference tier over another, and within one tier the set measured later. The base build
+ * writes that claim; the stand-in is told it, as the store would answer, and decides nothing. In each case the winner's set
+ * is named to sort LAST, so a sync that took the sets in name order would take the loser.
+ */
+describe("two sets of one plugin at the machine's cell (#152)", () => {
+  const MACHINE_CELL = { rate: 48000, quantum: 128 };
+  const OTHER_CELL = { rate: 96000, quantum: 128 };
+  const at = (c: { rate: number; quantum: number }) => (p: { rate: number; quantum: number }) => p.rate === c.rate && p.quantum === c.quantum;
+
+  /**
+   * The loser holds the whole grid and claims the other cell; the winner, measured on another day, holds the machine's
+   * cell only and claims it. The base lists them in byte order of their sets, the loser first.
+   */
+  function twoSets(clap: string, loser: string, winner: string): { base: FakeBaseRecord[]; loserAt: string; winnerAt: string } {
+    const loserAt = "2026-11-06T10:00:00.000Z";
+    const winnerAt = "2026-11-08T10:00:00.000Z";
+    const lose = edited(storedFixture(clap), (r) => ({ ...r, measuredAt: loserAt }));
+    const win = edited(storedFixture(clap), (r) => ({ ...r, measuredAt: winnerAt, measurements: { ...r.measurements, grid: r.measurements.grid.filter(at(MACHINE_CELL)) } }));
+    expect([loser, winner].sort()).toEqual([loser, winner]);
+    return { base: [{ ...lose, set: loser, claims: [OTHER_CELL] }, { ...win, set: winner, claims: [MACHINE_CELL] }], loserAt, winnerAt };
+  }
+
+  it("a provisional set and a reference set at one cell: the reference set's record is taken, whole", async () => {
+    const m = machine("tier", ["--grid", "48000/128"]);
+    const sets = twoSets(m.clap, "fedora44-48000-128", "fedora44-rt-48000-128");
+    const fake = fakeStore({ base: sets.base });
+    const { summary, lines } = await sync(m.settings, fake);
+    expect(lines, lines.join("\n")).toContain(`stored: clap:${m.clap}#${FIXTURE_CLAP_ID}: applied (fedora44-rt-48000-128)`);
+    expect(summary.distributed).toBe(1);
+    expect(fake.user().map((u) => u.record.measuredAt)).toEqual([sets.winnerAt]);
+  });
+
+  it("a set measured again at one cell, of the same tier: the later set's record is taken, whole", async () => {
+    const m = machine("remeasure", ["--grid", "48000/128"]);
+    const sets = twoSets(m.clap, "zynthian-vangelis", "zynthian-vangelis-48000-128");
+    const fake = fakeStore({ base: sets.base });
+    const { summary, lines } = await sync(m.settings, fake);
+    expect(lines, lines.join("\n")).toContain(`stored: clap:${m.clap}#${FIXTURE_CLAP_ID}: applied (zynthian-vangelis-48000-128)`);
+    expect(summary.distributed).toBe(1);
+    expect(fake.user().map((u) => u.record.measuredAt)).toEqual([sets.winnerAt]);
+  });
+
+  it("the record claiming the machine's cell, measured at no other cell the sync runs at, is not taken: the plugin is measured", async () => {
+    const m = machine("claimant-short", ["--grid", "48000/128,96000/128"]);
+    const sets = twoSets(m.clap, "zynthian-vangelis", "zynthian-vangelis-48000-128");
+    const fake = fakeStore({ base: sets.base });
+    const { summary, lines } = await sync(m.settings, fake);
+    expect(lines.some((l) => l.startsWith(`stored: ${FIXTURE_CLAP_ID} (`) && l.includes("set zynthian-vangelis-48000-128 claims 48000/128, measured at 48000/128 only; measured here")), lines.join("\n")).toBe(true);
+    expect(summary.distributed).toBe(0);
+    expect(fake.user()).toEqual([]);
   });
 });
 

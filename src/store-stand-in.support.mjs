@@ -4,8 +4,10 @@
  * The two store commands as processes, for the tests that run the sync's own entry point (the commands themselves are the
  * store repository's, exercised by `qualification-store.contract.test.ts`). `node store-stand-in.support.mjs write|read
  * <args>` keeps its layers in the JSON file named by STAND_IN_STORE and follows the documented interface: `put`, `delete`,
- * `query --json [--records] [--layer ..]` and `counts --layer .. --json`. It checks nothing of a record: `store-fake.support.ts`
- * is the stand-in that enforces section 3.7.
+ * `query --json [--records] [--rate N --quantum N] [--layer ..]` and `counts --layer .. --json`. A base record claims the
+ * cells its `claims` names, else every cell of its grid (the store's claim is the test's to give, never decided here); a
+ * cell result is the claimant's, a record line names its `set`, and `--records --rate --quantum` prints the record that
+ * claims that cell. It checks nothing of a record: `store-fake.support.ts` is the stand-in that enforces section 3.7.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
@@ -35,10 +37,17 @@ if (tool === "write" && verb === "put") {
   for (const f of Object.keys(per).sort()) out += `${JSON.stringify({ format: f, plugins: per[f].size, offered: [...per[f].values()].filter(Boolean).length, not_offered: [...per[f].values()].filter((o) => !o).length })}\n`;
 } else if (verb === "query") {
   const found = merged(flag("--layer")).filter(matches);
-  if (args.includes("--records")) out = found.map((r) => `${JSON.stringify(r)}\n`).join("");
+  const at = (c) => (flag("--rate") === undefined || c.rate === Number(flag("--rate"))) && (flag("--quantum") === undefined || c.quantum === Number(flag("--quantum")));
+  const claims = (r) => (r.layer === "user" ? r.record.measurements.grid : (r.claims ?? r.record.measurements.grid)).filter(at);
+  const setOf = (r) => (r.layer === "user" ? null : (r.set ?? null));
+  if (args.includes("--records"))
+    out = found
+      .filter((r) => claims(r).length > 0)
+      .map((r) => `${JSON.stringify({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: setOf(r), record: r.record })}\n`)
+      .join("");
   else
     out = found
-      .flatMap((r) => r.record.measurements.grid.map((c) => ({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: null, binary_path: r.record.binary.path, layout_scheme: r.record.binary.layout?.scheme ?? null, layout_sha256: r.record.binary.layout?.sha256 ?? null, tested_version: r.record.testedVersion ?? null, unpinnable: r.record.binary.unpinnable === undefined ? 0 : 1, files: r.record.binary.files, rate: c.rate, quantum: c.quantum, outcome: c.outcome, verdicts: r.record.verdicts.map((v) => ({ host: v.host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 })) })))
+      .flatMap((r) => r.record.measurements.grid.filter((c) => claims(r).some((k) => k.rate === c.rate && k.quantum === c.quantum)).map((c) => ({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: setOf(r), binary_path: r.record.binary.path, layout_scheme: r.record.binary.layout?.scheme ?? null, layout_sha256: r.record.binary.layout?.sha256 ?? null, tested_version: r.record.testedVersion ?? null, unpinnable: r.record.binary.unpinnable === undefined ? 0 : 1, files: r.record.binary.files, rate: c.rate, quantum: c.quantum, outcome: c.outcome, verdicts: r.record.verdicts.map((v) => ({ host: v.host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 })) })))
       .map((l) => `${JSON.stringify(l)}\n`)
       .join("");
 } else {
