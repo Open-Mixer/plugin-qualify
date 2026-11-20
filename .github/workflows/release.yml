@@ -206,7 +206,7 @@ jobs:
           # the main package requires plugin-qualify-contract of the same version: both files, from the same build
           dnf_retry ./pkgs/plugin-qualify-[0-9]*."$ARCH".rpm ./pkgs/plugin-qualify-contract-[0-9]*.noarch.rpm
           # the store's commands come with the package; the store's base comes with the records package, which the sync
-          # below reads (an absent base is refused, never replaced by files)
+          # below reads: an absent base is an empty base layer (the sync says so once), and no record file stands in for it
           rpm -q plugin-qualification-db plugin-qualification-db-write
           dnf_retry plugin-qualification-records
           rpm -q omx-clap-host
@@ -237,7 +237,7 @@ jobs:
           # the main package depends on plugin-qualify-contract of the same version: both files, from the same build
           apt-get install -y ./pkgs/"$SUITE"/plugin-qualify_*.deb ./pkgs/"$SUITE"/plugin-qualify-contract_*.deb
           # the store's commands come with the package; the store's base comes with the records package, which the sync
-          # below reads (an absent base is refused, never replaced by files)
+          # below reads: an absent base is an empty base layer (the sync says so once), and no record file stands in for it
           dpkg -s plugin-qualification-db plugin-qualification-db-write >/dev/null
           apt-get install -y plugin-qualification-records
           dpkg -s omx-clap-host >/dev/null
