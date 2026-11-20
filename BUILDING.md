@@ -47,7 +47,7 @@ from `pkg-config omx-contract` (`omx-contract-devel`, `libomx-contract-dev`, 3.9
 `make deps` fetches them.
 Its host features are omx-clap's LV2 feature provider, the static `libomx-clap-lv2` and its
 header: `pkg-config omx-clap-lv2` (`omx-clap-lv2-devel`, `libomx-clap-lv2-dev`), else `make deps`
-fetches omx-clap-core at the packages' floor, builds the archive against the fetched CLAP headers and
+fetches omx-clap at the packages' floor, builds the archive against the fetched CLAP headers and
 installs it into `native/deps/omx-clap-lv2`.
 
 ```

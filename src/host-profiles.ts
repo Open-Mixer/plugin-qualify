@@ -25,7 +25,7 @@ import type { HostProfile } from "./measurement/format.js";
  * which builds one provider per URI and refuses a URI it cannot provide; there is no C copy (the
  * console's native test reads this export).
  *
- * Equal to omx-clap-core's `LV2_CORE_PROVIDED_INIT` (`lv2/core/lv2_core.h`), same URIs in the same
+ * Equal to omx-clap's `LV2_CORE_PROVIDED_INIT` (`lv2/core/lv2_core.h`), same URIs in the same
  * order: the original seven, then the three rtmempool URIs (the header's `LV2_RTSAFE_MEMORY_POOL__Pool`,
  * the `#Pool` spelling some TTLs require, and the deprecated v1 URI), the three state-path features,
  * then uri-map and event (omx-clap-core #94).
@@ -78,7 +78,7 @@ export const OMX_CLAP_HOST_EXTENSIONS: readonly string[] = [
 ];
 
 /**
- * The three host extensions omx-clap-host turns on beyond the library's own (omx-clap-core
+ * The three host extensions omx-clap-host turns on beyond the library's own (omx-clap
  * `src/effects.c` `configure_core`: `preset_load`, `track_info`, `remote_controls`), by the ids
  * its host object answers (`src/clap_host.c`); the prober offers them with `--offer`.
  */

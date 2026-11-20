@@ -78,8 +78,8 @@ describe("the shipped profiles", () => {
   });
 });
 
-describe("OMX_INPROCESS_FEATURES against omx-clap-core's own header", () => {
-  // omx-clap-core's own tree: the deps checkout `make -C native deps` fetches (CI), else the installed header
+describe("OMX_INPROCESS_FEATURES against omx-clap's own header", () => {
+  // omx-clap's own tree: the deps checkout `make -C native deps` fetches (CI), else the installed header
   const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
   const CORE_H = [
     join(PKG, "native", "deps", "omx-clap-core", "lv2", "core", "lv2_core.h"),
@@ -110,8 +110,8 @@ describe("OMX_INPROCESS_FEATURES against omx-clap-core's own header", () => {
       return ctx.skip("no lv2_core.h: make -C native deps, or install omx-clap-devel");
     }
     const init = /#define\s+LV2_CORE_PROVIDED_INIT\s*\\?\s*\{([^}]*)\}/.exec(readFileSync(CORE_H, "utf8"));
-    // a header older than omx-clap-core 0.15 (the pin native/Makefile fetches today) has no such list
-    if (init === null) return ctx.skip(`${CORE_H} has no LV2_CORE_PROVIDED_INIT (omx-clap-core before 0.15)`);
+    // a header older than omx-clap 0.15 (the pin native/Makefile fetches today) has no such list
+    if (init === null) return ctx.skip(`${CORE_H} has no LV2_CORE_PROVIDED_INIT (omx-clap before 0.15)`);
     const names = init[1]!.replace(/\\\n/g, " ").split(",").map((n) => n.trim()).filter((n) => n !== "" && n !== "NULL");
     expect(names.filter((n) => URI_OF[n] === undefined), "a macro this test does not know").toEqual([]);
     expect(names.map((n) => URI_OF[n])).toEqual(OMX_INPROCESS_FEATURES);
@@ -119,7 +119,7 @@ describe("OMX_INPROCESS_FEATURES against omx-clap-core's own header", () => {
 });
 
 describe("omx-clap-host's profile", () => {
-  // omx-clap-core's own tree: the deps checkout `make -C native deps` fetches (CI), else the installed header
+  // omx-clap's own tree: the deps checkout `make -C native deps` fetches (CI), else the installed header
   const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
   const DEPS = join(PKG, "native", "deps", "omx-clap-core", "src");
   const HEADER = [join(DEPS, "clap_host_extensions.h"), "/usr/include/omx-clap-host/clap_host_extensions.h"].find((p) => existsSync(p));
@@ -131,7 +131,7 @@ describe("omx-clap-host's profile", () => {
     expect(OMX_CLAP_HOST_PROFILE.cost).toBe(HOST_BUDGETS["omx-clap-host"]);
   });
 
-  it("holds the library's host extensions as omx-clap-core's clap_host_extensions.h lists them", (ctx) => {
+  it("holds the library's host extensions as omx-clap's clap_host_extensions.h lists them", (ctx) => {
     if (HEADER === undefined) {
       if (process.env["CI"]) throw new Error("no clap_host_extensions.h: CI fetches it with make -C native deps");
       return ctx.skip("no clap_host_extensions.h: make -C native deps, or install omx-clap-devel");
@@ -144,8 +144,8 @@ describe("omx-clap-host's profile", () => {
 
   it("holds the three configured ones as omx-clap-host's configure_core turns them on", (ctx) => {
     if (!existsSync(EFFECTS)) {
-      if (process.env["CI"]) throw new Error("no omx-clap-core checkout: CI fetches it with make -C native deps");
-      return ctx.skip("no omx-clap-core checkout: make -C native deps");
+      if (process.env["CI"]) throw new Error("no omx-clap checkout: CI fetches it with make -C native deps");
+      return ctx.skip("no omx-clap checkout: make -C native deps");
     }
     const configure = /static int configure_core\(void\)\s*\{([\s\S]*?)\n\}/.exec(readFileSync(EFFECTS, "utf8"));
     expect(configure).not.toBeNull();

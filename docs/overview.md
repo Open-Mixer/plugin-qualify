@@ -178,7 +178,7 @@ it, keeps a small machine's night bounded.
 
 ## CLAP plugins: the RT-safety verdict
 
-A `.clap` file, or a directory holding one, is scanned by `omx-clap-scan` (from omx-clap-core; set
+A `.clap` file, or a directory holding one, is scanned by `omx-clap-scan` (from omx-clap; set
 `OMX_CLAP_SCAN` to its path when it is not on `PATH`) and each plugin in it is then qualified by the
 CLAP prober the package installs (from a checkout, the one built from `native/`, see `BUILDING.md`):
 
@@ -386,7 +386,7 @@ Without `--plugins` it measures every plugin the scan finds. Each plugin's entry
 through plugin-db's `pin.h`, as for CLAP. `OMX_LV2_MEASURE` and `OMX_RT_INTERPOSE` name the
 measurer and the interposer when they are not the installed ones or the checkout's own build.
 
-The features the measurer offers a plugin are the console's own: omx-clap-core's LV2 feature
+The features the measurer offers a plugin are the console's own: omx-clap's LV2 feature
 provider, the code its LV2 host builds every instance's features with. Each of the provider's
 options is a flag of `tools/lv2-measure.mjs` and of `lv2_measure` itself, and each plugin's record
 names the options it ran under, `featureOptions`:

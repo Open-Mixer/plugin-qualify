@@ -33,7 +33,7 @@ static const char *const LOG_MODE_NAMES[] = {
 };
 
 const char LV2_MEASURE_OPTIONS_HELP[] =
-  "feature options (omx-clap-core's LV2 feature provider; the record's featureOptions names them):\n"
+  "feature options (omx-clap's LV2 feature provider; the record's featureOptions names them):\n"
   "  --features LIST        kinds offered: map,unmap,options,bounded,worker,default-state,log,rtmempool\n"
   "                         (default: all but default-state; empty: none)\n"
   "  --strict               refuse a plugin requiring a feature not offered\n"

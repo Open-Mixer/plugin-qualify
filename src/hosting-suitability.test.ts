@@ -785,7 +785,7 @@ describe("the CLAP arm — the §3 verdict over CLAP facts", () => {
     expect(codeOf(v, "latency")).toEqual([HOSTING_CODE.latencyUnmeasured]);
   });
 
-  it("a plugin with no audio-effect feature is no longer refused for its kind (omx-clap-core 0.13.0 drops the check, #130)", () => {
+  it("a plugin with no audio-effect feature is no longer refused for its kind (omx-clap 0.13.0 drops the check, #130)", () => {
     const v = classify(clapDescriptor({}, cleanClap({ features: ["instrument", "synthesizer"] })));
     expect(v.rating).toBe("suitable");
     expect(v.path).toBe("in-process");

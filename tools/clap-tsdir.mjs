@@ -24,7 +24,7 @@ export const CLAP_TS_MODULES = Object.freeze(['omx-clap-vocabulary.js', 'omx-cla
 /** This package's root. */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** `native/fetch-deps.sh`'s own checkout of omx-clap-core, for a build with no omx-clap-devel installed. */
+/** `native/fetch-deps.sh`'s own checkout of omx-clap, for a build with no omx-clap-devel installed. */
 const DEPS_TS_DIR = join(PACKAGE_ROOT, 'native/deps/omx-clap-core/ts');
 
 /** Where `make install` of omx-clap-host puts them (BUILDING.md), for a run with no `pkg-config` binary at all. */

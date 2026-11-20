@@ -179,7 +179,7 @@ jobs:
         run: |
           echo "::notice::catch-up: $ARTIFACT was not built by this run (the channel serves that cell), so it is not installed here"
 
-      # the OpenMixer channel serves omx-clap-host (omx-clap-scan) and omx-clap-core (the hosting codes'
+      # the OpenMixer channel serves omx-clap-host (omx-clap-scan) and omx-clap (the hosting codes'
       # TypeScript modules), which the package depends on, and the CLAP headers the fixtures build
       # against on Debian. The package alone pulls no development package; the fixtures' build tools
       # come after that check.
