@@ -22,10 +22,10 @@ node tools/gen-python-declarations.mjs --write
 ```
 
 `src/hosting-codes.generated.ts` is omx-clap-core's hosting tables (`HOSTING_<DIMENSION>_CODES` in
-the TypeScript modules under `pkg-config --variable=tsdir omx-clap-core`), flattened into the plain
+the TypeScript modules under `pkg-config --variable=tsdir omx-clap`), flattened into the plain
 data `HOSTING_CODE` is, so no public subpath a browser bundles reads a file or imports a `node:`
 module. `pnpm build` rewrites it whenever it finds omx-clap-core's modules (`OMX_CLAP_CORE_TSDIR`,
-else pkg-config, else the checkout `make -C native deps` fetches, else `/usr/share/omx-clap-core/ts`)
+else pkg-config, else the checkout `make -C native deps` fetches, else `/usr/share/omx-clap/ts`)
 and keeps the committed one where it finds none. After moving to a new omx-clap-core, regenerate it
 and commit it:
 

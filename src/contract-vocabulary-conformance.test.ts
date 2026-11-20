@@ -37,7 +37,7 @@ const PKG = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "src/contract-vocabulary-conformance.test.ts";
 
 /** omx-clap-core's two TypeScript modules, read independently of `tools/gen-hosting-codes.mjs`'s loader. */
-const CLAP_CORE_TS_MODULES = ["omx-clap-core-vocabulary.js", "omx-clap-core-hosting.js"] as const;
+const CLAP_CORE_TS_MODULES = ["omx-clap-vocabulary.js", "omx-clap-hosting.js"] as const;
 
 function locateClapCoreTsDir(): string {
   const dir = clapCoreTsDirCandidates().find((d) => CLAP_CORE_TS_MODULES.every((m) => existsSync(join(d, m))));

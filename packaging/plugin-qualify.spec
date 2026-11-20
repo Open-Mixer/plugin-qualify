@@ -23,7 +23,7 @@ BuildRequires: pkgconfig(lv2)
 BuildRequires: pkgconfig(plugin-db) >= 0.4.4
 BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.9
 BuildRequires: pkgconfig(omx-contract) >= 3.20.2
-BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
+BuildRequires: pkgconfig(omx-clap-lv2) >= 0.34.0
 BuildRequires: pkgconfig(omxdsp) >= 0.32.1
 BuildRequires: systemd-rpm-macros
 
@@ -51,12 +51,12 @@ Requires: plugin-hostd-protocol-contract >= 0.8.0
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: omx-clap-host >= 0.32.5
+Requires: omx-clap-host >= 0.34.0
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
-# /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
+# /usr/share/omx-clap/ts, in the runtime package omx-clap from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: omx-clap-core >= 0.32.5
+Requires: omx-clap >= 0.34.0
 # the qualification store: the sync reads it through plugin-qualification-db and writes its records through
 # plugin-qualification-db-write (which brings plugin-qualification-db-schema); the store spec's section 7. The floor is the
 # release whose reader reads an absent base as an empty base layer (the base-absent line on standard error), after the one
@@ -526,8 +526,8 @@ the English source sentence.
 - The hosting codes are read from omx-clap-core's installed TypeScript
   module instead of omx-contract (the contract split moved
   data/hosting/*.json there): HOSTING_CODE is omx-clap-core's tables now,
-  found at pkg-config --variable=tsdir omx-clap-core, the fetched checkout,
-  or /usr/share/omx-clap-core/ts (OMX_CLAP_CORE_TSDIR overrides)
+  found at pkg-config --variable=tsdir omx-clap, the fetched checkout,
+  or /usr/share/omx-clap/ts (OMX_CLAP_CORE_TSDIR overrides)
 - Two writes stop, as omx-clap-core 0.13.0 did: a topology past the
   auxiliary limit is hosting.topology.too-many-ports instead of the retired
   extra-inputs-fed-silence, and a CLAP's feature list is no longer judged
@@ -677,14 +677,14 @@ the English source sentence.
 
 * Sun Oct 11 2026 Pau Aliagas <linuxnow@gmail.com> - 0.2.0-1
 - New hosting code `hosting.output.non-finite`: the refusal the
-  libomx-clap-core CLAP host gives a plugin whose output goes non-finite.
-- `CLAP_CORE_REFUSALS` lists the refusals libomx-clap-core returns from
+  libomx-clap CLAP host gives a plugin whose output goes non-finite.
+- `CLAP_CORE_REFUSALS` lists the refusals libomx-clap returns from
   open, activate and the timed open, each by the hosting code it answers
   with.
 - `ScalingNoteCode` types the words `latency.scalingNote` may carry, and a
   test keeps `benchmark.py`'s scaling notes equal to the declared list.
 - The CLAP host extensions list is documented as the mirror of the header
-  libomx-clap-core's host object offers.
+  libomx-clap's host object offers.
 
 * Thu Oct 08 2026 Pau Aliagas <linuxnow@gmail.com> - 0.1.1-1
 - plugin-qualify installs from the FreeMixer package channel: `dnf install

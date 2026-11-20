@@ -152,7 +152,7 @@ export { HOSTING_CODE };
 export type HostingCode = (typeof HOSTING_CODE)[keyof typeof HOSTING_CODE];
 
 /**
- * The refusals libomx-clap-core returns from `open`, `activate` and the timed open, each named by the KEY of the
+ * The refusals libomx-clap returns from `open`, `activate` and the timed open, each named by the KEY of the
  * `HOSTING_CODE` it answers with — never by the string, so no second spelling of a code exists. The console's
  * generator renders them into omx-clap-host's `clap_host_limits.h` as `CLAP_HOST_CODE_<NAME>`, the left column's
  * name in upper snake case. The facts the qualifier judges from a measurement (latency, thread violations, process

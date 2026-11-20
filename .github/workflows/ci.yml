@@ -106,7 +106,7 @@ jobs:
       - run: >-
           dnf install -y --setopt=install_weak_deps=False
           'plugin-qualification-db >= 2026112001' 'plugin-qualification-db-write >= 2026112001'
-          'plugin-hostd-contract >= 0.21.0' plugin-db-contract omx-clap-core-contract
+          'plugin-hostd-contract >= 0.21.0' plugin-db-contract omx-clap-contract
       # the installed contract directory, qualification domain included (plugin-hostd-contract's): a writable copy the store
       # contract tests use
       - name: The store commands' contract directory

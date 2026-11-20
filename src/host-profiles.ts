@@ -52,7 +52,7 @@ export const OMX_INPROCESS_FEATURES: readonly string[] = [
  * The CLAP host object's extensions — what the console's control-thread host provides to every
  * instance it hosts (CLAP hosting spec §5), and ALL the qualifier offers, so a plugin that needs
  * more fails `init` headless in qualification and reads `hosting.clap.headless-failed` rather
- * than on the desk. The list's home is the CLAP library — libomx-clap-core's own
+ * than on the desk. The list's home is the CLAP library — libomx-clap's own
  * `clap_host_extensions.h`, what its host object offers — and this is its mirror, held equal to the
  * header at the pinned omx-clap-host (by the console's conformance test), so the verdict never
  * promises more or less than the host provides. Nothing else: no `gui`.

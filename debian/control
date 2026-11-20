@@ -12,7 +12,7 @@ Build-Depends: debhelper-compat (= 13),
                plugin-db-dev (>= 0.4.4~),
                libplugin-hostd-protocol-dev (>= 0.5.9~),
                libomx-contract-dev (>= 3.20.2~),
-               libomx-clap-lv2-dev (>= 0.32.5~),
+               libomx-clap-lv2-dev (>= 0.34.0~),
                libomxdsp-dev (>= 0.32.1~)
 Standards-Version: 4.6.2
 Homepage: https://github.com/Open-Mixer/plugin-qualify
@@ -20,7 +20,7 @@ Rules-Requires-Root: no
 
 Package: plugin-qualify
 Architecture: any
-Depends: ${misc:Depends}, ${shlibs:Depends}, nodejs (>= 18), python3, python3-jsonschema, plugin-hostd (>= 0.21.0~), plugin-hostd-protocol-contract (>= 0.8.0~), omx-clap-host (>= 0.32.5~), libomx-clap-core1 (>= 0.32.5~), liblilv-0-0, ${lilv:Depends}, plugin-hostd-contract (>= 0.21.0~), plugin-qualification-db (>= 2026112001~), plugin-qualification-db-write (>= 2026112001~)
+Depends: ${misc:Depends}, ${shlibs:Depends}, nodejs (>= 18), python3, python3-jsonschema, plugin-hostd (>= 0.21.0~), plugin-hostd-protocol-contract (>= 0.8.0~), omx-clap-host (>= 0.34.0~), libomx-clap1 (>= 0.34.0~), liblilv-0-0, ${lilv:Depends}, plugin-hostd-contract (>= 0.21.0~), plugin-qualification-db (>= 2026112001~), plugin-qualification-db-write (>= 2026112001~)
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.

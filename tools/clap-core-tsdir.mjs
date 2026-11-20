@@ -4,9 +4,9 @@
  * clap-core-tsdir.mjs — where omx-clap-core's TypeScript modules are, and their hosting tables.
  *
  * omx-clap-core declares every hosting code: one `HOSTING_<DIMENSION>_CODES` table per dimension,
- * rendered into the modules its package installs under `pkg-config --variable=tsdir omx-clap-core`
- * (BUILDING.md) — `omx-clap-core-vocabulary.js` for the dimensions carried from omx-contract,
- * `omx-clap-core-hosting.js` for `hosting.idle.*`. `tools/gen-hosting-codes.mjs` reads them here
+ * rendered into the modules its package installs under `pkg-config --variable=tsdir omx-clap`
+ * (BUILDING.md) — `omx-clap-vocabulary.js` for the dimensions carried from omx-contract,
+ * `omx-clap-hosting.js` for `hosting.idle.*`. `tools/gen-hosting-codes.mjs` reads them here
  * to write `src/hosting-codes.generated.ts`, and the conformance test reads them here to hold that
  * file to them.
  *
@@ -19,21 +19,21 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The two TypeScript modules omx-clap-core's `tsdir` carries, each a `HOSTING_<DIMENSION>_CODES` source. */
-export const CLAP_CORE_TS_MODULES = Object.freeze(['omx-clap-core-vocabulary.js', 'omx-clap-core-hosting.js']);
+export const CLAP_CORE_TS_MODULES = Object.freeze(['omx-clap-vocabulary.js', 'omx-clap-hosting.js']);
 
 /** This package's root. */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** `native/fetch-deps.sh`'s own checkout of omx-clap-core, for a build with no omx-clap-core-devel installed. */
+/** `native/fetch-deps.sh`'s own checkout of omx-clap-core, for a build with no omx-clap-devel installed. */
 const DEPS_TS_DIR = join(PACKAGE_ROOT, 'native/deps/omx-clap-core/ts');
 
 /** Where `make install` of omx-clap-host puts them (BUILDING.md), for a run with no `pkg-config` binary at all. */
-const DEFAULT_SYSTEM_TS_DIR = '/usr/share/omx-clap-core/ts';
+const DEFAULT_SYSTEM_TS_DIR = '/usr/share/omx-clap/ts';
 
-/** `pkg-config --variable=tsdir omx-clap-core`, or `undefined` where pkg-config or the package is absent. */
+/** `pkg-config --variable=tsdir omx-clap`, or `undefined` where pkg-config or the package is absent. */
 function pkgConfigTsDir(env) {
   try {
-    const out = execFileSync(env.PKG_CONFIG ?? 'pkg-config', ['--variable=tsdir', 'omx-clap-core'], {
+    const out = execFileSync(env.PKG_CONFIG ?? 'pkg-config', ['--variable=tsdir', 'omx-clap'], {
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -45,7 +45,7 @@ function pkgConfigTsDir(env) {
 
 /**
  * Where omx-clap-core's TypeScript modules are looked for, in order: `OMX_CLAP_CORE_TSDIR` when
- * set (and only that), else `pkg-config --variable=tsdir omx-clap-core`, else the checkout
+ * set (and only that), else `pkg-config --variable=tsdir omx-clap`, else the checkout
  * `native/fetch-deps.sh` stages, else the path `make install` of omx-clap-host uses by default.
  */
 export function clapCoreTsDirCandidates(env = process.env) {

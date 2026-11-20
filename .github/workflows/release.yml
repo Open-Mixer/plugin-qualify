@@ -210,7 +210,7 @@ jobs:
           rpm -q plugin-qualification-db plugin-qualification-db-write
           dnf_retry plugin-qualification-records
           rpm -q omx-clap-host
-          rpm -qf /usr/share/omx-clap-core/ts | grep -q '^omx-clap-core-[0-9]'
+          rpm -qf /usr/share/omx-clap/ts | grep -q '^omx-clap-[0-9]'
           if rpm -qa --qf '%{NAME}\n' | grep -E -- '-devel$'; then echo "plugin-qualify pulled a -devel package"; exit 1; fi
           # mod-host is only suggested: the install with weak dependencies on does not pull it, so the qualification below
           # runs on a machine without it
@@ -241,7 +241,7 @@ jobs:
           dpkg -s plugin-qualification-db plugin-qualification-db-write >/dev/null
           apt-get install -y plugin-qualification-records
           dpkg -s omx-clap-host >/dev/null
-          dpkg -S /usr/share/omx-clap-core/ts | grep -q '^libomx-clap-core1'
+          dpkg -S /usr/share/omx-clap/ts | grep -q '^libomx-clap1'
           if dpkg-query -W -f '${Package}\n' | grep -E -- '-dev$'; then echo "plugin-qualify pulled a -dev package"; exit 1; fi
           # mod-host is only suggested, and the qualification below runs without it
           dpkg-query -W -f '${Suggests}\n' plugin-qualify | grep -qw mod-host
