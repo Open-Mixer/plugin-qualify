@@ -1123,6 +1123,24 @@
             "x-text": "--layout must be <scheme>:<sha256>",
             "x-args": [],
             "x-name": "judgedLayoutForm"
+          },
+          {
+            "const": "qualify.judged.takes-shadow-key",
+            "title": "judgedTakesShadowKey",
+            "x-code": 116,
+            "x-text": "judged-layer takes a shadow key, not a file: {file}",
+            "x-args": [
+              "file"
+            ],
+            "x-name": "judgedTakesShadowKey"
+          },
+          {
+            "const": "qualify.judged.layer-one-of",
+            "title": "judgedLayerOneOf",
+            "x-code": 117,
+            "x-text": "--layer must be user or base",
+            "x-args": [],
+            "x-name": "judgedLayerOneOf"
           }
         ]
       }

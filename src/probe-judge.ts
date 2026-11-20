@@ -262,7 +262,9 @@ function costOf(output: ProbeOutput, profile: HostProfile): HostJudgment["cost"]
     { rate, quantum, profile },
     DEFAULT_HOSTING_POLICY,
   );
-  const voices = output.grid.find((p) => p.outcome === probeOk() && p.rate === rate && p.quantum === quantum)?.cost?.voices;
+  const held = output.grid.find((p) => p.outcome === probeOk() && p.rate === rate && p.quantum === quantum)?.cost?.voices;
+  // in the record's own key order, whichever reader built the object: the probe's reader and the store's export differ in it
+  const voices = held === undefined ? undefined : { held: held.held, basis: held.basis, ...(held.capacity === undefined ? {} : { capacity: held.capacity }) };
   return { rate, quantum, ...(voices === undefined ? {} : { voices }), reasons: reasons.map(asRecordReason) };
 }
 

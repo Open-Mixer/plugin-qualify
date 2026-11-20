@@ -57,6 +57,12 @@ Requires: omx-clap-host >= 0.32.5
 # /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
 Requires: omx-clap-core >= 0.32.5
+# the qualification store: the sync reads it through plugin-qualification-db and writes its records through
+# plugin-qualification-db-write (which brings plugin-qualification-db-schema); the store spec's section 7. The floor is the
+# release whose reader reads an absent base as an empty base layer (the base-absent line on standard error), after the one
+# that first shipped the widened verbs (query --records, --layer, counts) and the writer.
+Requires: plugin-qualification-db >= 2026112001
+Requires: plugin-qualification-db-write >= 2026112001
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.

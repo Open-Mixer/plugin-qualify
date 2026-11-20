@@ -87,6 +87,8 @@
     "qualify.here.config-file": { "text": "--config benötigt eine Datei", "by": "machine", "model": "draft-prose", "source": "9e2799e1354618e3cef1f2450e91789b5f8cff9cbb8fcbfcf6cd1ff4143b2291" },
     "qualify.judge.name-probe-output": { "text": "benennen Sie mindestens eine Probeausgabe", "by": "machine", "model": "draft-prose", "source": "907166635424d3e8aed58b6b350c687f492267c0e6bb17834a69e0fc02cb70c2" },
     "qualify.judged.files-pin": { "text": "--files muss die 64 hexadezimalen Ziffern des Dateipins sein", "by": "machine", "model": "draft-prose", "source": "c03d04191538954d2e4ea007ad7a827292b8f55496487a691d2221169eb3211d" },
+    "qualify.judged.layer-one-of": "--layer muss user oder base sein",
+    "qualify.judged.takes-shadow-key": "judged-layer nimmt einen Schattenschlüssel, keine Datei: {file}",
     "qualify.judged.layout-form": { "text": "--layout muss <schema>:<sha256> sein", "by": "machine", "model": "draft-prose", "source": "5a948cff6c6e3e5255d4c4811331ce2f3df89583952761a86cde99b6f7af147f" },
     "qualify.judged.machine-class": { "text": "--machine-class ist erforderlich", "by": "machine", "model": "draft-prose", "source": "13a37111e3ee85100d9a706c5c9279296f0092cf41e8cce0559b1cb580b01ebc" },
     "qualify.judged.name-one-record": { "text": "benennen Sie einen Datensatz", "by": "machine", "model": "draft-prose", "source": "a337888f47f8d1807cd99b8c8a9c48be74a4989e1c91ca4aa5b2fd567077c7d5" },

@@ -113,29 +113,6 @@ describe("plugin-qualify-records-package", () => {
     for (const f of device.kept) expect(readFileSync(join(tree, dir, f))).toEqual(readFileSync(join(device.state, f)));
   });
 
-  it("unpacked, is a distributed layer the sync takes the plugin from", async () => {
-    const tree = join(scratch, "installed");
-    readDeb(deb, tree);
-    const m = join(scratch, "fresh");
-    mkdirSync(join(m, "lv2"), { recursive: true });
-    const sp = splitPathFlags([
-      "--clap-path", dirname(device.clap), "--lv2-path", join(m, "lv2"), "--lv2-extra", "",
-      "--qualification-dir", join(m, "q"), "--descriptor-dir", join(m, "d"), "--state-file", join(m, "s.json"), "--pin-file", join(m, "p.pins"),
-      "--hostd-port", "0", "--budget-s", "5", "--host-class", "test-class", "--distributed-dir", join(tree, "usr", "share", "omx", "qualification"),
-      "--grid", "48000/128",
-    ]);
-    const args = parseSyncArgs(sp.argv);
-    if (!args.ok) throw new Error(args.error);
-    const s = resolveSyncSettings(new Map(), args.args, {}, m, undefined, undefined, sp.run);
-    if (!s.ok) throw new Error(s.error);
-    // other.clap has no record in the package and is measured; plate.clap is taken from it
-    unlinkSync(join(dirname(device.clap), "other.clap"));
-    const lines: string[] = [];
-    const summary = await runSync(s.settings, { env: {}, log: (l) => lines.push(l) });
-    expect(lines).toContain(`distributed: clap:${device.clap}#${FIXTURE_CLAP_ID}: applied (test-set-48000-128)`);
-    expect(summary?.distributed).toBe(1);
-  });
-
   it("refuses a name a Debian package cannot carry, and a run without its provenance", () => {
     expect(run([device.state, "--host-class", "Test_Class", "--set", "s", "--provenance", given, "--out", out]).status).toBe(2);
     expect(run([device.state, "--host-class", "c", "--set", "s", "--out", out]).status).toBe(2);
@@ -206,26 +183,4 @@ describe("a run of two cells, one package per cell (#317, plugin-db-qualificatio
     expect(r3.stderr).toContain("are both measured at 48000/512: one set per cell");
     expect(existsSync(out3)).toBe(false);
   });
-
-  it("installed together, a sync at each cell takes its own set", async () => {
-    for (const c of cells) {
-      const tree = join(scratch, `run-installed-${String(c.rate)}`);
-      for (const o of cells) readDeb(debOf(o.set), tree);
-      const m = join(scratch, `run-fresh-${String(c.rate)}`);
-      mkdirSync(join(m, "lv2"), { recursive: true });
-      const sp = splitPathFlags([
-        "--clap-path", dirname(clap), "--lv2-path", join(m, "lv2"), "--lv2-extra", "",
-        "--qualification-dir", join(m, "q"), "--descriptor-dir", join(m, "d"), "--state-file", join(m, "s.json"), "--pin-file", join(m, "p.pins"),
-        "--hostd-port", "0", "--budget-s", "5", "--host-class", "x86-64", "--distributed-dir", join(tree, "usr", "share", "omx", "qualification"),
-        "--grid", `${String(c.rate)}/${String(c.quantum)}`,
-      ]);
-      const args = parseSyncArgs(sp.argv);
-      if (!args.ok) throw new Error(args.error);
-      const s = resolveSyncSettings(new Map(), args.args, {}, m, undefined, undefined, sp.run);
-      if (!s.ok) throw new Error(s.error);
-      const lines: string[] = [];
-      await runSync(s.settings, { env: {}, log: (l) => lines.push(l) });
-      expect(lines).toContain(`distributed: clap:${clap}#${FIXTURE_CLAP_ID}: applied (${c.set})`);
-    }
-  }, 60_000);
 });

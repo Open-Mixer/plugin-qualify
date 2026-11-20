@@ -4,3 +4,4 @@
 # src/workflows-agree.test.ts holds the two to this file.
 src/qualification-domain-installed.test.ts
 src/describe-hostd.test.ts
+src/qualification-store.contract.test.ts
