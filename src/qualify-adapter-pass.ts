@@ -25,7 +25,6 @@ import { defaultAddressSpaceLimit } from "./direct-limit.js";
 import { QUALIFICATION_RECORD_SCHEMA, type AdapterBlock, type QualificationRecord } from "./qualification-record.js";
 import { ADMIT_ADDRESS_KB_ENV, ADMIT_STATE_DIR_ENV, ADMIT_STEP_MS_ENV, PI_CELLS } from "./qualify-declarations.js";
 import { digestFiles, type SyncContext, type SyncState } from "./qualify-sync.js";
-import { writeFileWhole } from "./whole-file.js";
 import { localeOf, textOf } from "./text-catalog.js";
 import { TEXT_CODE, type TextRef } from "./text-codes.js";
 

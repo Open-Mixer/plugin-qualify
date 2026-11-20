@@ -30,7 +30,7 @@ import type { PluginTarget } from "./loader.js";
 import { cellKey, type GridCell } from "./measurement-grid.js";
 import { pinVerdictOf } from "./pins-file.js";
 import { failedOutcome, judgeProbeOutput, type RecordReason } from "./probe-judge.js";
-import { probeOk, readProbeOutput, sha256Hex, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { probeOk, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import { probeTarget, ProbeRunnerError, type ProbeRun } from "./probe-runner.js";
 import { proberOffer } from "./clap-qualify.js";
 import {

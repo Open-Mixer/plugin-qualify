@@ -25,7 +25,6 @@ import { HOSTING_CODE } from "./hosting-codes.js";
 import type { IsolatedFigures, QualificationRecord, RecordVerdict, RunBlock, RunStep } from "./qualification-record.js";
 import { ISOLATED_SIGNAL_TOOL_ENV, ISOLATED_SIGNAL_TOOL_NAME } from "./qualify-declarations.js";
 import { locateNativeTool, toolsDir } from "./tool-paths.js";
-import { writeFileWhole } from "./whole-file.js";
 import { probeOutcome } from "./probe-domain.js";
 import type { QualificationStore, ShadowKey } from "./qualification-store.js";
 
