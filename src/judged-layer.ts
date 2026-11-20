@@ -22,6 +22,7 @@ import { QUALIFICATION_RECORD_SCHEMA, ISOLATED_TIER_HOST, type QualificationReco
 import type { SuitabilityRating } from "./rating.js";
 import { withContractPathHelp } from "./qualification-domain.js";
 import { TEXT_CODE, type TextRef } from "./text-codes.js";
+import { probeOk } from "./probe-output.js";
 
 /** The host a judged layer is written for: the one that runs plugins, in workers of its own (PLUGIN_DB_ISOLATION_HOSTS). */
 export const JUDGED_HOST = "plugin-hostd";
@@ -95,7 +96,7 @@ function versionOf(record: QualificationRecord, name: string): string | undefine
 /** The cells of the record: each measured rate and quantum, with its latency in milliseconds when one was measured. */
 export function judgedCells(record: QualificationRecord): JudgedCell[] {
   return record.measurements.grid
-    .filter((p) => p.outcome === "probe.ok")
+    .filter((p) => p.outcome === probeOk())
     .map((p) => {
       const frames = (p.latency as { measuredFrames?: number }).measuredFrames;
       return { rate: p.rate, quantum: p.quantum, ...(frames === undefined ? {} : { latencyMs: latencyMsOf(frames, p.rate) }) };

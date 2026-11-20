@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { fixtureJson } from "./probe-output-fixtures.js";
-import { PROBE_OK, readProbeOutput } from "./probe-output.js";
+import { readProbeOutput } from "./probe-output.js";
 import { stderrCopyFileName } from "./qualification-record.js";
 import { checkStderrKept } from "./refused-stderr-kept.js";
 
@@ -55,7 +55,7 @@ describe("checkStderrKept: a refused row whose child's own words are not readabl
   });
 
   it("skips a row that was not refused, even with no stderr kept at all", () => {
-    const dir = makeCase("not-refused", crashProbeText([]), fakeRecord("p.json", { outcome: PROBE_OK, qualified: true }));
+    const dir = makeCase("not-refused", crashProbeText([]), fakeRecord("p.json", { outcome: "probe.ok", qualified: true }));
     expect(checkStderrKept(dir)).toEqual([]);
   });
 

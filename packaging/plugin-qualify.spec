@@ -43,6 +43,9 @@ Requires: python3-jsonschema
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
 # 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
 Requires: plugin-hostd >= 0.20.8
+# the probe domain (the words of a probe's outcomes and signals, contract.d/probe/ there) that the judging code reads at run
+# time (src/probe-domain.ts); it is plugin-hostd-protocol's, and 0.8.0 is the release it lands in; a floor only
+Requires: plugin-hostd-protocol-contract >= 0.8.0
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.

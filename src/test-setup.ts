@@ -11,16 +11,26 @@
  */
 import { vi } from "vitest";
 import "./qualification-domain-node.js";
+import "./probe-domain-node.js";
 
-const HOLDER = vi.hoisted(() => {
+/**
+ * The place the tests read: the qualification domain (plugin-hostd's) and the probe domain (plugin-hostd-protocol's) in
+ * one directory, as the installed contract directory holds them. Each domain comes from the first directory of
+ * OMX_CONTRACT_PATH that holds it, else from the installed place; a domain found nowhere is not linked, and the first read of
+ * it refuses by name. The CLIs a test spawns read the same variable, which names this directory.
+ */
+const CONTRACT_DIR = vi.hoisted(() => {
   const fs = process.getBuiltinModule("node:fs");
-  return (process.env.OMX_CONTRACT_PATH ?? "")
-    .split(":")
-    .filter((d) => d !== "")
-    .find((d) => fs.existsSync(`${d}/qualification/qualification.json`));
+  const os = process.getBuiltinModule("node:os");
+  const dirs = [...(process.env.OMX_CONTRACT_PATH ?? "").split(":").filter((d) => d !== ""), "/usr/share/omx-contract/contract.d"];
+  const dir = fs.mkdtempSync(`${os.tmpdir()}/qualify-contract-dir-`);
+  for (const domain of ["qualification", "probe"]) {
+    const holder = dirs.find((d) => fs.existsSync(`${d}/${domain}/${domain}.json`));
+    if (holder !== undefined) fs.symlinkSync(`${holder}/${domain}`, `${dir}/${domain}`);
+  }
+  process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
+  process.env.OMX_CONTRACT_PATH = dir;
+  return dir;
 });
 
-vi.mock("./qualification-installed-dir.js", async (importOriginal) => {
-  const real = await importOriginal<typeof import("./qualification-installed-dir.js")>();
-  return { INSTALLED_CONTRACT_DIR: HOLDER ?? real.INSTALLED_CONTRACT_DIR };
-});
+vi.mock("./qualification-installed-dir.js", () => ({ INSTALLED_CONTRACT_DIR: CONTRACT_DIR }));
