@@ -20,8 +20,9 @@ export type StoredMatch =
   | { readonly status: "none" }
   /** Every reason a record found was not taken, one line each; the plugin is measured. */
   | { readonly status: "ignored"; readonly lines: readonly string[] }
-  /** The records of the plugin's bytes, by shadow key, in the order the reader gave them (the user layer first). */
-  | { readonly status: "applies"; readonly keys: readonly ShadowKey[]; readonly set: string | null; readonly lines: readonly string[] };
+  /** The plugin's keys of these bytes, in the order the reader gave them (the user layer first). Which record of a key is
+   * taken is the store's claim at the machine's cell (`QualificationStore.recordAt`), not this order (#152). */
+  | { readonly status: "applies"; readonly keys: readonly ShadowKey[]; readonly lines: readonly string[] };
 
 const keyOf = (r: StoredResult): ShadowKey => ({ sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, hostClass: r.host_class });
 const idOf = (r: StoredResult): string => [r.layer, r.sha256, r.uri, r.offer, r.host_class].join("\0");
@@ -32,7 +33,7 @@ export const storedUri = (item: SyncItem, r: Pick<StoredResult, "uri" | "format"
 /**
  * Whether the item is taken from the records the reader gave for it. A record counts only when the files plugin-hostd
  * names for the item's pin (`--pin-files`, as `withHostdFiles` takes them; not the sync's own discovery) are exactly its list; the cells of the sync must all be held; the host must have a verdict, and one the source could
- * measure. The first record of the order that counts applies, with every record of the same bytes.
+ * measure. The keys of the same bytes apply; each key's cells are the ones the store's claim gives it.
  */
 export function matchStored(
   results: readonly StoredResult[],
@@ -80,7 +81,7 @@ export function matchStored(
     return { status: "ignored", lines };
   }
   if (judged.length === 0) return { status: "ignored", lines };
-  return { status: "applies", keys: atCell.map((c) => keyOf(c[0]!)), set: atCell[0]![0]!.set, lines };
+  return { status: "applies", keys: atCell.map((c) => keyOf(c[0]!)), lines };
 }
 
 /**

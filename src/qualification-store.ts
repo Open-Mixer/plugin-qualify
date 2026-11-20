@@ -85,6 +85,8 @@ export interface StoredRecord {
   readonly uri: string;
   readonly offer: string;
   readonly host_class: string;
+  /** The base set the record came in; null in the user layer. A put record has none (the writer's layer is the user's). */
+  readonly set?: string | null;
   readonly record: QualificationRecord;
 }
 
@@ -231,6 +233,19 @@ export class QualificationStore {
   recordsOf(filter: { readonly sha256: string; readonly format: string; readonly uri: string; readonly offer: string; readonly hostClass: string; readonly layer?: "user" | "base" }): StoredRecord[] {
     const args = ["--json", "--records", ...(filter.layer === undefined ? [] : ["--layer", filter.layer]), "--sha256", filter.sha256, "--format", filter.format, "--uri", filter.uri, "--offer", filter.offer, "--host-class", filter.hostClass];
     return lines(this.read("query", args), "query --records", isRecordLine) as StoredRecord[];
+  }
+
+  /**
+   * The record that answers a key at one cell, whole: `query --json --records --rate --quantum` (plugin-db-qualification
+   * 2026112001). The store's claim decides it (its spec, section 4: the reference tier over another, then the set
+   * measured later), the user layer over the base; the line names the claimant's `set`. `undefined` when no record of
+   * the key claims the cell. Two lines, or a line with no `set`, are not what the reader prints, and are refused.
+   */
+  recordAt(key: ShadowKey, cell: { readonly rate: number; readonly quantum: number }): StoredRecord | undefined {
+    const args = ["--json", "--records", "--sha256", key.sha256, "--format", key.format, "--uri", key.uri, "--offer", key.offer, "--host-class", key.hostClass, "--rate", String(cell.rate), "--quantum", String(cell.quantum)];
+    const found = lines(this.read("query", args), "query --records --rate --quantum", (v) => isRecordLine(v) && (v as Record<string, unknown>)["set"] !== undefined) as StoredRecord[];
+    if (found.length > 1) throw new StoreError("store-output", `plugin-qualification-db query --records --rate --quantum: ${String(found.length)} records claim ${keyLabel(key)} at ${String(cell.rate)}/${String(cell.quantum)}`);
+    return found[0];
   }
 
   /** What the scope's own layer holds per format: `counts --layer user --json`. */

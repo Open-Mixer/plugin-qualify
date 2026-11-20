@@ -71,7 +71,7 @@ export function fakeStore(options: { readonly baseAbsent?: boolean; readonly bas
   const base: FakeBaseRecord[] = [...(options.base ?? [])];
   const cellId = (c: { rate: number; quantum: number }): string => `${String(c.rate)}/${String(c.quantum)}`;
   /** The cells a record claims: a user record every cell of its grid, a base record what the test gave it. */
-  const claimed = (r: FakeBaseRecord): { rate: number; quantum: number }[] => [...(r.claims ?? r.record.measurements.grid)].map((c) => ({ rate: c.rate, quantum: c.quantum }));
+  const claimed = (r: FakeBaseRecord): { rate: number; quantum: number }[] => [...(r.claims ?? r.record.measurements?.grid ?? [])].map((c) => ({ rate: c.rate, quantum: c.quantum }));
   // the claim's primary key: one record per key and cell in the base (the store refuses two, claim-duplicate)
   const owner = new Map<string, FakeBaseRecord>();
   for (const b of base)
@@ -133,8 +133,9 @@ export function fakeStore(options: { readonly baseAbsent?: boolean; readonly bas
       const at = (c: { rate: number; quantum: number }): boolean => (rate === undefined || c.rate === Number(rate)) && (quantum === undefined || c.quantum === Number(quantum));
       const claims = (r: FakeBaseRecord): { rate: number; quantum: number }[] => claimed(r).filter(at);
       if (args.includes("--records")) {
-        // a record claiming a cell the filters name; with --rate and --quantum, the one record that claims that cell
-        return ok(found.filter((r) => claims(r).length > 0).map((r) => `${JSON.stringify(line(r))}\n`).join(""));
+        // as the reader: --rate and --quantum together or neither; with them, the one record that claims that cell
+        if ((rate === undefined) !== (quantum === undefined)) return { status: 2, stdout: "", stderr: "--records at a cell takes --rate and --quantum together" };
+        return ok(found.filter((r) => rate === undefined || claims(r).length > 0).map((r) => `${JSON.stringify(line(r))}\n`).join(""));
       }
       const lines = found.flatMap((r) =>
         r.record.measurements.grid.filter((cell) => claims(r).some((c) => cellId(c) === cellId(cell))).map((cell) => ({

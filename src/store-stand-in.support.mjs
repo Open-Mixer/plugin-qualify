@@ -40,9 +40,12 @@ if (tool === "write" && verb === "put") {
   const at = (c) => (flag("--rate") === undefined || c.rate === Number(flag("--rate"))) && (flag("--quantum") === undefined || c.quantum === Number(flag("--quantum")));
   const claims = (r) => (r.layer === "user" ? r.record.measurements.grid : (r.claims ?? r.record.measurements.grid)).filter(at);
   const setOf = (r) => (r.layer === "user" ? null : (r.set ?? null));
-  if (args.includes("--records"))
+  if (args.includes("--records") && (flag("--rate") === undefined) !== (flag("--quantum") === undefined)) {
+    process.stderr.write("--records at a cell takes --rate and --quantum together\n");
+    process.exit(2);
+  } else if (args.includes("--records"))
     out = found
-      .filter((r) => claims(r).length > 0)
+      .filter((r) => flag("--rate") === undefined || claims(r).length > 0)
       .map((r) => `${JSON.stringify({ layer: r.layer, sha256: r.sha256, format: r.format, uri: r.uri, offer: r.offer, host_class: r.host_class, set: setOf(r), record: r.record })}\n`)
       .join("");
   else

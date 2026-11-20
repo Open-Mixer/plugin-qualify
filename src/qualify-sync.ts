@@ -26,9 +26,9 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { withRunHome } from "./run-home.js";
 import { clapQualifyTools } from "./clap-qualify.js";
-import { hostClassOf, outcomeOfVerdict, readBoardModel, readMachine } from "./distributed-records.js";
+import { hostClassOf, outcomeOfVerdict, readBoardModel, readMachine, recordCells } from "./distributed-records.js";
 import { matchStored, pinOfStored, storedUri } from "./pin-match.js";
-import { QualificationStore, keyId, keyLabel, shadowKeyOf, type ShadowKey } from "./qualification-store.js";
+import { QualificationStore, keyId, keyLabel, shadowKeyOf, type ShadowKey, type StoredRecord } from "./qualification-store.js";
 import { rowsUnreadable } from "./row-judge.js";
 import { parseClapScan } from "./clap-loader.js";
 import { SPAWNED_SEARCH_PATH, hostdSearchPath, searchPathWarnings, type SearchPathRun } from "./hostd-search-path.js";
@@ -44,7 +44,7 @@ import { hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
 import { localeOf, reasonText } from "./text-catalog.js";
 import type { Judgment } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { GRID_FULL, hostCells, parseGridSpec, type GridCell, type GridSpec } from "./measurement-grid.js";
+import { GRID_FULL, cellKey, hostCells, parseGridSpec, type GridCell, type GridSpec } from "./measurement-grid.js";
 import { adapterPass, type AdapterPassOptions, type AdapterPassResult } from "./qualify-adapter-pass.js";
 import { ISOLATED_RESULT, baseSteps, completeIsolated, isolatedCell, missingSteps, judgeIsolatedRun, owesIsolated, pinAfterStep, spawnedIsolatedRunner, type IsolatedRunner } from "./qualify-isolated.js";
 import { lv2World, rejudgeFromRows, rejudgeState, rejudgeToolName, memoryPass, type MemoryPassResult, type RejudgeResult } from "./qualify-rejudge.js";
@@ -1000,8 +1000,12 @@ export function syncCells(settings: Pick<SyncSettings, "grid" | "hostProfile">):
 /**
  * The item's entry taken from the store's records, or `undefined` when it is to be measured: no record finds it, or the
  * ones that do were not taken, each reason said. The match is the pin (`pin-match.ts`): the key and the exact set of the
- * item's files. Its descriptors are written as a measured item's are: a `.clap` is scanned for them (the scan lists the
- * plugins and measures nothing), an LV2 plugin joins the run's descriptor pass.
+ * item's files. Of a key, the record taken is the one the store says answers the machine's cell (the first cell the
+ * sync runs at), whole: `QualificationStore.recordAt`, the store's claim. Two sets of the base may hold a key at one
+ * cell; which one answers is the store's rule (the reference tier, then the set measured later), read here and never
+ * decided here (#152). That record must hold every cell the sync runs at, as any record taken must (#317). Its
+ * descriptors are written as a measured item's are: a `.clap` is scanned for them (the scan lists the plugins and
+ * measures nothing), an LV2 plugin joins the run's descriptor pass.
  */
 function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest[]): SyncEntry | undefined {
   const started = Date.now();
@@ -1019,12 +1023,19 @@ function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest
   // it stands. A record today's judge cannot decide for this host is measured here.
   const by = rejudgeToolName();
   const at = new Date(started).toISOString();
-  const taken: { key: ShadowKey; record: QualificationRecord; result: (typeof results)[number] }[] = [];
+  const cells = syncCells(ctx.settings);
+  const machineCell = cells[0]!;
+  const taken: { key: ShadowKey; whole: StoredRecord; record: QualificationRecord; result: (typeof results)[number] }[] = [];
   for (const key of match.keys) {
     const label = keyLabel(key);
-    const whole = ctx.store.recordsOf(key)[0];
+    const whole = ctx.store.recordAt(key, machineCell);
     if (whole === undefined) {
-      ctx.log(`stored: ${label}: its record is not there; measured here`);
+      ctx.log(`stored: ${label}: no record of it answers ${cellKey(machineCell)}; measured here`);
+      return undefined;
+    }
+    const held = new Set(recordCells(whole.record).map(cellKey));
+    if (!cells.every((c) => held.has(cellKey(c)))) {
+      ctx.log(`stored: ${label}: set ${whole.set ?? whole.layer} claims ${cellKey(machineCell)}, measured at ${[...held].join(", ")} only; measured here`);
       return undefined;
     }
     const missing = missingSteps(whole.record);
@@ -1048,12 +1059,11 @@ function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest
       ctx.log(`stored: ${label}: judged again, ${v.deciding ?? "unknown"} for ${host}; measured here`);
       return undefined;
     }
-    taken.push({ key, record, result: results.find((r) => keyId(shadowKeyOf(r)) === keyId(key))! });
+    taken.push({ key, whole, record, result: results.find((r) => keyId(shadowKeyOf(r)) === keyId(key))! });
   }
   const plugins: SyncPlugin[] = [];
-  for (const { key, record, result } of taken) {
+  for (const { key, whole, record, result } of taken) {
     // a record already in this scope's layer stands; one of the base is carried into the layer, judged again
-    const whole = ctx.store.recordsOf(key)[0]!;
     if (whole.layer === "base" || JSON.stringify(whole.record) !== JSON.stringify(record)) ctx.store.put(key, record);
     const v = record.verdicts.find((x) => x.host === host);
     if (v === undefined) continue; // the other tier's record: carried, and no plugin of the sweep
@@ -1062,7 +1072,7 @@ function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest
   }
   if (item.format === "clap") scanClapDescriptors(ctx, item);
   const all = digestFiles(item.root, item.files, files) ?? [...files];
-  return { format: item.format, root: item.root, files: all, plugins, qualifiedAt: new Date(started).toISOString(), seconds: (Date.now() - started) / 1000, distributed: match.set ?? "store" };
+  return { format: item.format, root: item.root, files: all, plugins, qualifiedAt: new Date(started).toISOString(), seconds: (Date.now() - started) / 1000, distributed: taken.find((t) => typeof t.whole.set === "string")?.whole.set ?? "store" };
 }
 
 /** The descriptors of a `.clap` taken from the layer: the scanner lists its plugins, the descriptor writer writes them. */
