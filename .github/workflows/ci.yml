@@ -101,6 +101,18 @@ jobs:
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
       - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.2' 'omx-contract-devel >= 3.20.2' 'omx-contract-data >= 3.20.0' 'plugin-hostd-contract >= 0.21.0'
+      # describe's oracle reads omx-clap-core's scan domain through omx-contract's C loader (native/scan_words.c): the loader
+      # and the domain's package, at their floors, from the channel (the ubuntu runner has neither: the channel's bookworm
+      # repository carries no libomx-domain). A floor only, checked on what dnf installed; 0.33.1 is omx-clap-core's
+      # version on main (0.33.0 already ships the scan domain)
+      - run: dnf install -y --setopt=install_weak_deps=False gcc make 'cjson-devel >= 1.7.15' 'libomx-domain-devel >= 3.20.0' 'omx-clap-core-contract >= 0.33.1'
+      - name: omx-clap-core-contract is at the floor
+        run: |
+          set -euo pipefail
+          v=$(rpm -q --qf '%{VERSION}' omx-clap-core-contract)
+          [ "$(printf '%s\n0.33.1\n' "$v" | sort -V | head -1)" = 0.33.1 ] || { echo "omx-clap-core-contract $v; the floor of the scan domain is 0.33.1"; exit 1; }
+      - name: Build describe's oracle
+        run: make -C native describe-oracle
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: Install

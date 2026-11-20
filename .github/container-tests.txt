@@ -3,3 +3,5 @@
 # publish.yml, a checkout without that package), and the container job of ci.yml runs exactly these with OMX_CONTAINER_TESTS=1;
 # src/workflows-agree.test.ts holds the two to this file.
 src/qualification-domain-installed.test.ts
+src/describe-scan-scopes.test.ts
+src/describe-native.test.ts
