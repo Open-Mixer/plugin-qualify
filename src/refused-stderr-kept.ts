@@ -10,7 +10,7 @@
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readProbeOutput, sha256Hex, PROBE_OK } from "./probe-output.js";
+import { readProbeOutput, sha256Hex, probeOk } from "./probe-output.js";
 import { stderrCopyFileName, type QualificationRecord } from "./qualification-record.js";
 
 export type StderrKeptProblem = "empty-stderr" | "log-line-not-kept";
@@ -28,7 +28,7 @@ interface ProbeLogEntry {
   readonly bytes?: number;
 }
 
-const isRefused = (record: QualificationRecord): boolean => record.probe.outcome !== PROBE_OK || record.verdicts.some((v) => !v.qualified);
+const isRefused = (record: QualificationRecord): boolean => record.probe.outcome !== probeOk() || record.verdicts.some((v) => !v.qualified);
 
 /** Every `*.qualification.json` in `dir`, refused rows only, with its parsed record. */
 function refusedRecords(dir: string): { readonly file: string; readonly record: QualificationRecord }[] {

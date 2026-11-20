@@ -186,8 +186,9 @@ describe("QUALIFICATION_MEMORY_BOUND_OUTCOMES", () => {
     init(doc);
     expect(() => isOutOfMemory("probe.oom")).toThrow(new RegExp(OUTCOMES));
   });
-  it("leaves probe.memory-limit, plugin-hostd's word, in the source", () => {
-    expect(read("src/memory-bound.ts")).toContain('export const PROBE_MEMORY_LIMIT = "probe.memory-limit"');
+  it("reads probe.memory-limit, plugin-hostd's word, from the probe domain: it is no literal of the source", () => {
+    expect(read("src/memory-bound.ts")).toContain('probeOutcome("probeMemoryLimit")');
+    expect(read("src/memory-bound.ts")).not.toContain('"probe.memory-limit"');
   });
 });
 

@@ -21,13 +21,14 @@ import { join } from "node:path";
 
 import type { Adjustment } from "./history-adjust.js";
 import type { Judgment, RecordReason } from "./probe-judge.js";
-import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { sha256Hex, probeNotAttempted, probeOk, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import type { VoicesHeld } from "./measurement/format.js";
 import { packageOwnerOf, type PackageOwner } from "./package-owner.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { qualificationDomain } from "./qualification-domain.js";
 import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
+import { probeOutcome } from "./probe-domain.js";
 
 export const QUALIFICATION_RECORD_SCHEMA = "plugin-qualify.qualification-record/1";
 
@@ -162,7 +163,7 @@ export interface UnmeasuredFigure {
  */
 export function unmeasuredFigures(output: ProbeOutput): readonly UnmeasuredFigure[] {
   return output.steps
-    .filter((s) => (s.step === "latency" || s.step === "cost") && s.outcome !== PROBE_OK)
+    .filter((s) => (s.step === "latency" || s.step === "cost") && s.outcome !== probeOk())
     .map((s) => ({
       dimension: s.step as "latency" | "cost",
       ...(s.rate === undefined ? {} : { rate: s.rate }),
@@ -180,8 +181,8 @@ export function unmeasuredFigures(output: ProbeOutput): readonly UnmeasuredFigur
  * a plugin with no latency.
  */
 export function latencyNeverTaken(record: Pick<QualificationRecord, "probe" | "measurements">): boolean {
-  if (record.probe?.outcome !== PROBE_OK) return false;
-  const ok = (record.measurements?.grid ?? []).filter((p) => p.outcome === PROBE_OK);
+  if (record.probe?.outcome !== probeOk()) return false;
+  const ok = (record.measurements?.grid ?? []).filter((p) => p.outcome === probeOk());
   if (ok.length === 0) return false;
   if ((record.measurements.unmeasured ?? []).some((u) => u.dimension === "latency")) return false;
   // a point's latency is a figure, or the reason the probe gave for none; `not-attempted` with no step is the older probe's silence
@@ -247,11 +248,11 @@ export function gridPointOf(output: ProbeOutput, p: ProbeGridPoint): RecordGridP
 
 /** The unmeasured word of a cell whose run did not end well, by its outcome code. */
 const outcomeWords = (): Readonly<Record<string, string>> => ({
-  "probe.crashed": word("probeCrashed"),
-  "probe.timeout": word("probeTimeout"),
-  "probe.refused-instantiation": word("refusedInstantiation"),
-  "probe.non-finite-output": word("nonFiniteOutput"),
-  [PROBE_NOT_ATTEMPTED]: word("notAttempted"),
+  [probeOutcome("probeCrashed")]: word("probeCrashed"),
+  [probeOutcome("probeTimeout")]: word("probeTimeout"),
+  [probeOutcome("probeRefusedInstantiation")]: word("refusedInstantiation"),
+  [probeOutcome("probeNonFiniteOutput")]: word("nonFiniteOutput"),
+  [probeNotAttempted()]: word("notAttempted"),
 });
 
 /**
@@ -269,7 +270,7 @@ export function latencyOfCell(output: ProbeOutput, point: ProbeGridPoint): Recor
 
 function unmeasuredOfCell(output: ProbeOutput, point: ProbeGridPoint): UnmeasuredLatency {
   const code = HOSTING_CODE.latencyUnmeasured;
-  if (point.outcome !== PROBE_OK) return { unmeasuredReason: outcomeWords()[point.outcome] ?? word("probeError"), code };
+  if (point.outcome !== probeOk()) return { unmeasuredReason: outcomeWords()[point.outcome] ?? word("probeError"), code };
   const step = output.steps.find((st) => st.step === "latency" && st.rate === point.rate && (st.quantum === undefined || st.quantum === point.quantum));
   if (step === undefined) return { unmeasuredReason: word("notAttempted"), code };
   const said = step.detail?.split(":")[0]?.trim() ?? "";

@@ -59,6 +59,7 @@ async function consumersOver(dir: string) {
   vi.resetModules();
   vi.doMock("./qualification-installed-dir.js", () => ({ INSTALLED_CONTRACT_DIR: dir }));
   await import("./qualification-domain-node.js");
+  await import("./probe-domain-node.js");
   const memory = await import("./memory-bound.js");
   const distributed = await import("./distributed-records.js");
   return { memory, distributed };

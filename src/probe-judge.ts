@@ -36,12 +36,13 @@ import {
 } from "./hosting-suitability.js";
 import type { HostProfile } from "./host-profiles.js";
 import { admissionRating, runDecides, type HostAdmission } from "./host-admission.js";
-import { PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { probeNotAttempted, probeOk, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
 import { RATING_SEVERITY, worstRating, type SuitabilityRating } from "./rating.js";
 import type { IntegrityMeasurement, VoicesHeld } from "./measurement/format.js";
 import { isOutOfMemory } from "./memory-bound.js";
 import type { MemoryFootprint } from "./measurement/format.js";
+import { probeOutcome } from "./probe-domain.js";
 
 /** Facts of the descriptor, which the probe output repeats none of. */
 export interface JudgeFacts {
@@ -72,7 +73,7 @@ function total(points: readonly ProbeGridPoint[], count: (p: ProbeGridPoint) => 
 
 /** The points whose run ended well: a point that crashed measured nothing. */
 function okPoints(output: ProbeOutput): ProbeGridPoint[] {
-  return output.grid.filter((p) => p.outcome === PROBE_OK);
+  return output.grid.filter((p) => p.outcome === probeOk());
 }
 
 /**
@@ -170,14 +171,14 @@ export function clapLineFromProbeOutput(output: ProbeOutput, facts: JudgeFacts =
       mainOutputChannels: 0,
       sidechainInputs: 0,
       features: [],
-      headlessOk: output.steps.some((s) => s.step === "instantiate" && s.outcome === PROBE_OK),
+      headlessOk: output.steps.some((s) => s.step === "instantiate" && s.outcome === probeOk()),
       noteInputs: facts.noteInputs ?? (noteSweep.applicable ? 1 : 0),
       latency,
       threadViolations: total(withRt, (p) => p.rtSafety?.threadViolations ?? 0) ?? 0,
       processErrors: total(withRt, (p) => p.rtSafety?.processErrors ?? 0) ?? 0,
       // the sweep ran as many blocks as the points that counted say; a run with none measured nothing
       processCalls: rtSafety.interposer ? (rtSafety.blocks ?? 0) : points.length,
-      nonFinite: output.steps.some((s) => s.outcome === "probe.non-finite-output"),
+      nonFinite: output.steps.some((s) => s.outcome === probeOutcome("probeNonFiniteOutput")),
     },
     rtSafety,
     noteSweep,
@@ -233,7 +234,7 @@ function decidingOf(reasons: readonly RecordReason[], rating: SuitabilityRating)
 /** The footprints of the cells that ran to their end, as the verdict reads them. */
 function gridMemoryReadings(output: ProbeOutput): Record<string, MemoryFootprint> {
   const out: Record<string, MemoryFootprint> = {};
-  for (const p of output.grid) if (p.outcome === PROBE_OK && p.memory !== undefined) out[costPointKey(p.rate, p.quantum)] = p.memory;
+  for (const p of output.grid) if (p.outcome === probeOk() && p.memory !== undefined) out[costPointKey(p.rate, p.quantum)] = p.memory;
   return out;
 }
 
@@ -253,15 +254,15 @@ const memoryParams = (p: ProbeGridPoint): Record<string, number | string> =>
 function costOf(output: ProbeOutput, profile: HostProfile): HostJudgment["cost"] {
   const { rate, quantum } = profile.cost;
   const cell = cellOf(output, profile);
-  if (cell !== undefined && cell.outcome !== PROBE_OK && cell.outcome !== PROBE_NOT_ATTEMPTED) {
+  if (cell !== undefined && cell.outcome !== probeOk() && cell.outcome !== probeNotAttempted()) {
     return { rate, quantum, reasons: [{ dimension: "cost", rating: "unknown", code: cell.outcome, params: { rate, quantum, ...memoryParams(cell) } }] };
   }
   const reasons = hostingCostReasons(
-    { cpuCost: { perRateQuantum: gridCostReadings(output.grid, PROBE_OK) } },
+    { cpuCost: { perRateQuantum: gridCostReadings(output.grid, probeOk()) } },
     { rate, quantum, profile },
     DEFAULT_HOSTING_POLICY,
   );
-  const voices = output.grid.find((p) => p.outcome === PROBE_OK && p.rate === rate && p.quantum === quantum)?.cost?.voices;
+  const voices = output.grid.find((p) => p.outcome === probeOk() && p.rate === rate && p.quantum === quantum)?.cost?.voices;
   return { rate, quantum, ...(voices === undefined ? {} : { voices }), reasons: reasons.map(asRecordReason) };
 }
 
@@ -271,9 +272,9 @@ function costOf(output: ProbeOutput, profile: HostProfile): HostJudgment["cost"]
  * itself, and is read as the failure it records rather than as a pass that skipped the point.
  */
 export function failedOutcome(output: ProbeOutput): string | undefined {
-  if (output.run.outcome !== PROBE_OK) return output.run.outcome;
+  if (output.run.outcome !== probeOk()) return output.run.outcome;
   // a cell that outgrew the memory bound is a recorded outcome of that cell, judged per host below, not the run's end
-  return output.grid.find((p) => p.outcome !== PROBE_OK && p.outcome !== PROBE_NOT_ATTEMPTED && !isOutOfMemory(p.outcome))?.outcome;
+  return output.grid.find((p) => p.outcome !== probeOk() && p.outcome !== probeNotAttempted() && !isOutOfMemory(p.outcome))?.outcome;
 }
 
 /**

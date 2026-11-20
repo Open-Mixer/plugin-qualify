@@ -30,7 +30,7 @@ import type { PluginTarget } from "./loader.js";
 import { cellKey, type GridCell } from "./measurement-grid.js";
 import { pinVerdictOf } from "./pins-file.js";
 import { failedOutcome, judgeProbeOutput, type RecordReason } from "./probe-judge.js";
-import { PROBE_OK, readProbeOutput, sha256Hex, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { probeOk, readProbeOutput, sha256Hex, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import { probeTarget, ProbeRunnerError, type ProbeRun } from "./probe-runner.js";
 import { proberOffer } from "./clap-qualify.js";
 import {
@@ -112,7 +112,7 @@ function withMemoryRun(output: ProbeOutput, record: QualificationRecord): ProbeO
     if (memory === undefined) continue;
     const at = grid.findIndex((p) => p.rate === c.rate && p.quantum === c.quantum);
     if (at >= 0) grid[at] = { ...grid[at]!, memory };
-    else grid.push({ rate: c.rate, quantum: c.quantum, outcome: PROBE_OK, memory });
+    else grid.push({ rate: c.rate, quantum: c.quantum, outcome: probeOk(), memory });
   }
   return { ...output, grid };
 }
@@ -393,7 +393,7 @@ export function mergeMemoryRun(record: QualificationRecord, output: ProbeOutput,
     const figures = memoryOfCell({ rate: c.rate, quantum: c.quantum, outcome, memory });
     const at = grid.findIndex((g) => cellKey(g) === cellKey(c));
     if (at >= 0) grid[at] = { ...grid[at]!, ...figures };
-    else grid.push({ rate: c.rate, quantum: c.quantum, outcome: PROBE_OK, latency: { unmeasuredReason: "not-attempted", code: HOSTING_CODE.latencyUnmeasured }, ...figures });
+    else grid.push({ rate: c.rate, quantum: c.quantum, outcome: probeOk(), latency: { unmeasuredReason: "not-attempted", code: HOSTING_CODE.latencyUnmeasured }, ...figures });
     said.push({ rate: c.rate, quantum: c.quantum, outcome, ...(p?.memoryLimit === undefined ? {} : { memoryLimit: p.memoryLimit }) });
   }
   const notMeasured = record.notMeasured ?? [];
