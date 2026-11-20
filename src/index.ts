@@ -5,6 +5,7 @@
  * plugins.
  */
 import "./qualification-domain-node.js";
+import "./probe-domain-node.js";
 export * from "./qualify-declarations.js";
 export * from "./measurement/index.js";
 export * from "./tool-paths.js";

@@ -50,6 +50,7 @@ import { ADMIT_STEP_MS_ENV, DESCRIPTOR_DIR_STATE_SUBDIR, DESCRIPTOR_DIR_SYSTEM, 
 import { toolsDir } from "./tool-paths.js";
 import { writeFileWhole } from "./whole-file.js";
 import { withContractPathHelp } from "./qualification-domain.js";
+import { probeOutcome } from "./probe-domain.js";
 
 // --- the settings -----------------------------------------------------------------------------------------------------
 
@@ -728,7 +729,7 @@ function outcomeOf(judgment: Judgment, host: string): { outcome: SyncOutcome; co
   const v = judgment.hosts.find((h) => h.verdict.host === host)?.verdict;
   if (v === undefined) return { outcome: "unmeasured", code: SYNC_CODE.notMeasured };
   const code = v.deciding;
-  if (!v.measured) return { outcome: code === "probe.crashed" ? "crashed" : code === "probe.timeout" ? "hung" : "unmeasured", ...(code === undefined ? {} : { code }) };
+  if (!v.measured) return { outcome: code === probeOutcome("probeCrashed") ? "crashed" : code === probeOutcome("probeTimeout") ? "hung" : "unmeasured", ...(code === undefined ? {} : { code }) };
   if (v.rating === "suitable" || v.rating === "conditional") return { outcome: "qualified", ...(code === undefined ? {} : { code }) };
   return { outcome: v.rating === "unsuitable" ? "refused" : "unmeasured", ...(code === undefined ? {} : { code }) };
 }

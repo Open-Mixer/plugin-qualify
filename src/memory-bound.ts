@@ -14,6 +14,7 @@ import { totalmem } from "node:os";
 import type { ProbeOutput } from "./probe-output.js";
 import { qualificationDomain } from "./qualification-domain.js";
 import { MEMORY_BOUND_EXIT_STATUS, MEMORY_LIMIT_RAM_FRACTION } from "./qualify-declarations.js";
+import { probeOutcome, probeSignal } from "./probe-domain.js";
 
 /** How the bound is applied: the runner's data limit on the child. */
 export const MEMORY_BOUND_MECHANISM = "rlimit-data";
@@ -40,11 +41,11 @@ export function probeOom(): string {
   return held.word;
 }
 
-/** The runner's own outcome for a child the kernel killed at its cgroup's `memory.max`. */
-export const PROBE_MEMORY_LIMIT = "probe.memory-limit";
+/** The runner's own outcome for a child the kernel killed at its cgroup's `memory.max`: the probe domain's word titled `probeMemoryLimit`. */
+export const probeMemoryLimit = (): string => probeOutcome("probeMemoryLimit");
 
 /** Whether an outcome says a run outgrew its memory limit, by either bound. */
-export const isOutOfMemory = (outcome: string): boolean => outcome === probeOom() || outcome === PROBE_MEMORY_LIMIT;
+export const isOutOfMemory = (outcome: string): boolean => outcome === probeOom() || outcome === probeMemoryLimit();
 
 export interface MemoryBound {
   readonly bytes: number;
@@ -76,7 +77,7 @@ export function memoryBoundOf(setting: number | "off" | undefined, ramBytes?: nu
 
 /** Whether a run under `bound` ended out of memory: the interposer's exit status, or a SIGKILL that was no deadline's. */
 export function outOfMemory(output: ProbeOutput, bound: MemoryBound | undefined): boolean {
-  if (output.run.outcome === PROBE_MEMORY_LIMIT || output.steps.some((s) => s.outcome === PROBE_MEMORY_LIMIT)) return true;
+  if (output.run.outcome === probeMemoryLimit() || output.steps.some((s) => s.outcome === probeMemoryLimit())) return true;
   if (bound === undefined) return false;
-  return output.steps.some((s) => s.exitStatus === MEMORY_BOUND_EXIT_STATUS || (s.signal === "SIGKILL" && s.outcome === "probe.crashed"));
+  return output.steps.some((s) => s.exitStatus === MEMORY_BOUND_EXIT_STATUS || (s.signal === probeSignal("sigkill") && s.outcome === probeOutcome("probeCrashed")));
 }

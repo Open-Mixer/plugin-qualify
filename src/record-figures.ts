@@ -14,6 +14,7 @@
  * (plugin-db#4) and the tiers already in the record (`RecordTiers`).
  */
 import type { QualificationRecord } from "./qualification-record.js";
+import { probeOutcome } from "./probe-domain.js";
 
 /** The latency frames this cell holds: what the plugin declared, and what the run measured, when either was taken. */
 export interface RecordLatencyFigures {
@@ -50,8 +51,6 @@ export interface RecordFigures {
   readonly timeoutCode?: string;
 }
 
-const PROBE_CRASHED = "probe.crashed";
-const PROBE_TIMEOUT = "probe.timeout";
 
 function rtSafetyFiguresOf(rtSafety: QualificationRecord["measurements"]["grid"][number]["rtSafety"]): RecordRtSafetyFigures | undefined {
   if (rtSafety === undefined) return undefined;
@@ -94,8 +93,8 @@ export function recordFigures(record: QualificationRecord, rate: number, quantum
   return {
     ...(point === undefined ? {} : { ...wrapLatency(point.latency), ...wrapCost(point.cost), ...wrapRtSafety(point.rtSafety) }),
     soakRan: soakRanAt(record, rate),
-    ...(point?.outcome === PROBE_CRASHED ? { crashCode: point.outcome } : {}),
-    ...(point?.outcome === PROBE_TIMEOUT ? { timeoutCode: point.outcome } : {}),
+    ...(point?.outcome === probeOutcome("probeCrashed") ? { crashCode: point.outcome } : {}),
+    ...(point?.outcome === probeOutcome("probeTimeout") ? { timeoutCode: point.outcome } : {}),
   };
 }
 

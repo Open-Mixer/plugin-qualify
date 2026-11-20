@@ -20,12 +20,13 @@ import { withRunHome } from "./run-home.js";
 import { ADAPTER_PASS_CELLS, startPrivateJack, type JackStarter } from "./qualify-adapter-pass.js";
 import type { GridCell } from "./measurement-grid.js";
 import { clapPinUri, type PinEntry } from "./pins-file.js";
-import { PROBE_OK, readProbeOutput } from "./probe-output.js";
+import { probeOk, readProbeOutput } from "./probe-output.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import type { IsolatedFigures, QualificationRecord, RecordVerdict, RunBlock, RunStep } from "./qualification-record.js";
 import { ISOLATED_SIGNAL_TOOL_ENV, ISOLATED_SIGNAL_TOOL_NAME } from "./qualify-declarations.js";
 import { locateNativeTool, toolsDir } from "./tool-paths.js";
 import { writeFileWhole } from "./whole-file.js";
+import { probeOutcome } from "./probe-domain.js";
 
 /** The steps of a pass, in the order they run. */
 export const RUN_STEP = { scan: "scan", describe: "describe", probe: "probe", rtSafety: "rt-safety", isolated: "isolated" } as const;
@@ -45,7 +46,7 @@ export const ISOLATED_CODE = {
 } as const;
 
 /** The outcomes of a probe that take the isolated step as well: the plugin never reached a verdict in-process. */
-const PROBE_FAILED_HARD = new Set(["probe.crashed", "probe.timeout"]);
+const probeFailedHard = (): ReadonlySet<string> => new Set([probeOutcome("probeCrashed"), probeOutcome("probeTimeout")]);
 
 /** What one run of the step saw. A run that never reached the plugin says `started: false`, and `problem`. */
 export interface IsolatedRunFacts {
@@ -114,7 +115,7 @@ export function memoryGapOnly(v: Pick<RecordVerdict, "measured" | "rating" | "re
 
 /** Whether a record's outcome calls for the isolated step: rated `conditional` by some host, a memory gap and nothing else unanswered, or a probe that crashed or hung. */
 export function owesIsolated(record: QualificationRecord): boolean {
-  return PROBE_FAILED_HARD.has(record.probe.outcome) || record.verdicts.some((v) => v.measured && (v.rating === "conditional" || memoryGapOnly(v)));
+  return probeFailedHard().has(record.probe.outcome) || record.verdicts.some((v) => v.measured && (v.rating === "conditional" || memoryGapOnly(v)));
 }
 
 /**
@@ -157,7 +158,7 @@ export function stepsCalledFor(record: QualificationRecord): readonly string[] {
     RUN_STEP.scan,
     RUN_STEP.describe,
     RUN_STEP.probe,
-    ...(record.probe.outcome === PROBE_OK ? [RUN_STEP.rtSafety] : []),
+    ...(record.probe.outcome === probeOk() ? [RUN_STEP.rtSafety] : []),
     ...(owesIsolated(record) ? [RUN_STEP.isolated] : []),
   ];
 }
@@ -176,7 +177,7 @@ export function baseSteps(record: QualificationRecord, describeProblem?: string)
     { step: RUN_STEP.scan, result: "ok" },
     describeProblem === undefined ? { step: RUN_STEP.describe, result: "ok" } : { step: RUN_STEP.describe, result: "failed", detail: describeProblem },
     { step: RUN_STEP.probe, result: record.probe.outcome },
-    ...(record.probe.outcome === PROBE_OK
+    ...(record.probe.outcome === probeOk()
       ? [{ step: RUN_STEP.rtSafety, result: !measured ? "not-measured" : record.verdicts.some((v) => v.rating === "conditional") ? "unsafe" : "safe" }]
       : []),
   ];

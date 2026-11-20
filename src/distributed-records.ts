@@ -23,6 +23,7 @@ import { QUALIFICATION_RECORD_SCHEMA, type QualificationRecord, type RecordVerdi
 import type { FileDigest, SyncItem, SyncOutcome, SyncPlugin } from "./qualify-sync.js";
 import type { SuitabilityRating } from "./rating.js";
 import { writeFileWhole } from "./whole-file.js";
+import { probeOutcome } from "./probe-domain.js";
 
 /** Where a system's packages install the distributed records. */
 export const DISTRIBUTED_DIR_SYSTEM = "/usr/share/omx/qualification";
@@ -179,7 +180,7 @@ export function distributedUri(item: SyncItem, r: DistributedRecord): string {
 
 /** What the sync's own judgment would make of the record's verdict for the host, as `outcomeOf` reads a run. */
 export function outcomeOfVerdict(v: Pick<RecordVerdict, "measured" | "rating" | "deciding">): SyncOutcome {
-  if (!v.measured) return v.deciding === "probe.crashed" ? "crashed" : v.deciding === "probe.timeout" ? "hung" : "unmeasured";
+  if (!v.measured) return v.deciding === probeOutcome("probeCrashed") ? "crashed" : v.deciding === probeOutcome("probeTimeout") ? "hung" : "unmeasured";
   if (v.rating === "suitable" || v.rating === "conditional") return "qualified";
   return v.rating === "unsuitable" ? "refused" : "unmeasured";
 }
