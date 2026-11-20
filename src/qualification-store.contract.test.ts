@@ -122,6 +122,18 @@ describe("every optional field the writer maps is put, not refused as unmapped",
   });
 });
 
+describe("a record run under an adapter host is put: the host is a word of QUALIFICATION_ADAPTER_HOSTS (qualification 1.4.0)", () => {
+  for (const host of ["omx-clap-host", "mod-host", "jalv"]) {
+    it(`adapter host ${host}`, () => {
+      const r = JSON.parse(JSON.stringify(record())) as Record<string, any>;
+      r.adapter = { host, measured: true, admitted: true, params: {} };
+      const out = put(r);
+      expect(out.stderr).not.toContain("word-unknown");
+      expect(out.status, out.stderr).toBe(0);
+    });
+  }
+});
+
 describe("plugin-qualification-db reads what the sync asks of it", () => {
   const verdict = (out: { status: number | null; stderr: string }, what: string): void => {
     // a store that is not there is a refusal by name; a verb the command does not have is a usage error
