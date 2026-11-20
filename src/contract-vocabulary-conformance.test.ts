@@ -15,6 +15,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { openQualificationDomainAt } from "./qualification-domain-node.js";
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 import { clapCoreTsDirCandidates, isHostingTableName } from "../tools/clap-core-tsdir.mjs";
 import { OUT as GENERATED_HOSTING_CODES, hostingCodesFileFrom } from "../tools/gen-hosting-codes.mjs";
 import { HOSTING_CODE } from "./hosting-codes.js";
@@ -162,7 +163,7 @@ describe("HOSTING_CODE is omx-clap-core's hosting tables, in full", () => {
 });
 
 /** The words of a contract item, in its order. */
-const domain = openQualificationDomainAt(join(PKG, "contract.d"));
+const domain = openQualificationDomainAt(INSTALLED_CONTRACT_DIR);
 const words = (name: string): readonly string[] => domain.words(name);
 const codes = (terms: readonly { readonly code: string }[]): string[] => terms.map((t) => t.code);
 
@@ -258,12 +259,6 @@ const WRITERS: readonly Writer[] = [
     words: captured(/\bmethod:\s*"([^"]+)"/g),
     vocabulary: [...words("QUALIFICATION_MEASUREMENT_LATENCY_METHODS"), ...words("QUALIFICATION_MEASUREMENT_COST_METHODS")],
   },
-  {
-    what: "scaling law benchmark.py fits",
-    files: (rel) => rel === "tools/benchmark.py",
-    words: pythonReturns("_fit_scaling"),
-    vocabulary: words("QUALIFICATION_MEASUREMENT_LATENCY_SCALING"),
-  },
 ];
 
 function writtenOutside(files: readonly string[], read: (rel: string) => string): string[] {
@@ -288,6 +283,13 @@ describe("every measurement word plugin-qualify writes is the contract's", () =>
 
   it("no writer writes a word the contract lacks", () => {
     expect(writtenOutside(files, readPkg)).toEqual([]);
+  });
+
+  it("benchmark.py types no scaling word: the law it fits returns the domain's words, read at call time", () => {
+    const text = readPkg("tools/benchmark.py");
+    expect(pythonReturns("_fit_scaling")(text)).toEqual([]);
+    expect(pythonReturns("classify_scaling")(text)).toEqual([]);
+    expect(text).toContain('"QUALIFICATION_MEASUREMENT_LATENCY_SCALING"');
   });
 
   it("an invented reason in the C measurer is seen — sabotage control", () => {

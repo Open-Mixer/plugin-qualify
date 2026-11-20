@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The qualification domain (contract.d/qualification/) follows the rule of data at run time: its items are named
+ * The qualification domain (plugin-hostd's contract.d/qualification/, read from the installed place) follows the rule of data at run time: its items are named
  * QUALIFICATION_*, it states its JSON Schema dialect, and nothing renders it into TypeScript, Python or any other source.
  */
 import { execFileSync } from "node:child_process";
@@ -9,9 +9,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CONTRACT_DIR = join(PKG, "contract.d");
+const CONTRACT_DIR = INSTALLED_CONTRACT_DIR;
 const DOC = join(CONTRACT_DIR, "qualification", "qualification.json");
 const doc = JSON.parse(readFileSync(DOC, "utf8")) as {
   $schema?: string;
