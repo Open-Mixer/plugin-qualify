@@ -22,9 +22,9 @@ runs:
         # 0.15.3: the memory footprint in the probe output, which a host with a memory budget judges (#114)
         v=$(dpkg-query -W -f='${Version}' plugin-hostd)
         dpkg --compare-versions "$v" ge 0.15.3 || { echo "::error::plugin-hostd $v in the channel; a verdict needs the memory footprint, plugin-hostd 0.15.3 or later"; exit 1; }
-        # 0.7.0: plugin-hostd-protocol-contract, the package of the probe domain the judging code reads (src/probe-domain.ts)
+        # 0.8.0: plugin-hostd-protocol-contract, the package of the probe domain the judging code reads (src/probe-domain.ts)
         c=$(dpkg-query -W -f='${Version}' plugin-hostd-protocol-contract)
-        dpkg --compare-versions "$c" ge 0.7.0 || { echo "::error::plugin-hostd-protocol-contract $c in the channel; the probe domain needs 0.7.0 or later"; exit 1; }
+        dpkg --compare-versions "$c" ge 0.8.0 || { echo "::error::plugin-hostd-protocol-contract $c in the channel; the probe domain needs 0.8.0 or later"; exit 1; }
         echo "PLUGIN_HOSTD=/usr/bin/plugin-hostd" >> "$GITHUB_ENV"
         # the runner is here now, so src/grid-runs.test.ts fails its live arms instead of skipping them
         echo "OMX_PROBE_RUNNER_REQUIRED=1" >> "$GITHUB_ENV"
