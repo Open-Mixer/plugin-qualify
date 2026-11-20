@@ -112,8 +112,23 @@ fi
 bare_jack() { if [ -n "$jack" ]; then env -i PATH=/usr/bin:/bin HOME="$HOME" JACK_DEFAULT_SERVER="$jack" JACK_NO_START_SERVER=1 "$@"; else bare "$@"; fi; }
 # the directories scanned are the ones the installed plugin-hostd prints for its settings file (plugin-qualify#9)
 printf 'lv2_path %s\nclap_path %s\n' "$out/sync/lv2" "$out/sync/clap" > "$out/sync/plugin-hostd.conf"
-bare_jack plugin-qualify-sync --hostd-conf "$out/sync/plugin-hostd.conf" --pin-file "$out/sync/qualified.pins" \
-  --qualification-dir "$out/sync/q" --descriptor-dir "$out/sync/d" --state-file "$out/sync/state.json" --hostd-port 0 > "$out/sync.txt" 2> "$out/sync.err" ||
+# the sync reads and writes the qualification store through the installed plugin-qualification-db and
+# plugin-qualification-db-write: the base the records package installed, and a user layer under a home of the check's
+# own, so nothing of the runner's home is read or written. A store that is not there is a failure, never a fallback.
+command -v plugin-qualification-db >/dev/null || fail "the package pulled no plugin-qualification-db"
+command -v plugin-qualification-db-write >/dev/null || fail "the package pulled no plugin-qualification-db-write"
+[ -f /usr/share/omx/qualification/qualification.sqlite ] || fail "no store base: install plugin-qualification-records"
+storehome="$out/sync/home"
+mkdir -p "$storehome"
+# the store keys its records by host class: a machine with no class of its own (an arm64 runner is no Raspberry Pi) is
+# named the store's arm64 class
+case "$(uname -m)" in
+  x86_64) class=x86-64 ;;
+  aarch64) class=rpi5 ;;
+  *) fail "no host class of the store for $(uname -m)" ;;
+esac
+HOME="$storehome" bare_jack plugin-qualify-sync --hostd-conf "$out/sync/plugin-hostd.conf" --pin-file "$out/sync/qualified.pins" \
+  --host-class "$class" --descriptor-dir "$out/sync/d" --state-file "$out/sync/state.json" --hostd-port 0 > "$out/sync.txt" 2> "$out/sync.err" ||
   fail "plugin-qualify-sync failed: $(cat "$out/sync.err")"
 cat "$out/sync.err"
 # a release with no python3-lilv says so; one with the bindings loads the library from the runtime package alone
@@ -126,4 +141,11 @@ else
   grep -q 'no JACK server' "$out/sync.err" || fail "the sync did not name the missing JACK server: $(cat "$out/sync.err")"
   [ "$(grep -c ' verdict=in-process$' "$out/sync/qualified.pins")" -eq 1 ] || fail "the sync's pin file does not pin the CLAP fixture in-process"
 fi
-echo "check-installed: plugin-qualify-sync qualifies a CLAP and an LV2 plugin, and its units are enabled"
+# the records are in the store's user layer, and no record file was written anywhere the sync used
+[ -f "$storehome/.local/share/omx/qualification/qualification.sqlite" ] || fail "the sync wrote no user layer of the store"
+HOME="$storehome" bare plugin-qualification-db counts --scope user --layer user --json > "$out/counts.txt" ||
+  fail "the store's user layer does not read: $(cat "$out/counts.txt")"
+grep -q '"plugins":[1-9]' "$out/counts.txt" || fail "the store's user layer holds no plugin: $(cat "$out/counts.txt")"
+! find "$out/sync" -name '*.qualification.json' -o -name '*.probe.json' -o -name '*.unmeasured.json' | grep -q . ||
+  fail "the sync wrote a record file: $(find "$out/sync" -name '*.json')"
+echo "check-installed: plugin-qualify-sync qualifies a CLAP and an LV2 plugin into the store, and its units are enabled"

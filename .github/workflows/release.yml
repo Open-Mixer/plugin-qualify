@@ -205,6 +205,10 @@ jobs:
           }
           # the main package requires plugin-qualify-contract of the same version: both files, from the same build
           dnf_retry ./pkgs/plugin-qualify-[0-9]*."$ARCH".rpm ./pkgs/plugin-qualify-contract-[0-9]*.noarch.rpm
+          # the store's commands come with the package; the store's base comes with the records package, which the sync
+          # below reads (an absent base is refused, never replaced by files)
+          rpm -q plugin-qualification-db plugin-qualification-db-write
+          dnf_retry plugin-qualification-records
           rpm -q omx-clap-host
           rpm -qf /usr/share/omx-clap-core/ts | grep -q '^omx-clap-core-[0-9]'
           if rpm -qa --qf '%{NAME}\n' | grep -E -- '-devel$'; then echo "plugin-qualify pulled a -devel package"; exit 1; fi
@@ -232,6 +236,10 @@ jobs:
           set -euo pipefail
           # the main package depends on plugin-qualify-contract of the same version: both files, from the same build
           apt-get install -y ./pkgs/"$SUITE"/plugin-qualify_*.deb ./pkgs/"$SUITE"/plugin-qualify-contract_*.deb
+          # the store's commands come with the package; the store's base comes with the records package, which the sync
+          # below reads (an absent base is refused, never replaced by files)
+          dpkg -s plugin-qualification-db plugin-qualification-db-write >/dev/null
+          apt-get install -y plugin-qualification-records
           dpkg -s omx-clap-host >/dev/null
           dpkg -S /usr/share/omx-clap-core/ts | grep -q '^libomx-clap-core1'
           if dpkg-query -W -f '${Package}\n' | grep -E -- '-dev$'; then echo "plugin-qualify pulled a -dev package"; exit 1; fi
