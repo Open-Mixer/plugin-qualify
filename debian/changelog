@@ -1,3 +1,26 @@
+plugin-qualify (0.20.7) unstable; urgency=medium
+
+  * The qualification domain 1.4.0 holds the words of the record store, the
+    14 kinds of an adapter code, the memory-bound outcome and the adapter
+    hosts; the adapter codes and the memory-bound outcome are read from it,
+    not spelled in the program (#113, #115, #136).
+  * Reasons and usage errors are codes, every language filled by the
+    router (#145).
+  * The qualification record holds the package its binary came from (#124).
+  * The audio thread decides: plugin-qualify's own threads are conditional and
+    groupable (#119).
+  * Entry points decide "run, not imported" with omx-contract's isMain (#134).
+  * Packages are built for Fedora 45, RPM for x86_64 only (#121); install
+    instructions for Fedora 45 and Debian trixie arm64 (#132).
+  * The release install job takes its cells and runners from check-matrix,
+    arm64 first (#117, #131).
+  * CI: floors only (#112), heavy jobs by dispatch (#116), the CLAP floor
+    lint on pull requests (#127, #140), the commit identity check (#133).
+  * Floors: omx-contract rises to 3.20.2 (#139); plugin-hostd rises to
+    0.20.8, the published fix of 0.20.7's protocol ceiling; no ceilings.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Fri, 20 Nov 2026 20:15:00 +0100
+
 plugin-qualify (0.20.6) unstable; urgency=medium
 
   * The qualification domain ships in the new plugin-qualify-contract package
