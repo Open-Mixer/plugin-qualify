@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The package reads the qualification domain (contract.d/qualification/) at run time: the words it uses are the JSON's, a
+ * The package reads the qualification domain (plugin-hostd's, installed in the contract directory) at run time: the words it uses are the JSON's, a
  * word changed there is the word the consumer reads, and a document the package cannot use is refused by name.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -12,13 +12,15 @@ import { spawnSync } from "node:child_process";
 import { describe, expect, it, vi } from "vitest";
 import { buildVocabulary } from "./measurement/vocabulary.js";
 import { openInstalledQualificationDomain, openQualificationDomainAt } from "./qualification-domain-node.js";
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 
-const CONTRACT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "contract.d");
+const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
+const CONTRACT_DIR = INSTALLED_CONTRACT_DIR;
 
 describe("the package reads its words from the installed JSON", () => {
   const fixture = (edit: (d: { components: { schemas: Record<string, { oneOf: object[] }> } }) => void): string => {
     const dir = mkdtempSync(join(tmpdir(), "qualification-domain-"));
-    cpSync(CONTRACT_DIR, dir, { recursive: true });
+    cpSync(join(CONTRACT_DIR, "qualification"), join(dir, "qualification"), { recursive: true });
     const file = join(dir, "qualification", "qualification.json");
     const d = JSON.parse(readFileSync(file, "utf8"));
     edit(d);
@@ -65,7 +67,7 @@ describe("the package reads its words from the installed JSON", () => {
 
 const withWord = (): string => {
   const dir = mkdtempSync(join(tmpdir(), "qualification-domain-"));
-  cpSync(CONTRACT_DIR, dir, { recursive: true });
+  cpSync(join(CONTRACT_DIR, "qualification"), join(dir, "qualification"), { recursive: true });
   const file = join(dir, "qualification", "qualification.json");
   const d = JSON.parse(readFileSync(file, "utf8")) as { components: { schemas: Record<string, { oneOf: object[] }> } };
   d.components.schemas.QUALIFICATION_MEASUREMENT_VOICE_BASES!.oneOf.push({ const: "fixture-word", title: "fixtureWord", "x-code": 2, "x-text": "A word only this test adds." });
@@ -113,7 +115,7 @@ describe("a page hands the document", () => {
   });
   it("no browser-reachable module imports the Node reader", () => {
     for (const f of ["qualification-domain.ts", "measurement/vocabulary.ts", "qualification-record.ts"]) {
-      expect(readFileSync(join(CONTRACT_DIR, "..", "src", f), "utf8"), f).not.toContain("qualification-domain-node");
+      expect(readFileSync(join(PKG, "src", f), "utf8"), f).not.toContain("qualification-domain-node");
     }
   });
 });
@@ -143,7 +145,7 @@ describe("OMX_CONTRACT_PATH belongs to the CLI entry, never to the library", () 
     }
   });
   it("every CLI entry names it in --help and starts by reading it", () => {
-    const root = join(CONTRACT_DIR, "..");
+    const root = PKG;
     for (const bin of ["plugin-qualify", "plugin-qualify-sync", "plugin-qualify-records-package"]) {
       const out = spawnSync(process.execPath, [join(root, "bin", `${bin}.mjs`), "--help"], { encoding: "utf8" });
       expect(`${out.stdout}${out.stderr}`, bin).toContain("OMX_CONTRACT_PATH");
@@ -199,7 +201,7 @@ describe("$id must be exactly the domain's", () => {
   const doc = () => JSON.parse(readFileSync(join(CONTRACT_DIR, "qualification", "qualification.json"), "utf8"));
   const dirWith = (edit: (d: Record<string, unknown>) => void): string => {
     const dir = mkdtempSync(join(tmpdir(), "qualification-id-"));
-    cpSync(CONTRACT_DIR, dir, { recursive: true });
+    cpSync(join(CONTRACT_DIR, "qualification"), join(dir, "qualification"), { recursive: true });
     const d = doc();
     edit(d);
     writeFileSync(join(dir, "qualification", "qualification.json"), JSON.stringify(d));

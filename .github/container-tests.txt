@@ -1,5 +1,5 @@
-# Test files that need omx-contract 3.20.0 as a system package (the installer domain mode, fmt, omx-contract.pc).
-# One list, two readers: vitest.config.ts leaves them out of an ordinary run (the Ubuntu job, publish.yml, a checkout
-# without that package), and the container job of ci.yml runs exactly these with OMX_CONTAINER_TESTS=1;
+# Test files that need the qualification domain installed as a system package (plugin-hostd-contract, which ships plugin-hostd's
+# contract.d/qualification). One list, two readers: vitest.config.ts leaves them out of an ordinary run (the Ubuntu job,
+# publish.yml, a checkout without that package), and the container job of ci.yml runs exactly these with OMX_CONTAINER_TESTS=1;
 # src/workflows-agree.test.ts holds the two to this file.
-src/qualification-domain-install.test.ts
+src/qualification-domain-installed.test.ts

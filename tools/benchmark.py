@@ -49,6 +49,7 @@ import subprocess
 import sys
 import time
 from collections import namedtuple
+from functools import lru_cache
 
 # `COST_REFERENCE_RATE` and `QUANTUM_FRAMES` are the rig's canonical-rate and quantum
 # declarations (with the rate list and timeouts), generated from `src/qualify-declarations.ts` because this script cannot import
@@ -535,6 +536,43 @@ def _within(values, absolute, relative):
     return (hi - lo) <= tol
 
 
+# The scaling words (the classes, the notes, the exclusions) are the `qualification` domain's, owner plugin-hostd
+# (QUALIFICATION_MEASUREMENT_LATENCY_SCALING, _SCALING_NOTES, _EXCLUSIONS): read at call time from the first directory of
+# OMX_CONTRACT_PATH (a ':' list, the test and development entry the CLIs share) that holds the domain, else the installed
+# contract directory. A domain that is absent, or without the word, ends the run naming it; no word is typed here.
+INSTALLED_CONTRACT_DIR = "/usr/share/omx-contract/contract.d"
+
+
+@lru_cache(maxsize=8)
+def _domain_titles(path, mtime):
+    with open(path, encoding="utf-8") as f:
+        schemas = json.load(f)["components"]["schemas"]
+    return {item: {e["title"]: e["const"] for e in body["oneOf"]} for item, body in schemas.items()}
+
+
+def _domain_word(item, title):
+    """The word of `title` in `item` of the qualification domain"""
+    dirs = [d for d in os.environ.get("OMX_CONTRACT_PATH", "").split(":") if d] + [INSTALLED_CONTRACT_DIR]
+    for d in dirs:
+        path = os.path.join(d, "qualification", "qualification.json")
+        if os.path.isfile(path):
+            break
+    else:
+        raise SystemExit("benchmark: the qualification domain is in none of %s (plugin-hostd-contract installs it)" % ", ".join(dirs))
+    try:
+        return _domain_titles(path, os.stat(path).st_mtime_ns)[item][title]
+    except (OSError, ValueError, KeyError) as e:
+        raise SystemExit("benchmark: %s: %s %s is not readable: %s" % (path, item, title, e))
+
+
+def _scaling(title):
+    return _domain_word("QUALIFICATION_MEASUREMENT_LATENCY_SCALING", title)
+
+
+def _scaling_note_word(title):
+    return _domain_word("QUALIFICATION_MEASUREMENT_LATENCY_SCALING_NOTES", title)
+
+
 def unreliable_readings(per_rate):
     """The readings in `per_rate` that are physically impossible → {rate: reason}. Pure.
 
@@ -568,30 +606,30 @@ def unreliable_readings(per_rate):
         # fixed-frame projects f frames onto this rate; fixed-time projects f*rate/r.
         implied = min(min(f, f * rate / r) for r, f in nonzero)
         if implied >= 1.0:
-            out[rate] = "impossible-zero"
+            out[rate] = _domain_word("QUALIFICATION_MEASUREMENT_LATENCY_EXCLUSIONS", "impossibleZero")
     return dict(sorted(out.items()))
 
 
 def _fit_scaling(points):
     """The scaling law `points` (rate → frames, coherent readings only) obey. Pure."""
     if not points:
-        return "unmeasured"
+        return _scaling("unmeasured")
     if len(points) < 2:
-        return "single-rate"
+        return _scaling("singleRate")
     frames = list(points.values())
     if all(f == 0.0 for f in frames):
-        return "zero"
+        return _scaling("zero")
     if _within(frames, SCALING_TOL_FRAMES, SCALING_TOL_FRAMES_REL):
-        return "fixed-frame"
+        return _scaling("fixedFrame")
     ms = [f / r * 1000.0 for r, f in points.items()]
     if _within(ms, SCALING_TOL_MS, SCALING_TOL_MS_REL):
-        return "fixed-time"
+        return _scaling("fixedTime")
     if max(ms) < COHERENCE_BUDGET_MS:
         # incoherent, but every reading fits inside the budget one plugin may spend:
         # nothing a mix can hear turns on which law this obeys, and flagging it would
         # spend the flag's credibility on the detector's noise.
-        return "zero"
-    return "nonconforming"
+        return _scaling("zero")
+    return _scaling("nonconforming")
 
 
 def _coherent_points(per_rate):
@@ -612,13 +650,14 @@ def _operational_refit(points):
     fit is not `nonconforming`, or the operational readings flag it too: only the flag is ever
     re-derived, so a fit that holds over every reading is never overturned by fewer points.
     """
-    if _fit_scaling(points) != "nonconforming":
+    nonconforming = _scaling("nonconforming")
+    if _fit_scaling(points) != nonconforming:
         return None
     operational = {r: f for r, f in points.items() if r >= OPERATIONAL_RATE_FLOOR}
     if len(operational) < 2 or len(operational) == len(points):
         return None
     refit = _fit_scaling(operational)
-    return None if refit == "nonconforming" else refit
+    return None if refit == nonconforming else refit
 
 
 def classify_scaling(per_rate):
@@ -682,8 +721,8 @@ def scaling_note(per_rate):
     if len(points) < 2 or all(f == 0.0 for f in points.values()):
         return None
     if _operational_refit(points) is not None:
-        return "informational-rate"
-    return "below-budget" if _fit_scaling(points) == "zero" else None
+        return _scaling_note_word("informationalRate")
+    return _scaling_note_word("belowBudget") if _fit_scaling(points) == _scaling("zero") else None
 
 
 def apply_coherence(lat, per_rate):
