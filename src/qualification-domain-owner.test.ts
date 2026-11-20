@@ -4,7 +4,8 @@
  * The `qualification` domain is plugin-hostd's (contract.d/qualification/ of plugin-hostd, the vocabulary sorting pass, row V5):
  * this package keeps no copy, reads the installed one, and requires plugin-hostd-contract for it. The words are frozen in
  * fixtures/qualification-golden.json (item -> [title, word] pairs), taken from this package's own domain 1.4.0 at 2d6aefc;
- * QUALIFICATION_MACHINE_CLASSES, which nothing reads, is dropped by plugin-hostd and may be absent.
+ * QUALIFICATION_MACHINE_CLASSES, which nothing reads, is dropped by plugin-hostd 0.21.0: the golden file lacks it and the domain
+ * must too.
  *
  *  a. golden: the domain the package reads holds the golden words;
  *  c. sabotage: a scratch contract directory with one word removed is refused by name by the vocabulary the package builds;
@@ -21,7 +22,6 @@ import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(PKG, rel), "utf8");
-const DROPPED = "QUALIFICATION_MACHINE_CLASSES";
 const golden = JSON.parse(read("fixtures/qualification-golden.json")) as Record<string, [string, string][]>;
 
 type Doc = { components: { schemas: Record<string, { oneOf: { const: string; title: string }[] }> } };
@@ -32,8 +32,8 @@ describe("the words the package reads are the golden ones", () => {
   it("the domain of the contract directory the tests read holds every golden item and word", () => {
     const doc = JSON.parse(readFileSync(join(INSTALLED_CONTRACT_DIR, "qualification", "qualification.json"), "utf8")) as Doc;
     const got = pairs(doc);
+    expect(Object.keys(got).sort()).toEqual(Object.keys(golden).sort());
     for (const [item, words] of Object.entries(golden)) {
-      if (item === DROPPED && got[item] === undefined) continue;
       expect(got[item], item).toEqual(words);
     }
   });

@@ -217,11 +217,11 @@ describe("x-since names the version of the domain document that first carried th
       const want = V140.includes(item) ? "1.4.0" : V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
       expect(schema["x-since"], item).toBe(want);
     }
-    // plugin-hostd dropped QUALIFICATION_MACHINE_CLASSES, which nothing reads (ownership map rows 5 and 20): 17 items with it, 16 without
-    const dropped = original.components.schemas.QUALIFICATION_MACHINE_CLASSES === undefined ? 1 : 0;
-    expect(Object.keys(original.components.schemas)).toHaveLength(17 - dropped + V120.length + V130.length + V140.length);
+    // plugin-hostd 0.21.0 ships the domain without QUALIFICATION_MACHINE_CLASSES, which nothing reads (ownership map rows 5 and 20): 16 created with it
+    expect(Object.keys(original.components.schemas)).toHaveLength(16 + V120.length + V130.length + V140.length);
+    expect(original.components.schemas.QUALIFICATION_MACHINE_CLASSES).toBeUndefined();
   });
-  it("the domain is 1.4.0 or later, the version that carries the items this package reads", () => {
-    expect(above(original.info.version, "1.3.99")).toBe(true);
+  it("the domain is 1.4.0", () => {
+    expect(original.info.version).toBe("1.4.0");
   });
 });

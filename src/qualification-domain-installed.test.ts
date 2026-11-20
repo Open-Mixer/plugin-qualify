@@ -20,7 +20,6 @@ describe("the installed qualification domain", () => {
   it("is the golden one, read at the real installed place", () => {
     const domain = openQualificationDomainAt(REAL);
     for (const [item, words] of Object.entries(golden)) {
-      if (item === "QUALIFICATION_MACHINE_CLASSES") continue;
       expect(domain.words(item), item).toEqual(words.map(([, word]) => word));
     }
   });

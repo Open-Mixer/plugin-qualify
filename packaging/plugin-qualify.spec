@@ -33,7 +33,7 @@ Requires: nodejs >= 18
 Requires: python3
 # the program reads the qualification domain at start-up: plugin-hostd's, shipped by its contract package (a floor only; the
 # package this one shipped the domain in is pruned from the channel, so no relation to it stands here)
-Requires: plugin-hostd-contract >= 0.20.8
+Requires: plugin-hostd-contract >= 0.21.0
 # the measurer and the LV2 host probe link lilv, and the descriptors read it through python3-lilv
 Requires: lilv-libs
 Requires: python3-lilv
