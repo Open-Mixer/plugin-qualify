@@ -221,7 +221,7 @@ class UnitsFromTheSheet(unittest.TestCase):
         self.assertIsNone(s.Scanner.unit_symbol(self.scanner(), self.FakePort(None)))
 
     @staticmethod
-    def lv2_domain(units=(("cent", "cents"),), openmixer=(("dbfs", "dBFS"),), drop_term=None):
+    def lv2_domain(units=(("cent", "cents"),), openmixer=(("dbfs", "dBFS"), ("hz", "Hz")), drop_term=None):
         """A plugin-db `lv2` domain with the given unit words (term key -> PARAM_UNITS word), as the document lays it out."""
         term = lambda key, kind: {"const": key, "title": key, "x-term": {"uri": s.UNITS + key, "kind": kind}}
         refs = "https://openmixer.org/contract/lv2#/components/schemas/LV2_UNITS_TERMS"
@@ -248,6 +248,18 @@ class UnitsFromTheSheet(unittest.TestCase):
             self.assertEqual(words[s.UNITS + "cent"], "cents")
             self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + "dBFS", words), "dBFS")
             self.assertIsNone(desc.unit_word(s.UNITS + "coef", words))
+
+    def test_an_openmixer_spelling_is_read_by_its_lower_cased_name_as_the_domain_says(self):
+        """plugin-db's LV2_OPENMIXER_UNIT_IDS (F1, Q7): its title is the <name> in lower case, and "a reader lower-cases the
+        name after urn:openmixer:unit# and reads the word of that title". So #Hz and #hz both read Hz, and #dbfs reads dBFS; a
+        name no title holds is refused."""
+        with tempfile.TemporaryDirectory() as root:
+            words = desc.unit_words(self.env_with(root, self.lv2_domain()))
+            for spelled in ("Hz", "hz", "HZ"):
+                self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + spelled, words), "Hz", spelled)
+            for spelled in ("dBFS", "dbfs"):
+                self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + spelled, words), "dBFS", spelled)
+            self.assertIsNone(desc.unit_word(s.OPENMIXER_UNITS + "furlong", words))
 
     def test_a_unit_whose_term_the_domain_lacks_refuses_by_name(self):
         with tempfile.TemporaryDirectory() as root:
