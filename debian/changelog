@@ -16,7 +16,8 @@ plugin-qualify (0.20.7) unstable; urgency=medium
     arm64 first (#117, #131).
   * CI: floors only (#112), heavy jobs by dispatch (#116), the CLAP floor
     lint on pull requests (#127, #140), the commit identity check (#133).
-  * Floors: omx-contract rises to 3.20.2 (#139); no ceilings.
+  * Floors: omx-contract rises to 3.20.2 (#139); plugin-hostd rises to
+    0.20.8, the published fix of 0.20.7's protocol ceiling; no ceilings.
 
  -- Pau Aliagas <linuxnow@gmail.com>  Fri, 20 Nov 2026 20:15:00 +0100
 

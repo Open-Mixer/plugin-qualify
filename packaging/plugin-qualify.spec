@@ -41,7 +41,7 @@ Requires: python3-jsonschema
 # plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
 # 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
-Requires: plugin-hostd >= 0.20.7
+Requires: plugin-hostd >= 0.20.8
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
@@ -257,7 +257,8 @@ the English source sentence.
 - entry points decide "run, not imported" with omx-contract's isMain (#134)
 - packages are built for Fedora 45, RPM for x86_64 only (#121)
 - the release install job takes its cells and runners from check-matrix (#117, #131)
-- floors: omx-contract rises to 3.20.2 (#139); no ceilings
+- floors: omx-contract rises to 3.20.2 (#139); plugin-hostd rises to 0.20.8, the
+  published fix of 0.20.7's protocol ceiling; no ceilings
 
 * Wed Nov 18 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.6-1
 - the qualification domain ships in the new plugin-qualify-contract package and is
