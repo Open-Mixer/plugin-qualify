@@ -914,11 +914,12 @@ records out of a run.
 
 A record set is per machine class, rate and quantum. The packages that install a run's sets are built by
 `plugin-qualify-records-package`, from the run's root (each `b<rate>-<quantum>/qualification` under it is one cell) or
-from one qualification directory per cell:
+from one records directory per cell: record documents with the probe outputs they judged, as `plugin-qualify --out`
+writes them. The sync reads none of these directories; it reads the store:
 
 ```
 plugin-qualify-records-package run/ --host-class x86-64 --set fedora44 --provenance provenance.json --out .
-plugin-qualify-records-package /var/lib/omx/qualification --cell 48000/256 --host-class rpi5 --set zynthian-vangelis \
+plugin-qualify-records-package out/ --cell 48000/256 --host-class rpi5 --set zynthian-vangelis \
   --provenance provenance.json --out .
 ```
 
