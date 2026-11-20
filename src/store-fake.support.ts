@@ -20,9 +20,12 @@ export interface FakeStore {
   readonly calls: string[];
   /** The base, which only the test writes. */
   readonly base: StoredRecord[];
-  /** True once a call was made while the store was `absent`. */
-  absent: boolean;
 }
+
+/** Where the reader opens the base, as it names it in the `base-absent` line. */
+export const FAKE_BASE_PATH = "/usr/share/omx/qualification/qualification.sqlite";
+/** The one line the reader writes on standard error when the base file is absent: the base layer is empty (store spec 6). */
+export const BASE_ABSENT_LINE = `plugin-qualification-db: base-absent: ${FAKE_BASE_PATH}: the base layer is empty`;
 
 const flag = (args: readonly string[], name: string): string | undefined => {
   const i = args.indexOf(name);
@@ -48,18 +51,25 @@ export function refusalOf(record: QualificationRecord): { code: string; path: st
 /**
  * `validate: false` is for the unit tests of what a pass does to a record's run, whose records are not whole: the writer's
  * refusals (section 3.7) are not enforced and a record with no binary is stored under the key `0...0`.
+ *
+ * `baseAbsent`: no base file. The reader answers from the user layer alone, exits 0, keeps standard output for records and
+ * writes the one `base-absent` line on standard error, as plugin-db-qualification's reader does from 2026112001.
+ * `baseRefused`: a base that exists and cannot be used. Every read exits 1 with that code first on standard error
+ * (`qualification-db.unreadable`, `qualification-db.not-a-store`, `qualification-db.schema-other`); the writer is not
+ * affected, since it never opens the base.
  */
-export function fakeStore(options: { readonly absent?: boolean; readonly base?: readonly StoredRecord[]; readonly validate?: boolean } = {}): FakeStore {
+export function fakeStore(options: { readonly baseAbsent?: boolean; readonly baseRefused?: string; readonly base?: readonly StoredRecord[]; readonly validate?: boolean } = {}): FakeStore {
   const user: StoredRecord[] = [];
   const calls: string[] = [];
   const base: StoredRecord[] = [...(options.base ?? [])];
-  const store: FakeStore = { run: undefined as unknown as StoreRun, user: () => [...user], calls, base, absent: false };
-  const ok = (stdout = ""): StoreRunResult => ({ status: 0, stdout, stderr: "" });
+  const store: FakeStore = { run: undefined as unknown as StoreRun, user: () => [...user], calls, base };
+  const ok = (stdout = ""): StoreRunResult => ({ status: 0, stdout, stderr: options.baseAbsent === true ? `${BASE_ABSENT_LINE}\n` : "" });
   const merged = (layer: string | undefined): StoredRecord[] => {
+    const theBase = options.baseAbsent === true ? [] : base;
     if (layer === "user") return user;
-    if (layer === "base") return base;
+    if (layer === "base") return theBase;
     const shadowed = new Set(user.map(key));
-    return [...user, ...base.filter((b) => !shadowed.has(key(b)))];
+    return [...user, ...theBase.filter((b) => !shadowed.has(key(b)))];
   };
   const matching = (records: StoredRecord[], args: readonly string[]): StoredRecord[] => {
     const want = { sha256: flag(args, "--sha256"), format: flag(args, "--format"), uri: flag(args, "--uri"), offer: flag(args, "--offer"), host_class: flag(args, "--host-class") };
@@ -68,11 +78,8 @@ export function fakeStore(options: { readonly absent?: boolean; readonly base?: 
   };
   const run: StoreRun = (tool, args, input) => {
     calls.push(`${tool} ${args.join(" ")}`);
-    if (options.absent === true || store.absent) {
-      store.absent = true;
-      return { status: 1, stdout: "", stderr: "qualification-db.absent: the base file does not exist" };
-    }
     const verb = args[0];
+    if (tool === "read" && options.baseRefused !== undefined) return { status: 1, stdout: "", stderr: `${options.baseRefused} ${FAKE_BASE_PATH}: the base cannot be used\n` };
     if (tool === "write") {
       if (verb === "put") {
         const record = JSON.parse(input ?? "{}") as QualificationRecord;
@@ -82,12 +89,12 @@ export function fakeStore(options: { readonly absent?: boolean; readonly base?: 
         const at = user.findIndex((u) => key(u) === key(stored));
         if (at >= 0) user[at] = stored;
         else user.push(stored);
-        return ok();
+        return { status: 0, stdout: "", stderr: "" };
       }
       if (verb === "delete") {
         const gone = matching(user, args);
         for (const g of gone) user.splice(user.indexOf(g), 1);
-        return ok();
+        return { status: 0, stdout: "", stderr: "" };
       }
       return { status: 2, stdout: "", stderr: `usage: plugin-qualification-db-write put|delete` };
     }

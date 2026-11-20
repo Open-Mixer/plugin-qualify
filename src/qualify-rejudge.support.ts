@@ -57,10 +57,10 @@ export function exportedFixture(stem: string, record: QualificationRecord = stor
  * files on disk as they were recorded and its pin the word the record's run gave. `patch` changes a record before it is
  * stored (an adapter run a later plugin-qualify took).
  */
-export function device(stems: readonly string[], options: { patch?: (r: QualificationRecord) => QualificationRecord; host?: string } = {}): Device {
+export function device(stems: readonly string[], options: { patch?: (r: QualificationRecord) => QualificationRecord; host?: string; baseAbsent?: boolean } = {}): Device {
   const root = join(scratch, `device-${String(++devices)}`);
   mkdirSync(root, { recursive: true });
-  const fake = fakeStore();
+  const fake = fakeStore({ baseAbsent: options.baseAbsent === true });
   const store = new QualificationStore("user", { run: fake.run });
   const keys = new Map<string, ShadowKey>();
   const entries: Record<string, SyncEntry> = {};

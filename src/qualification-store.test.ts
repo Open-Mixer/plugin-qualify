@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import { QualificationStore, StoreError, shadowKeyOf, type StoredRecord } from "./qualification-store.js";
 import { FIXTURES, LV2_CLEAN, CLAP_RT, stored } from "./qualify-rejudge.support.js";
 import { readProbeOutput } from "./probe-output.js";
-import { fakeStore } from "./store-fake.support.js";
+import { BASE_ABSENT_LINE, FAKE_BASE_PATH, fakeStore } from "./store-fake.support.js";
 import { storeExport } from "./store-export.support.js";
 
 function exported(stem: string, hostClass = "x86-64"): StoredRecord {
@@ -138,14 +138,54 @@ describe("QualificationStore reads through plugin-qualification-db", () => {
     expect(fake.calls.at(-1)).toBe("read counts --scope user --layer user --json");
   });
 
-  it("an absent store is refused by its name, and nothing is taken", () => {
-    const store = new QualificationStore("user", { run: fakeStore({ absent: true }).run });
-    expect(() => store.userRecords()).toThrow(/qualification-db\.absent/);
-    try {
-      store.userRecords();
-    } catch (e) {
-      expect((e as StoreError).code).toBe("qualification-db.absent");
+  it("an absent base is an empty base layer: no refusal, the user layer is read and written, the reader's signal is kept", () => {
+    const fake = fakeStore({ baseAbsent: true });
+    const seen: string[] = [];
+    const store = new QualificationStore("user", { run: fake.run, onBaseAbsent: (path) => seen.push(path) });
+    const a = exported(LV2_CLEAN);
+    store.put(shadowKeyOf(a), a.record);
+    expect(store.userRecords().map((r) => r.uri)).toEqual([a.uri]);
+    expect(store.scopeRecords().map((r) => r.layer)).toEqual(["user"]);
+    expect(store.counts().length).toBe(1);
+    expect(store.baseAbsent).toBe(FAKE_BASE_PATH);
+    // the signal is said once for the store, however many reads carried it
+    expect(seen).toEqual([FAKE_BASE_PATH]);
+  });
+
+  it("a present base gives no signal", () => {
+    const store = new QualificationStore("user", { run: fakeStore().run });
+    store.userRecords();
+    expect(store.baseAbsent).toBeUndefined();
+  });
+
+  it("standard error is never read as a record, and a line of standard output that is no record is refused by name", () => {
+    const record = exported(LV2_CLEAN);
+    const run = (stdout: string) => () => ({ status: 0, stdout, stderr: `${BASE_ABSENT_LINE}\n{"layer":"user"}\n` });
+    expect(new QualificationStore("user", { run: run(`${JSON.stringify(record)}\n`) }).userRecords()).toHaveLength(1);
+    expect(new QualificationStore("user", { run: run("") }).userRecords()).toEqual([]);
+    for (const bad of [`${BASE_ABSENT_LINE}\n`, "[1]\n", "not json\n"]) {
+      const store = new QualificationStore("user", { run: run(bad) });
+      expect(() => store.userRecords()).toThrow(StoreError);
+      try {
+        store.userRecords();
+      } catch (e) {
+        expect((e as StoreError).code).toBe("store-output");
+      }
     }
+  });
+
+  it.each(["qualification-db.unreadable", "qualification-db.not-a-store", "qualification-db.schema-other"])("a base that cannot be used is refused by its name: %s", (code) => {
+    const store = new QualificationStore("user", { run: fakeStore({ baseRefused: code }).run });
+    for (const read of [() => store.userRecords(), () => store.counts(), () => store.scopeRecords()]) {
+      try {
+        read();
+        throw new Error("not refused");
+      } catch (e) {
+        expect(e).toBeInstanceOf(StoreError);
+        expect((e as StoreError).code).toBe(code);
+      }
+    }
+    expect(store.baseAbsent).toBeUndefined();
   });
 
   it("a verb the command does not have is named, not skipped", () => {

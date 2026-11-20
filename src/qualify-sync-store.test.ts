@@ -12,7 +12,7 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { QualificationStore, shadowKeyOf, type StoredRecord } from "./qualification-store.js";
 import { readProbeOutput } from "./probe-output.js";
-import { CLAP_RT, FIXTURES, LV2_CLEAN, LV2_RT, stored } from "./qualify-rejudge.support.js";
+import { CLAP_RT, FIXTURES, LV2_CLEAN, LV2_RT, device, stored } from "./qualify-rejudge.support.js";
 import { rejudgeState } from "./qualify-rejudge.js";
 import {
   SYNC_STATE_SCHEMA,
@@ -23,11 +23,13 @@ import {
   pruneStale,
   readSyncState,
   resolveSyncSettings,
+  runSync,
   type SyncContext,
   type SyncState,
 } from "./qualify-sync.js";
 import { searchPathOf } from "./hostd-search-path.support.js";
-import { fakeStore } from "./store-fake.support.js";
+import { FAKE_BASE_PATH, fakeStore } from "./store-fake.support.js";
+import type { QualificationRecord } from "./qualification-record.js";
 import { storeExport } from "./store-export.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-store-"));
@@ -91,11 +93,11 @@ describe("C5: no directory is read", () => {
     return dir;
   }
 
-  it("with the store absent the re-judge refuses by qualification-db.absent and takes nothing from the files", () => {
+  it("with a base that cannot be used the re-judge refuses by its name and takes nothing from the files", () => {
     const old = oldFiles();
-    const fake = fakeStore({ absent: true });
+    const fake = fakeStore({ baseRefused: "qualification-db.unreadable" });
     const ctx: SyncContext = { settings: settingsOf(), env: {}, log: () => {}, store: new QualificationStore("user", { run: fake.run }) };
-    expect(() => rejudgeState(ctx, { schema: SYNC_STATE_SCHEMA, entries: {} })).toThrow(/qualification-db\.absent/);
+    expect(() => rejudgeState(ctx, { schema: SYNC_STATE_SCHEMA, entries: {} })).toThrow(/qualification-db\.unreadable/);
     expect(readdirSync(old).length).toBeGreaterThan(0);
   });
 
@@ -214,5 +216,41 @@ describe("C8: pluginCounts on the store", () => {
     const fake = fakeStore();
     pluginCounts(new QualificationStore("system", { run: fake.run }));
     expect(fake.calls[0]).toBe("read counts --scope system --layer user --json");
+  });
+});
+
+describe("an absent base is an empty base layer (the store spec, section 6.1)", () => {
+  /** A user-layer record the judge of today changes: its verdict says unknown where the figures say otherwise. */
+  const stale = (r: QualificationRecord): QualificationRecord => {
+    const j = JSON.parse(JSON.stringify(r)) as any;
+    j.verdicts[0].rating = "unknown";
+    j.verdicts[0].measured = false;
+    return j;
+  };
+
+  it("the sync runs with no base: no refusal, the user layer is written, and the run says the base is empty once", async () => {
+    const d = device([LV2_RT], { baseAbsent: true, patch: stale });
+    const before = d.fake.calls.filter((c) => c.startsWith("write put")).length;
+    const lines: string[] = [];
+    const summary = await runSync(d.settings, { rejudge: true, qualificationStore: d.store, log: (l) => lines.push(l), env: { OMX_PROBE_RUNNER: "/nonexistent", OMX_CLAP_QUALIFY: "/nonexistent" }, pinFilesRun: () => ({ status: 1, stdout: "", stderr: "" }) });
+    expect(summary?.rejudge?.changed).toBeGreaterThanOrEqual(1);
+    expect(d.fake.calls.filter((c) => c.startsWith("write put")).length).toBeGreaterThan(before);
+    const said = lines.filter((l) => l.includes("base-absent"));
+    expect(said).toEqual([`qualification store: base-absent: ${FAKE_BASE_PATH}: the base layer is empty; the user layer's records alone are read`]);
+  });
+
+  it("a present base says nothing of it", async () => {
+    const d = device([LV2_RT], { patch: stale });
+    const lines: string[] = [];
+    await runSync(d.settings, { rejudge: true, qualificationStore: d.store, log: (l) => lines.push(l), env: { OMX_PROBE_RUNNER: "/nonexistent", OMX_CLAP_QUALIFY: "/nonexistent" }, pinFilesRun: () => ({ status: 1, stdout: "", stderr: "" }) });
+    expect(lines.filter((l) => l.includes("base-absent"))).toEqual([]);
+  });
+
+  it.each(["qualification-db.unreadable", "qualification-db.not-a-store", "qualification-db.schema-other"])("a base that cannot be used refuses the run by its name: %s", async (code) => {
+    const fake = fakeStore({ baseRefused: code });
+    const store = new QualificationStore("user", { run: fake.run });
+    const ctx: SyncContext = { settings: settingsOf(), env: {}, log: () => {}, store };
+    expect(() => rejudgeState(ctx, { schema: SYNC_STATE_SCHEMA, entries: {} })).toThrow(new RegExp(code.replace(/[.]/g, "\\.")));
+    expect(() => pluginCounts(store)).toThrow(new RegExp(code.replace(/[.]/g, "\\.")));
   });
 });
