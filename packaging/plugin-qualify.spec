@@ -53,7 +53,7 @@ Suggests: mod-host
 # remote-control pages (remote_controls), which the descriptors keep
 Requires: omx-clap-host >= 0.34.0
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
-# tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
+# tools/clap-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap/ts, in the runtime package omx-clap from 0.17.0 on; the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
 Requires: omx-clap >= 0.34.0

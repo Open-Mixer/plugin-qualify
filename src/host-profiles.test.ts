@@ -83,7 +83,6 @@ describe("OMX_INPROCESS_FEATURES against omx-clap-core's own header", () => {
   const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
   const CORE_H = [
     join(PKG, "native", "deps", "omx-clap-core", "lv2", "core", "lv2_core.h"),
-    "/usr/include/omx-clap-core/lv2_core.h",
   ].find((p) => existsSync(p));
 
   // the header spells each URI as a macro of the LV2 headers; each macro's URI is the spelling of that header
