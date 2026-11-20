@@ -164,6 +164,7 @@ describe("plugin-qualify judged-layer", () => {
     expect(rendered(parseJudgedLayerArgs([...key, "--machine-class", "x", "--files", PIN.files, "--layout", "nope"])).ok).toBe(false);
     expect(rendered(parseJudgedLayerArgs([...key.slice(2), "--machine-class", "x", "--files", PIN.files]))).toEqual({ ok: false, error: "--sha256 is needed" });
     expect(rendered(parseJudgedLayerArgs([...key, "r.json", "--machine-class", "x", "--files", PIN.files]))).toEqual({ ok: false, error: "judged-layer takes a shadow key, not a file: r.json" });
+    expect(rendered(parseJudgedLayerArgs([...key, "--layer", "system", "--machine-class", "x", "--files", PIN.files]))).toEqual({ ok: false, error: "--layer must be user or base" });
   });
 
   it("the built command reads the record of the shadow key from the store, prints the layer, the body for plugin-db put, and exits 1 with the reason for no layer", async () => {
