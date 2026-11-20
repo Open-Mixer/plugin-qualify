@@ -41,6 +41,7 @@ MAXIMUM = LV2 + "maximum"
 DEFAULT = LV2 + "default"
 PP = "http://lv2plug.in/ns/ext/port-props#"
 UNITS = "http://lv2plug.in/ns/extensions/units#"
+OPENMIXER_UNITS = "urn:openmixer:unit#"
 PATCH = "http://lv2plug.in/ns/ext/patch#"
 ATOM = "http://lv2plug.in/ns/ext/atom#"
 RDFS = "http://www.w3.org/2000/01/rdf-schema#"
@@ -63,7 +64,7 @@ REPORTS_LATENCY = LV2 + "reportsLatency"
 MINOR_VERSION = LV2 + "minorVersion"
 MICRO_VERSION = LV2 + "microVersion"
 
-# A port's unit is spelled as omx-contract's units sheet spells it (desc.unit_words), in the catalog and in the
+# A port's unit is spelled as plugin-db's lv2 domain spells it (desc.unit_words), in the catalog and in the
 # descriptor alike; a unit the sheet has no word for falls to the plugin's own units:symbol in the catalog, and
 # is `unknown` in the descriptor.
 _UNIT_WORDS = None
@@ -220,8 +221,9 @@ class Scanner:
         if un is None:
             return None
         uri = str(un)
-        if uri in unit_words():
-            return unit_words()[uri]
+        word = desc.unit_word(uri, unit_words())
+        if word is not None:
+            return word
         sym = first(self.w.find_nodes(un, self.u[UNITS + "symbol"], None))
         return str(sym) if sym is not None else None
 
@@ -395,7 +397,7 @@ class Scanner:
 
     def descriptor_unit(self, port):
         un = first(port.get_value(self.u[UNITS + "unit"]))
-        return unit_words().get(str(un), "unknown") if un is not None else "unknown"
+        return (desc.unit_word(str(un), unit_words()) or "unknown") if un is not None else "unknown"
 
     def descriptor_control(self, port, link, readonly=False):
         """An input (or, readonly, an output) control port as a descriptor control."""
