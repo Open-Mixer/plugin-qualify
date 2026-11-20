@@ -4,7 +4,7 @@
  * The two other sites that name a signal read PROBE_SIGNALS of the probe domain: the sweep reader's exit statuses
  * (measuredPluginsFromSweep: 134, 135, 139) and the crash table (attributeCrash). (a) the words are the golden ones
  * frozen from the hand copy; (c) a temporary domain with the SIGSEGV word changed gives the changed word at both calls.
- * PLUGIN_HOSTD_CONTRACT_DIR names a plugin-hostd checkout's contract.d where the package is not installed.
+ * PLUGIN_HOSTD_PROTOCOL_CONTRACT_DIR names a plugin-hostd-protocol checkout's contract.d where the package is not installed.
  */
 import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,7 +16,7 @@ import { openProbeDomainAt } from "./probe-domain-node.js";
 import { measuredPluginsFromSweep } from "./measurement/sweep-jsonl.js";
 import { attributeCrash } from "./hosting-suitability.js";
 
-const PROBE_DIR = process.env.PLUGIN_HOSTD_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d";
+const PROBE_DIR = process.env.PLUGIN_HOSTD_PROTOCOL_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d";
 const QUICK = {
   uri: "urn:swept",
   instantiated: true,

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * The probe domain's words as this package judges with them: the outcome a probe's step or run ended with and the signal a
- * child died of. The domain is plugin-hostd's (contract.d/probe/probe.json, shipped by plugin-hostd-contract), data read at
+ * child died of. The domain is plugin-hostd-protocol's (contract.d/probe/probe.json, shipped by plugin-hostd-protocol-contract), data read at
  * run time; no word of it is a literal here. A word is asked for by its title, the key the domain gives it
  * (`probeCrashed`, `sigkill`), and the call refuses by name when the domain is not at hand or has no such word.
  *

@@ -2,13 +2,13 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * The package reads the outcome and signal words of the probe domain (plugin-hostd's contract.d/probe/probe.json, shipped
- * by plugin-hostd-contract) at run time: the words the judging code compares a probe's output with are the domain's, a word
+ * by plugin-hostd-protocol-contract) at run time: the words the judging code compares a probe's output with are the domain's, a word
  * changed there is the word the consumer reads, and a domain that is absent is refused by name. (a) the consumers' words
  * are the golden ones frozen from the literals they held; (b) they are the installed domain's own words; (c) a temporary
  * domain with a word changed gives the changed word at the call, and one that is absent is refused. The calls are the
  * consumers' real ones: isOutOfMemory, outOfMemory and outcomeOfVerdict.
  *
- * The probe domain is read where plugin-hostd-contract installs it; PLUGIN_HOSTD_CONTRACT_DIR names a checkout's
+ * The probe domain is read where plugin-hostd-protocol-contract installs it; PLUGIN_HOSTD_PROTOCOL_CONTRACT_DIR names a checkout's
  * contract.d instead, for a machine that has the package nowhere.
  */
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const CONTRACT_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "contract.d");
-const PROBE_DIR = process.env.PLUGIN_HOSTD_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d";
+const PROBE_DIR = process.env.PLUGIN_HOSTD_PROTOCOL_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d";
 
 /** The golden words, frozen from the literals of the consumers at 2d6aefc: the title of the word in the domain and the word. */
 const GOLDEN_OUTCOMES = {

@@ -12,8 +12,8 @@ import "./probe-domain-node.js";
 
 /**
  * The place the tests read: this checkout's qualification domain and plugin-hostd's probe domain (the words of a probe's
- * outcomes and signals, shipped by plugin-hostd-contract) in one directory, as the installed contract directory holds them.
- * The probe domain is the installed one, or the contract.d of a plugin-hostd checkout that PLUGIN_HOSTD_CONTRACT_DIR names.
+ * outcomes and signals, shipped by plugin-hostd-protocol-contract) in one directory, as the installed contract directory holds them.
+ * The probe domain is the installed one, or the contract.d of a plugin-hostd-protocol checkout that PLUGIN_HOSTD_PROTOCOL_CONTRACT_DIR names.
  * Where there is none, the directory has no probe domain and the first judgment refuses by name.
  */
 const CONTRACT_DIR = await vi.hoisted(async () => {
@@ -21,7 +21,7 @@ const CONTRACT_DIR = await vi.hoisted(async () => {
   const { tmpdir } = await import("node:os");
   const dir = mkdtempSync(`${tmpdir()}/plugin-qualify-contract-`);
   symlinkSync(`${import.meta.dirname}/../contract.d/qualification`, `${dir}/qualification`);
-  const probe = `${process.env.PLUGIN_HOSTD_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d"}/probe`;
+  const probe = `${process.env.PLUGIN_HOSTD_PROTOCOL_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d"}/probe`;
   if (existsSync(probe)) symlinkSync(probe, `${dir}/probe`);
   process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
   return dir;
