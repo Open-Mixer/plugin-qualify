@@ -892,6 +892,18 @@ and only when:
   "latency unknown" for a figure today's probe takes;
 - it holds every step its outcome calls for, and its rows hold every figure the judge reads.
 
+Two sets of the base may hold one plugin's record (the same bytes, offer and host class) at one cell: a reference set
+(`fedora44-rt-48000-64`, measured with real-time priority) beside a provisional one (`fedora44-48000-64`), or a set
+measured again at one cell (`zynthian-vangelis-48000-256`, 2026-11-08) beside the set measured over its whole grid
+(`zynthian-vangelis`, 2026-11-06). The record taken is the one that answers the machine's cell, the first cell the sync
+runs at (the grid's first, else the host profile's cost cell). The rule is the store's: the reference tier answers, and within
+one tier the set measured later. Its one holder is the claim plugin-db-qualification's base build writes, which its
+reader follows. The sync asks the reader for the record that claims that cell, whole (`plugin-qualification-db query
+--json --records --rate R --quantum Q`, plugin-db-qualification 2026112001), and takes that record. Neither the set's
+name nor the order of the reader's lines picks it, and plugin-qualify holds no copy of the rule (#152). A record that
+answers the machine's cell but was not measured at every cell the sync runs at is not taken. The plugin is measured,
+and the run says `stored: <key>: set <set> claims <cell>, measured at <cells> only; measured here`.
+
 The verdicts of a record that applies are not taken as the measuring device's plugin-qualify wrote them: its figures
 are judged again from its rows under this version's rules, as `--rejudge` judges a device's own records after an upgrade.
 A plugin an older judge refused for an RT-safety violation alone is taken as `conditional`, pinned `isolated` and runs
@@ -971,7 +983,8 @@ base that the reader merges under it.
   --offer .. --host-class ..` removes the layer's record of that key. A refusal names its code, and the sync surfaces it
   to the user as it was given.
 - Reads go through `plugin-qualification-db`: `query --json` (one line per cell, with the per-file list), `query --json
-  --records [--layer user]` (one line per record) and `counts --layer user --json`. Standard output is read line by line,
+  --records [--layer user]` (one line per record, naming its `set`), `query --json --records --rate R --quantum Q` (the
+  record that claims the cell, the store's tier/date rule applied by the reader) and `counts --layer user --json`. Standard output is read line by line,
   and a line that is not what the verb prints is refused as `store-output`.
 - An absent base is an empty base layer. No base is shipped until the records are migrated, and the sync writes its own
   layer from the first run. With no base file the reader answers from the scope's layer alone, exits 0 and writes one line
