@@ -58,6 +58,8 @@ import {
   hereText,
   parseHereArgs,
   parseSyncConf,
+  localeOf,
+  reasonText,
   toolVersion,
 } from "../dist/index.js";
 
@@ -84,7 +86,7 @@ if (process.argv[2] === "compare") {
 if (process.argv[2] === "judge") {
   const j = parseJudgeArgs(process.argv.slice(3));
   if (!j.ok) {
-    process.stderr.write(`plugin-qualify judge: ${j.error}\n\n${judgeHelpText()}`);
+    process.stderr.write(`plugin-qualify judge: ${reasonText(j.error, localeOf(process.env))}\n\n${judgeHelpText()}`);
     process.exit(EXIT_CODE.couldNotMeasure);
   }
   if (j.args.help) {
@@ -112,7 +114,7 @@ if (process.argv[2] === "judge") {
 if (process.argv[2] === "here") {
   const h = parseHereArgs(process.argv.slice(3));
   if (!h.ok) {
-    process.stderr.write(`plugin-qualify here: ${h.error}\n\n${hereHelpText()}`);
+    process.stderr.write(`plugin-qualify here: ${reasonText(h.error, localeOf(process.env))}\n\n${hereHelpText()}`);
     process.exit(2);
   }
   const confPath = h.args.config ?? SYNC_CONF;
@@ -127,7 +129,7 @@ if (process.argv[2] === "here") {
   }
   const conf = parseSyncConf(confText, confPath);
   if (!conf.ok) {
-    process.stderr.write(`plugin-qualify here: ${conf.error}\n`);
+    process.stderr.write(`plugin-qualify here: ${reasonText(conf.error, localeOf(process.env))}\n`);
     process.exit(2);
   }
   const facts = hereFacts({ file: conf.values, hostdVersion: toolVersion(process.env[HOSTD_ENV] ?? "plugin-hostd") });
@@ -138,7 +140,7 @@ if (process.argv[2] === "here") {
 if (process.argv[2] === "judged-layer") {
   const j = parseJudgedLayerArgs(process.argv.slice(3));
   if (!j.ok) {
-    process.stderr.write(`plugin-qualify judged-layer: ${j.error}\n\n${judgedLayerHelpText()}`);
+    process.stderr.write(`plugin-qualify judged-layer: ${reasonText(j.error, localeOf(process.env))}\n\n${judgedLayerHelpText()}`);
     process.exit(2);
   }
   if ("help" in j) {
@@ -159,7 +161,7 @@ if (process.argv[2] === "judged-layer") {
     ...(j.args.address === undefined ? {} : { address: j.args.address }),
   });
   if (l.layer === null) {
-    process.stderr.write(`plugin-qualify judged-layer: ${j.args.record}: no judged layer: ${l.reason}\n`);
+    process.stderr.write(`plugin-qualify judged-layer: ${j.args.record}: no judged layer: ${reasonText(l.reason, localeOf(process.env))}\n`);
     process.exit(1);
   }
   process.stdout.write(`${JSON.stringify(j.args.body ? l.body : l, null, 2)}\n`);
@@ -169,7 +171,7 @@ if (process.argv[2] === "judged-layer") {
 if (process.argv[2] === "adjust") {
   const a = parseAdjustArgs(process.argv.slice(3));
   if (!a.ok) {
-    process.stderr.write(`plugin-qualify adjust: ${a.error}\n\n${adjustHelpText()}`);
+    process.stderr.write(`plugin-qualify adjust: ${reasonText(a.error, localeOf(process.env))}\n\n${adjustHelpText()}`);
     process.exit(EXIT_CODE.couldNotMeasure);
   }
   if (a.args.help) {
@@ -219,7 +221,7 @@ if (process.argv[2] === "adjust") {
 
 const parsed = parseQualifyArgs(process.argv.slice(2));
 if (!parsed.ok) {
-  process.stderr.write(`plugin-qualify: ${parsed.error}\n\n${helpText()}`);
+  process.stderr.write(`plugin-qualify: ${reasonText(parsed.error, localeOf(process.env))}\n\n${helpText()}`);
   process.exit(EXIT_CODE.couldNotMeasure);
 }
 if (parsed.args.help) {

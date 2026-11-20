@@ -12,6 +12,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { hostdSearchPath, parseSearchPath, type SearchPathRun } from "./hostd-search-path.js";
 import { FROM_FILE, searchPathClause, searchPathOf, searchPathText } from "./hostd-search-path.support.js";
 import { MOVED_TO_HOSTD, discoverSyncItems, flagOf, parseSyncArgs, parseSyncConf, resolveSyncSettings } from "./qualify-sync.js";
+import { rendered } from "./text-rendered.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "hostd-search-path-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -34,9 +35,9 @@ describe("plugin-hostd --search-path, read", () => {
   });
 
   it("says plugin-hostd is missing, or too old to answer", () => {
-    expect(hostdSearchPath(undefined, {}, () => ({ status: null, stdout: "", stderr: "", missing: true }))).toEqual({ ok: false, error: expect.stringContaining("not installed") });
+    expect(rendered(hostdSearchPath(undefined, {}, () => ({ status: null, stdout: "", stderr: "", missing: true })))).toEqual({ ok: false, error: expect.stringContaining("not installed") });
     const old = hostdSearchPath(undefined, {}, () => ({ status: 1, stdout: "", stderr: "plugin-hostd: unrecognized option '--search-path'\n" }));
-    expect(old).toEqual({ ok: false, error: expect.stringContaining("0.20.3 or later") });
+    expect(rendered(old)).toEqual({ ok: false, error: expect.stringContaining("0.20.3 or later") });
     const bad = hostdSearchPath("/etc/x.conf", {}, () => ({ status: 1, stdout: "", stderr: "plugin-hostd: cannot read /etc/x.conf\n" }));
     expect(bad).toEqual({ ok: false, error: "plugin-hostd: cannot read /etc/x.conf" });
   });
@@ -45,8 +46,8 @@ describe("plugin-hostd --search-path, read", () => {
     const stand = join(scratch, "plugin-hostd");
     writeFileSync(stand, `#!/bin/sh\n[ "$1" = -c ] && [ "$2" = /etc/omx/plugin-hostd.conf ] || exit 7\n${searchPathClause(["/from/file"], ["/clap"])}\nexit 9\n`);
     chmodSync(stand, 0o755);
-    expect(hostdSearchPath("/etc/omx/plugin-hostd.conf", { PLUGIN_HOSTD: stand })).toMatchObject({ ok: true, path: { lv2: ["/from/file"], clap: ["/clap"] } });
-    expect(hostdSearchPath(undefined, { PLUGIN_HOSTD: stand }).ok).toBe(false);
+    expect(rendered(hostdSearchPath("/etc/omx/plugin-hostd.conf", { PLUGIN_HOSTD: stand }))).toMatchObject({ ok: true, path: { lv2: ["/from/file"], clap: ["/clap"] } });
+    expect(rendered(hostdSearchPath(undefined, { PLUGIN_HOSTD: stand })).ok).toBe(false);
   });
 });
 
@@ -82,8 +83,8 @@ describe("the sync's directories", () => {
     const r = settle(searchPathOf(["/l"], ["/c"], { lv2_path: "env", lv2_extra: "default", clap_path: "default" }));
     if (!r.ok) throw new Error(r.error);
     expect(r.warnings).toHaveLength(2);
-    expect(r.warnings[0]).toMatch(/^lv2_path is plugin-hostd's environment \(LV2_PATH\).*running daemon may search other directories/);
-    expect(r.warnings[1]).toMatch(/^clap_path is plugin-hostd's default/);
+    expect(rendered(r.warnings[0])).toMatch(/^lv2_path is plugin-hostd's environment \(LV2_PATH\).*running daemon may search other directories/);
+    expect(rendered(r.warnings[1])).toMatch(/^clap_path is plugin-hostd's default/);
     const file = settle(searchPathOf(["/l"], ["/c"], FROM_FILE));
     expect(file.ok && file.warnings).toEqual([]);
   });

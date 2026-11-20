@@ -24,7 +24,8 @@ export type TextCodeKey = keyof typeof TEXT_CODE;
 /** A code of {@link TEXT_CODE} with the arguments its source sentence names. A reader renders it; it is never prose itself. */
 export interface TextRef {
   readonly code: string;
-  readonly args?: Readonly<Record<string, string | number>>;
+  /** An argument may be another code, an inner problem said in the same language as the sentence it fills. */
+  readonly args?: Readonly<Record<string, string | number | TextRef>>;
 }
 
 /**
