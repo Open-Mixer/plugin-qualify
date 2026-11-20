@@ -22,6 +22,9 @@ runs:
         # 0.15.3: the memory footprint in the probe output, which a host with a memory budget judges (#114)
         v=$(dpkg-query -W -f='${Version}' plugin-hostd)
         dpkg --compare-versions "$v" ge 0.15.3 || { echo "::error::plugin-hostd $v in the channel; a verdict needs the memory footprint, plugin-hostd 0.15.3 or later"; exit 1; }
+        # the qualification domain is plugin-hostd-contract's (plugin-hostd depends on it): the ordinary test run reads it at the
+        # installed place, so a plugin-hostd without it fails here by name, not in the first test
+        test -f /usr/share/omx-contract/contract.d/qualification/qualification.json || { echo "::error::plugin-hostd-contract in the channel ships no qualification domain"; exit 1; }
         echo "PLUGIN_HOSTD=/usr/bin/plugin-hostd" >> "$GITHUB_ENV"
         # the runner is here now, so src/grid-runs.test.ts fails its live arms instead of skipping them
         echo "OMX_PROBE_RUNNER_REQUIRED=1" >> "$GITHUB_ENV"

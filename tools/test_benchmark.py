@@ -25,6 +25,7 @@ import sys
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.dirname(__file__))
 import benchmark as b  # noqa: E402
@@ -309,6 +310,79 @@ class AnnotateMeasured(unittest.TestCase):
         out = b.annotate_measured(cat, {}, {"u1": "no-audio-in"}, 48000)
         self.assertEqual(out[0]["latency"]["unmeasurable"], "no-audio-in")
         self.assertNotIn("latency", out[1])
+
+
+class DomainWords(unittest.TestCase):
+    """The scaling words are the `qualification` domain's (QUALIFICATION_MEASUREMENT_LATENCY_SCALING, _SCALING_NOTES and
+    _EXCLUSIONS, owner plugin-hostd), read at call time from the first directory of OMX_CONTRACT_PATH (a ':' list) holding
+    the domain, else the installed contract directory. Golden: the words as plugin-qualify's own domain 1.4.0 gave them
+    (plugin-qualify 2d6aefc). Sabotage: a scratch domain with one word renamed gives the renamed word."""
+
+    GOLDEN = {
+        "fixed-frame": {44100: 1024.0, 48000: 1024.0, 96000: 1024.0, 192000: 1024.0},
+        "fixed-time": {44100: 220.0, 48000: 240.0},
+        "zero": {48000: 0.0, 96000: 0.0},
+        "nonconforming": {48000: 64.0, 96000: 4096.0},
+        "single-rate": {48000: 240.0},
+        "unmeasured": {},
+    }
+
+    def domain_dir(self):
+        for d in [d for d in os.environ.get("OMX_CONTRACT_PATH", "").split(":") if d] + ["/usr/share/omx-contract/contract.d"]:
+            if os.path.isfile(os.path.join(d, "qualification", "qualification.json")):
+                return d
+        self.skipTest("no qualification domain in OMX_CONTRACT_PATH or the installed contract directory")
+
+    def scratch(self, item, old, new):
+        import shutil
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, True)
+        shutil.copytree(os.path.join(self.domain_dir(), "qualification"), os.path.join(root, "qualification"))
+        path = os.path.join(root, "qualification", "qualification.json")
+        with open(path) as f:
+            doc = json.load(f)
+        for e in doc["components"]["schemas"][item]["oneOf"]:
+            if e["const"] == old:
+                e["const"] = new
+        with open(path, "w") as f:
+            json.dump(doc, f)
+        return root
+
+    def with_path(self, path):
+        before = os.environ.get("OMX_CONTRACT_PATH")
+        def restore():
+            if before is None:
+                os.environ.pop("OMX_CONTRACT_PATH", None)
+            else:
+                os.environ["OMX_CONTRACT_PATH"] = before
+        self.addCleanup(restore)
+        os.environ["OMX_CONTRACT_PATH"] = path
+
+    def test_golden_classes(self):
+        for word, points in self.GOLDEN.items():
+            self.assertEqual(b.classify_scaling(points), word)
+
+    def test_golden_notes_and_exclusions(self):
+        self.assertEqual(b.scaling_note({48000: 64.0, 96000: 4096.0}), None)
+        self.assertEqual(b.unreliable_readings({44100: 462.0, 48000: 0.0, 96000: 0.0, 192000: 0.0}),
+                         {48000: "impossible-zero", 96000: "impossible-zero", 192000: "impossible-zero"})
+
+    def test_sabotage_a_renamed_word_is_the_word_read(self):
+        self.with_path(self.scratch("QUALIFICATION_MEASUREMENT_LATENCY_SCALING", "fixed-frame", "fixed-frame-x"))
+        self.assertEqual(b.classify_scaling(self.GOLDEN["fixed-frame"]), "fixed-frame-x")
+
+    def test_sabotage_a_renamed_exclusion_is_the_word_read(self):
+        self.with_path(self.scratch("QUALIFICATION_MEASUREMENT_LATENCY_EXCLUSIONS", "impossible-zero", "impossible-zero-x"))
+        self.assertEqual(set(b.unreliable_readings({44100: 462.0, 48000: 0.0, 96000: 0.0, 192000: 0.0}).values()), {"impossible-zero-x"})
+
+    def test_a_directory_without_the_domain_is_refused_by_name(self):
+        empty = tempfile.mkdtemp()
+        self.addCleanup(os.rmdir, empty)
+        self.with_path(empty)
+        with unittest.mock.patch.object(b, "INSTALLED_CONTRACT_DIR", empty):
+            with self.assertRaises(SystemExit) as raised:
+                b.classify_scaling(self.GOLDEN["fixed-frame"])
+        self.assertIn("qualification", str(raised.exception))
 
 
 class ClassifyScaling(unittest.TestCase):

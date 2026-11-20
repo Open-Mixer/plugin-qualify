@@ -203,8 +203,8 @@ jobs:
             done
             return 1
           }
-          # the main package requires plugin-qualify-contract of the same version: both files, from the same build
-          dnf_retry ./pkgs/plugin-qualify-[0-9]*."$ARCH".rpm ./pkgs/plugin-qualify-contract-[0-9]*.noarch.rpm
+          # the main package requires plugin-hostd-contract, which ships the qualification domain: dnf takes it from the channel
+          dnf_retry ./pkgs/plugin-qualify-[0-9]*."$ARCH".rpm
           rpm -q omx-clap-host
           rpm -qf /usr/share/omx-clap-core/ts | grep -q '^omx-clap-core-[0-9]'
           if rpm -qa --qf '%{NAME}\n' | grep -E -- '-devel$'; then echo "plugin-qualify pulled a -devel package"; exit 1; fi
@@ -230,8 +230,8 @@ jobs:
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
         run: |
           set -euo pipefail
-          # the main package depends on plugin-qualify-contract of the same version: both files, from the same build
-          apt-get install -y ./pkgs/"$SUITE"/plugin-qualify_*.deb ./pkgs/"$SUITE"/plugin-qualify-contract_*.deb
+          # the main package depends on plugin-hostd-contract, which ships the qualification domain: apt takes it from the channel
+          apt-get install -y ./pkgs/"$SUITE"/plugin-qualify_*.deb
           dpkg -s omx-clap-host >/dev/null
           dpkg -S /usr/share/omx-clap-core/ts | grep -q '^libomx-clap-core1'
           if dpkg-query -W -f '${Package}\n' | grep -E -- '-dev$'; then echo "plugin-qualify pulled a -dev package"; exit 1; fi
@@ -245,7 +245,7 @@ jobs:
 
       # a module the installed program imports at run time that the package does not carry (ajv, for the qualification
       # domain's reader) fails here by name, before any plugin is measured; the domain itself opens from the contract
-      # directory the contract package installed
+      # directory plugin-hostd-contract installed
       - name: The installed program loads its run-time modules and its domain
         if: steps.pkgs.outcome == 'success'
         run: |
