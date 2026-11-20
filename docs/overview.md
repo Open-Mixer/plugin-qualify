@@ -971,7 +971,14 @@ base that the reader merges under it.
   --offer .. --host-class ..` removes the layer's record of that key. A refusal names its code, and the sync surfaces it
   to the user as it was given.
 - Reads go through `plugin-qualification-db`: `query --json` (one line per cell, with the per-file list), `query --json
-  --records [--layer user]` (one line per record) and `counts --layer user --json`.
+  --records [--layer user]` (one line per record) and `counts --layer user --json`. Standard output is read line by line,
+  and a line that is not what the verb prints is refused as `store-output`.
+- An absent base is an empty base layer. No base is shipped until the records are migrated, and the sync writes its own
+  layer from the first run. With no base file the reader answers from the scope's layer alone, exits 0 and writes one line
+  on standard error, `plugin-qualification-db: base-absent: <path>: the base layer is empty`. The sync never reads that
+  line as a record, and logs it once a run: `qualification store: base-absent: <path>: the base layer is empty; the user
+  layer's records alone are read`. A base that exists and cannot be used is refused by its name
+  (`qualification-db.unreadable`, `qualification-db.not-a-store`, `qualification-db.schema-other`).
 - The record document is the interchange between the sync's judge and the writer. Nothing keeps it as a file.
 
 **Removed, with no alias:** the settings `qualification_dir` and `distributed_dir` (the places are the store's), the

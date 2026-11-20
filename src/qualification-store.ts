@@ -8,6 +8,13 @@
  *
  * `QualificationStore` is one scope's view: the user layer's records are listed once and kept current by its own writes,
  * so a run asks the reader a few times, not a plugin at a time.
+ *
+ * An absent base is an empty base layer (the store spec, section 6.1): the reader answers from the scope's layer alone,
+ * exits 0, keeps standard output for records and says so in one line on standard error,
+ * `plugin-qualification-db: base-absent: <path>: the base layer is empty`. That line is kept as a signal, never read as a
+ * record; standard output is read line by line, and a line that is not what the verb prints is refused as `store-output`.
+ * A base that exists and cannot be used is the reader's refusal by name (`qualification-db.unreadable`, `not-a-store`,
+ * `schema-other`).
  */
 import { spawnSync } from "node:child_process";
 
@@ -119,25 +126,68 @@ export const keyId = (k: ShadowKey): string => [k.sha256, k.format, k.uri, k.off
 /** A key as a person reads it, in the sync's log and the list of what is owed. */
 export const keyLabel = (k: ShadowKey): string => `${k.uri} (${k.offer}, ${k.sha256.slice(0, 12)})`;
 
-const lines = (text: string): unknown[] => text.split("\n").filter((l) => l !== "").map((l) => JSON.parse(l));
+/** The reader's line on standard error when there is no base file: the base layer is empty. */
+const BASE_ABSENT = /^plugin-qualification-db: base-absent: (.+): the base layer is empty$/m;
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+/** A line of `query --json [--records]`: an object of a layer, and with `--records` the record in it. */
+const isRecordLine = (v: unknown): boolean => isObject(v) && (v["layer"] === "user" || v["layer"] === "base") && isObject(v["record"]);
+const isResultLine = (v: unknown): boolean => isObject(v) && (v["layer"] === "user" || v["layer"] === "base") && Array.isArray(v["files"]);
+const isCountsLine = (v: unknown): boolean => isObject(v) && typeof v["format"] === "string" && typeof v["plugins"] === "number";
+
+/** Standard output, one JSON object a line, each what the verb prints; anything else is refused by name, never skipped. */
+function lines(text: string, verb: string, is: (v: unknown) => boolean): unknown[] {
+  return text
+    .split("\n")
+    .filter((l) => l !== "")
+    .map((l) => {
+      let v: unknown;
+      try {
+        v = JSON.parse(l);
+      } catch {
+        v = undefined;
+      }
+      if (!is(v)) throw new StoreError("store-output", `plugin-qualification-db ${verb}: a line of its output is not what ${verb} prints: ${l.slice(0, 200)}`);
+      return v;
+    });
+}
 
 export class QualificationStore {
   private user: StoredRecord[] | undefined;
   private readonly run: StoreRun;
   private readonly env: Readonly<Record<string, string | undefined>>;
+  private absentBase: string | undefined;
+  private readonly baseAbsentListeners: ((path: string) => void)[] = [];
 
-  /** `scope` is the sync's: `system` under `--system`, else the user's. */
+  /** `scope` is the sync's: `system` under `--system`, else the user's. `onBaseAbsent` hears, once, that the base is absent. */
   constructor(
     readonly scope: "user" | "system",
-    options: { readonly run?: StoreRun; readonly env?: Readonly<Record<string, string | undefined>> } = {},
+    options: { readonly run?: StoreRun; readonly env?: Readonly<Record<string, string | undefined>>; readonly onBaseAbsent?: (path: string) => void } = {},
   ) {
     this.run = options.run ?? SPAWNED_STORE;
     this.env = options.env ?? process.env;
+    if (options.onBaseAbsent !== undefined) this.baseAbsentListeners.push(options.onBaseAbsent);
+  }
+
+  /** The base file's path when the reader said it is absent (the base layer is empty); `undefined` while it has not. */
+  get baseAbsent(): string | undefined {
+    return this.absentBase;
+  }
+
+  /** `fn` hears the absent base once: now, if the reader already said so, else at the first read that says it. */
+  whenBaseAbsent(fn: (path: string) => void): void {
+    if (this.absentBase !== undefined) fn(this.absentBase);
+    else this.baseAbsentListeners.push(fn);
   }
 
   private read(verb: string, args: readonly string[]): string {
     const r = this.run("read", [verb, "--scope", this.scope, ...args], undefined, this.env);
     if (r.missing === true || r.status !== 0) throw failure("read", verb, r);
+    const absent = BASE_ABSENT.exec(r.stderr);
+    if (absent !== null && this.absentBase === undefined) {
+      this.absentBase = absent[1]!;
+      for (const fn of this.baseAbsentListeners.splice(0)) fn(this.absentBase);
+    }
     return r.stdout;
   }
 
@@ -157,13 +207,13 @@ export class QualificationStore {
 
   /** Every record of the scope's user layer (`query --json --records --layer user`), listed once. */
   userRecords(): readonly StoredRecord[] {
-    this.user ??= lines(this.read("query", ["--json", "--records", "--layer", "user"])) as StoredRecord[];
+    this.user ??= lines(this.read("query", ["--json", "--records", "--layer", "user"]), "query --records", isRecordLine) as StoredRecord[];
     return this.user;
   }
 
   /** Every record of the scope, the user layer over the base (`query --json --records`, no layer named). */
   scopeRecords(): StoredRecord[] {
-    return lines(this.read("query", ["--json", "--records"])) as StoredRecord[];
+    return lines(this.read("query", ["--json", "--records"]), "query --records", isRecordLine) as StoredRecord[];
   }
 
   /** The user layer's record of a key. */
@@ -174,17 +224,17 @@ export class QualificationStore {
   /** The cells of the records of a plugin, the user layer first, a base record only where the user has none of its key. */
   results(filter: { readonly format: string; readonly uri?: string; readonly hostClass: string; readonly binaryPath?: string }): StoredResult[] {
     const args = ["--json", "--format", filter.format, ...(filter.uri === undefined ? [] : ["--uri", filter.uri]), ...(filter.binaryPath === undefined ? [] : ["--binary-path", filter.binaryPath]), "--host-class", filter.hostClass];
-    return lines(this.read("query", args)) as StoredResult[];
+    return lines(this.read("query", args), "query", isResultLine) as StoredResult[];
   }
 
   /** The records of the merged answer for a plugin's shadow keys, whole (`query --json --records`, no layer). */
   recordsOf(filter: { readonly sha256: string; readonly format: string; readonly uri: string; readonly offer: string; readonly hostClass: string; readonly layer?: "user" | "base" }): StoredRecord[] {
     const args = ["--json", "--records", ...(filter.layer === undefined ? [] : ["--layer", filter.layer]), "--sha256", filter.sha256, "--format", filter.format, "--uri", filter.uri, "--offer", filter.offer, "--host-class", filter.hostClass];
-    return lines(this.read("query", args)) as StoredRecord[];
+    return lines(this.read("query", args), "query --records", isRecordLine) as StoredRecord[];
   }
 
   /** What the scope's own layer holds per format: `counts --layer user --json`. */
   counts(): StoreCounts[] {
-    return lines(this.read("counts", ["--layer", "user", "--json"])) as StoreCounts[];
+    return lines(this.read("counts", ["--layer", "user", "--json"]), "counts", isCountsLine) as StoreCounts[];
   }
 }

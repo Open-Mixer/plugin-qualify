@@ -26,6 +26,10 @@ plugin is then not measured, the record is put in the scope's layer of the store
 files differ is ignored (\fBstored: \fIuri\fB: binary differs\fR) and the plugin is measured. The host class is
 \fBhost_class\fR, else the board's own from the device tree (\fBrpi5\fR on a Raspberry Pi 5), else \fBx86\-64\fR.
 .PP
+An absent base is an empty base layer: with no shipped base the store answers from the scope's own layer, and the run
+says so once, \fBqualification store: base\-absent: \fIpath\fB: the base layer is empty\fR. A base that exists and
+cannot be used is refused by its name (\fBqualification\-db.unreadable\fR, \fBnot\-a\-store\fR, \fBschema\-other\fR).
+.PP
 The last line on standard output counts the plugins: qualified, skipped, refused, crashed, hung,
 unmeasured, taken from the store's records, and the seconds the run took.
 .PP

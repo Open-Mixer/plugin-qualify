@@ -56,9 +56,10 @@ Requires: omx-clap-host >= 0.32.5
 Requires: omx-clap-core >= 0.32.5
 # the qualification store: the sync reads it through plugin-qualification-db and writes its records through
 # plugin-qualification-db-write (which brings plugin-qualification-db-schema); the store spec's section 7. The floor is the
-# release that first ships the reader's widened verbs (query --records, --layer, counts) and the writer.
-Requires: plugin-qualification-db >= 2026111901
-Requires: plugin-qualification-db-write >= 2026111901
+# release whose reader reads an absent base as an empty base layer (the base-absent line on standard error), after the one
+# that first shipped the widened verbs (query --records, --layer, counts) and the writer.
+Requires: plugin-qualification-db >= 2026112001
+Requires: plugin-qualification-db-write >= 2026112001
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
