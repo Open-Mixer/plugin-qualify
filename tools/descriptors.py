@@ -156,6 +156,7 @@ def schema_candidates(env=None):
 
 SCHEMA_MAJOR = re.search(r"\d+", DESCRIPTOR_SCHEMA_FLOOR).group(0)
 LV2_DOMAIN = os.path.join("lv2", "lv2.json")
+OPENMIXER_UNIT_PREFIX = "urn:openmixer:unit#"
 INSTALLED_CONTRACT_DIR = "/usr/share/omx-contract/contract.d"
 
 
@@ -169,7 +170,7 @@ def contract_dir_candidates(env=None):
 def unit_words(env=None):
     """plugin-db's `lv2` domain as LV2 unit URI -> the word of omx-contract's PARAM_UNITS it is: each word of LV2_UNIT_IDS
     names its unit term of LV2_UNITS_TERMS (its `x-from`), whose uri is the unit as an LV2 file writes it; the urn:openmixer:unit#
-    spellings are LV2_OPENMIXER_UNIT_IDS', each as its description writes the URI. A unit the domain gives no word has none
+    spellings are LV2_OPENMIXER_UNIT_IDS' (by their lower-cased name, see `unit_word`). A unit the domain gives no word has none
     here. The domain is the owner: there is no table of units in this package."""
     paths = [os.path.join(d, LV2_DOMAIN) for d in contract_dir_candidates(env)]
     found = [p for p in paths if os.path.isfile(p)]
@@ -186,20 +187,19 @@ def unit_words(env=None):
                     raise KeyError(f"LV2_UNIT_IDS {w['const']} names the term {ref['x-term']}, which LV2_UNITS_TERMS lacks")
                 out[terms[ref["x-term"]]["uri"]] = w["const"]
         for w in schemas["LV2_OPENMIXER_UNIT_IDS"]["oneOf"]:
-            # the spelling as written: the URI the word's description names (the title is the lower-cased name, not a spelling)
-            spelled = re.match(r"(urn:openmixer:unit#\S+) ", w.get("description", ""))
-            if spelled is None:
-                raise KeyError(f"LV2_OPENMIXER_UNIT_IDS {w['title']} names no urn:openmixer:unit# spelling in its description")
-            out[spelled.group(1)] = w["const"]
+            out[OPENMIXER_UNIT_PREFIX + w["title"]] = w["const"]
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where=found[0], message=str(e)) from e
     return out
 
 
 def unit_word(uri, words):
-    """The word of `uri` in `words` (unit_words), matched exactly as the domain spells the unit: `#Hz` is the domain's, `#hz`
-    is not. None for none."""
-    return words.get(uri)
+    """The word of `uri` in `words` (unit_words): exact, else a urn:openmixer:unit# spelling by its lower-cased name; None for none."""
+    if uri in words:
+        return words[uri]
+    if uri.startswith(OPENMIXER_UNIT_PREFIX):
+        return words.get(OPENMIXER_UNIT_PREFIX + uri[len(OPENMIXER_UNIT_PREFIX):].lower())
+    return None
 
 
 def meaning_words(env=None):
