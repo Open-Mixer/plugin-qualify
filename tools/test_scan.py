@@ -221,14 +221,14 @@ class UnitsFromTheSheet(unittest.TestCase):
         self.assertIsNone(s.Scanner.unit_symbol(self.scanner(), self.FakePort(None)))
 
     @staticmethod
-    def lv2_domain(units=(("cent", "cents"),), openmixer=(("dbfs", "dBFS"),), drop_term=None):
+    def lv2_domain(units=(("cent", "cents"),), openmixer=(("dbfs", "dBFS", "urn:openmixer:unit#dBFS"), ("hz", "Hz", "urn:openmixer:unit#Hz")), drop_term=None):
         """A plugin-db `lv2` domain with the given unit words (term key -> PARAM_UNITS word), as the document lays it out."""
         term = lambda key, kind: {"const": key, "title": key, "x-term": {"uri": s.UNITS + key, "kind": kind}}
         refs = "https://openmixer.org/contract/lv2#/components/schemas/LV2_UNITS_TERMS"
         schemas = {
             "LV2_UNITS_TERMS": {"x-kind": "terms", "oneOf": [term("Unit", "class")] + [term(k, "unit") for k, _ in units if k != drop_term]},
             "LV2_UNIT_IDS": {"x-kind": "words", "oneOf": [{"const": w, "title": k, "x-from": [{"$ref": refs, "x-term": k}]} for k, w in units]},
-            "LV2_OPENMIXER_UNIT_IDS": {"x-kind": "words", "oneOf": [{"const": w, "title": t} for t, w in openmixer]},
+            "LV2_OPENMIXER_UNIT_IDS": {"x-kind": "words", "oneOf": [{"const": w, "title": t, "description": f"{u} is the standard unit {w}"} for t, w, u in openmixer]},
         }
         return {"info": {"x-owner": "plugin-db"}, "components": {"schemas": schemas}}
 
@@ -248,6 +248,13 @@ class UnitsFromTheSheet(unittest.TestCase):
             self.assertEqual(words[s.UNITS + "cent"], "cents")
             self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + "dBFS", words), "dBFS")
             self.assertIsNone(desc.unit_word(s.UNITS + "coef", words))
+
+    def test_an_openmixer_spelling_is_matched_exactly_as_the_domain_writes_it(self):
+        with tempfile.TemporaryDirectory() as root:
+            words = desc.unit_words(self.env_with(root, self.lv2_domain()))
+            self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + "Hz", words), "Hz")
+            for folded in ("hz", "HZ", "dbfs", "DBFS"):
+                self.assertIsNone(desc.unit_word(s.OPENMIXER_UNITS + folded, words), folded)
 
     def test_a_unit_whose_term_the_domain_lacks_refuses_by_name(self):
         with tempfile.TemporaryDirectory() as root:
