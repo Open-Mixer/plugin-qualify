@@ -24,6 +24,8 @@ const MEASURE_ASAN = join(BUILD, "asan", "lv2_measure");
 const ORACLE = join(BUILD, "lv2_measure_options_test");
 const PATH_ORACLE = join(BUILD, "lv2_measure_path_test");
 const INTERPOSER = join(BUILD, "rt_interpose.so");
+const COUNTER_ORACLE = join(BUILD, "rt_interpose_test");
+const NO_TASK_DIR = join(BUILD, "no_task_dir.so");
 // liblilv's own world leak (native/lsan.supp) is not ours; every other leak still fails
 const LSAN_SUPPRESSIONS = join(NATIVE, "lsan.supp");
 const LV2_FIXTURES = join(BUILD, "fixtures", "lv2");
@@ -31,7 +33,7 @@ const SAFE = "urn:plugin-qualify:fixture:lv2-rt-safe";
 const UNSAFE = "urn:plugin-qualify:fixture:lv2-rt-unsafe";
 const SYNTH = "urn:plugin-qualify:fixture:lv2-synth";
 const SYNTH_ALLOC = "urn:plugin-qualify:fixture:lv2-synth-alloc";
-const BUILT = [MEASURE, ORACLE, PATH_ORACLE, INTERPOSER, join(LV2_FIXTURES, "rt-safe.lv2", "gain.so"),
+const BUILT = [MEASURE, ORACLE, PATH_ORACLE, COUNTER_ORACLE, NO_TASK_DIR, INTERPOSER, join(LV2_FIXTURES, "rt-safe.lv2", "gain.so"),
   join(LV2_FIXTURES, "spaced.lv2", "manifest.ttl"), join(LV2_FIXTURES, "synth.lv2", "synth.so"), join(LV2_FIXTURES, "synth-alloc.lv2", "synth.so")].every((p) => existsSync(p));
 
 function live(name: string, body: () => void): void {
@@ -63,6 +65,23 @@ describe("lv2-measure, live — the LV2 fixtures", () => {
     const r = spawnSync(PATH_ORACLE, [], { cwd: NATIVE, encoding: "utf8" });
     expect(r.stderr).toBe("");
     expect(r.status).toBe(0);
+  });
+
+  live("the interposer counts other threads' calls exactly under several threads at once", () => {
+    const r = spawnSync(COUNTER_ORACLE, [], { encoding: "utf8" });
+    expect(r.stderr).toBe("");
+    expect(r.status).toBe(0);
+  });
+
+  live("a thread count the measurer cannot take leaves ownThreads out, never a false none", () => {
+    const r = spawnSync(MEASURE, [SAFE, "48000", "64", "3", "2"], {
+      encoding: "utf8",
+      env: { PATH: process.env["PATH"], LV2_PATH: LV2_FIXTURES, LD_PRELOAD: `${INTERPOSER} ${NO_TASK_DIR}` },
+    });
+    const rt = (JSON.parse(r.stdout) as { rtSafety: Record<string, unknown> }).rtSafety;
+    expect(r.status).toBe(0);
+    expect(rt["interposer"]).toBe(true);
+    expect(rt).not.toHaveProperty("ownThreads");
   });
 
   live("counts no allocation in the safe fixture's run(), and every block's in the unsafe one's", () => {

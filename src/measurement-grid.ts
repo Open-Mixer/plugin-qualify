@@ -8,6 +8,7 @@
  * Pure: no file, no process. `probe-runner.ts` runs what `runnerInvocations` plans.
  */
 import { COST_REFERENCE_RATE, GRID_CONTINUITY_QUANTUM, LONG_QUANTUM_FRAMES } from "./qualify-declarations.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** One cell of the grid. */
 export interface GridCell {
@@ -29,7 +30,7 @@ const positive = (t: string): number | undefined => {
 };
 
 /** `hosts`, `full`, or `<rate>/<quantum>,...`; anything else is refused with what was wrong. */
-export function parseGridSpec(text: string): { ok: true; spec: GridSpec } | { ok: false; error: string } {
+export function parseGridSpec(text: string): { ok: true; spec: GridSpec } | { ok: false; error: TextRef } {
   const t = text.trim();
   if (t === "hosts") return { ok: true, spec: GRID_HOSTS };
   if (t === "full") return { ok: true, spec: GRID_FULL };
@@ -39,7 +40,7 @@ export function parseGridSpec(text: string): { ok: true; spec: GridSpec } | { ok
     const rate = m === null ? undefined : positive(m[1]!);
     const quantum = m === null ? undefined : positive(m[2]!);
     if (rate === undefined || quantum === undefined) {
-      return { ok: false, error: `the grid is hosts, full, or cells as <rate>/<quantum>, comma-separated; "${part}" is none of them` };
+      return { ok: false, error: { code: TEXT_CODE.gridPartUnknown, args: { part: part } } };
     }
     cells.push({ rate, quantum });
   }

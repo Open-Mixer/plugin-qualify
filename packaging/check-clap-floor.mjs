@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isMain } from "@openmixer/omx-contract/entry";
 
 /** `{ floor }` read from the spec's `pkgconfig(clap)` constraint, or null if absent. */
 export function specClapRange(spec) {
@@ -36,7 +37,7 @@ export function checkClapFloor(spec, control) {
   );
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMain(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), "..");
   const spec = readFileSync(join(root, "packaging/plugin-qualify.spec"), "utf8");
   const control = readFileSync(join(root, "debian/control"), "utf8");

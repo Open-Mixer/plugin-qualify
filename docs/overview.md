@@ -7,7 +7,7 @@ Licence: GPL-3.0-or-later (`LICENSE`).
 
 ## Install
 
-plugin-qualify is published, signed, in the OpenMixer package channel, for Fedora 44 (x86_64, aarch64)
+plugin-qualify is published, signed, in the OpenMixer package channel, for Fedora 45 (x86_64)
 and for Debian bookworm and trixie, including Raspberry Pi OS (amd64, arm64).
 
 Fedora:
@@ -211,7 +211,12 @@ The prober runs each plugin headless at every cell of the grid (see "The measure
 allocations, locks and syscalls its `process()` makes while every parameter is swept, and prints
 the file's SHA-256 beside what it measured. The verdict is the real-time-safety one: **suitable**
 only on a clean count, **conditional** (isolated in the pin: it runs in a worker of its own, never refused) on any
-allocation, lock, syscall or main-thread host call from `process()`, **unsuitable** on `CLAP_PROCESS_ERROR`, **unknown** when it could not be counted. An instrument is
+allocation, lock, syscall or main-thread host call from `process()`, **unsuitable** on `CLAP_PROCESS_ERROR`, **unknown** when it could not be counted. Only the
+audio thread's calls decide: a call another thread makes while `process()` runs (a plugin's own worker, whose timing
+no run fixes) is counted apart, `otherThreads` in `rtSafety`, a figure and never the verdict. A clean plugin that
+started threads of its own (`ownThreads`, from `/proc/self/task` before it is created and after it runs, less the
+host's pool helpers) is **conditional** under `hosting.rt-safety.own-threads`: groupable, so it shares a worker,
+never runs alone and is offered on its tier; only an RT-unsafe reason isolates. An instrument is
 quiet until it is played, so a plugin with a note input is also played, at every rate and under a
 count of its own: a chord, the pitch bent and a controller moved, pressure, the chord let go, a
 burst of 32 note ons in one block and their offs, all notes off, in the dialect its note input
@@ -247,6 +252,18 @@ class, so a reference figure and a local one are told apart. The record holds, f
 (`rating`, `hosting`, the deciding reason code and every reason) and the cost reasons at that profile's rate and
 quantum, and the figures as measured. Exit `0` every plugin qualified, `1` some did not, `2` something could not
 be read or judged.
+
+The record also says which installed package the binary came from, in `package`: `format` (`deb` or `rpm`),
+`name`, `version`, `release`, `distro` and `arch`, as the package manager states them. They are read when the
+record is written, from the package manager's owner of `binary.path` (`dpkg-query -S` and `-W` on a Debian system,
+`rpm -qf` on an RPM one). A `deb` version `1.1.0-4` is `version` `1.1.0` and `release` `4`; `distro` is the
+distribution's own word (`trixie`, `fc44`): an RPM's dist tag, or a Debian system's release codename. A binary no
+package owns (one built by hand, one in a home directory) has `package: null`, and so has a field the manager
+does not state; nothing is guessed. The package never takes part in the record's identity, which is the binary's
+SHA-256. A record written before the field existed does not hold it and is not filled in afterwards. A `distro` or `arch` that those items do not hold (Ubuntu noble, `fc46`, an `armhf` package) is
+null, and the record is still written; the words are read from the installed domain, never a copy here. The words of
+`format`, `distro` and `arch` are the items `QUALIFICATION_PACKAGE_FORMATS`, `QUALIFICATION_PACKAGE_DISTROS` and
+`QUALIFICATION_PACKAGE_ARCHES` of the `qualification` contract domain.
 
 The verdict is the same one `plugin-qualify` gives CLAP plugins, the real-time-safety one, now for LV2 as
 well; cost is reported beside it, not folded into it. Cost is read at the profile's rate AND quantum: a pair the
@@ -490,7 +507,7 @@ the comparison: `OMX_COMPARE_VERSION_MOD_HOST="zynthian 3f2c1ab"` names a `mod-h
 
 plugin-qualify does not pull in mod-host or jalv: install them, and the plugins to compare, yourself.
 
-Fedora 44 (a `fedora:44` container does, started with `--shm-size=1g`: the JACK server maps about 100 MB of
+Fedora 45 (a `fedora:45` container does, started with `--shm-size=1g`: the JACK server maps about 100 MB of
 `/dev/shm` and a container's default 64 MB runs out mid-run):
 
 ```

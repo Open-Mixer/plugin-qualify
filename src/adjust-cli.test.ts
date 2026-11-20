@@ -21,6 +21,7 @@ import { readProbeOutput } from "./probe-output.js";
 import { fixtureText } from "./probe-output-fixtures.js";
 import { parsePinLine, pinsFile } from "./pins-file.js";
 import { rewriteRecord, writeQualification, type QualificationRecord } from "./qualification-record.js";
+import { rendered } from "./text-rendered.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "adjust-cli-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -241,7 +242,7 @@ describe("--pins with --history", () => {
 
 describe("parseAdjustArgs", () => {
   it("reads the history, the directory, the class, the pins, the clock, the profiles (once each) and the format", () => {
-    expect(parseAdjustArgs(["--history", "h", "--qualification-dir", "q", "--host-class", CLASS, "--pins", "p", "--now", "5", "--host-profile", "omx-clap-host,jalv", "--host-profile", "jalv", "--format", "json"])).toEqual({
+    expect(rendered(parseAdjustArgs(["--history", "h", "--qualification-dir", "q", "--host-class", CLASS, "--pins", "p", "--now", "5", "--host-profile", "omx-clap-host,jalv", "--host-profile", "jalv", "--format", "json"]))).toEqual({
       ok: true,
       args: { history: "h", hostProfiles: ["omx-clap-host", "jalv"], qualificationDir: "q", hostClass: CLASS, pins: "p", now: 5, format: "json", help: false },
     });
@@ -250,15 +251,15 @@ describe("parseAdjustArgs", () => {
   });
 
   it("refuses a missing history, an unknown option, a missing value, a bad clock, a bad format and a positional", () => {
-    expect(parseAdjustArgs([])).toEqual({ ok: false, error: "name the history file with --history" });
-    expect(parseAdjustArgs(["--history", "h", "--nope"])).toEqual({ ok: false, error: "unknown option --nope" });
-    expect(parseAdjustArgs(["--history"])).toEqual({ ok: false, error: "--history needs a value" });
-    expect(parseAdjustArgs(["--history", "--pins"])).toEqual({ ok: false, error: "--history needs a value" });
-    expect(parseAdjustArgs(["--history", "h", "--now", "-3"]).ok).toBe(false);
-    expect(parseAdjustArgs(["--history", "h", "--now", "soon"]).ok).toBe(false);
-    expect(parseAdjustArgs(["--history", "h", "--format", "xml"]).ok).toBe(false);
-    expect(parseAdjustArgs(["--history", "h", "a.json"]).ok).toBe(false);
-    expect(parseAdjustArgs(["--help"]).ok).toBe(true);
+    expect(rendered(parseAdjustArgs([]))).toEqual({ ok: false, error: "name the history file with --history" });
+    expect(rendered(parseAdjustArgs(["--history", "h", "--nope"]))).toEqual({ ok: false, error: "unknown option --nope" });
+    expect(rendered(parseAdjustArgs(["--history"]))).toEqual({ ok: false, error: "--history needs a value" });
+    expect(rendered(parseAdjustArgs(["--history", "--pins"]))).toEqual({ ok: false, error: "--history needs a value" });
+    expect(rendered(parseAdjustArgs(["--history", "h", "--now", "-3"])).ok).toBe(false);
+    expect(rendered(parseAdjustArgs(["--history", "h", "--now", "soon"])).ok).toBe(false);
+    expect(rendered(parseAdjustArgs(["--history", "h", "--format", "xml"])).ok).toBe(false);
+    expect(rendered(parseAdjustArgs(["--history", "h", "a.json"])).ok).toBe(false);
+    expect(rendered(parseAdjustArgs(["--help"])).ok).toBe(true);
   });
 });
 

@@ -87,20 +87,20 @@ jobs:
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           node packaging/check-tarball.mjs "$RUNNER_TEMP"/pack/openmixer-plugin-qualify-*.tgz
 
-  # the test files of .github/container-tests.txt: they need omx-contract 3.20.0 as a system package (the installer's
-  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora; the build and test job above leaves them out
+  # the test files of .github/container-tests.txt: they need omx-contract 3.20.2 as a system package (the installer's
+  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora 45; the build and test job above leaves them out
   container-tests:
     name: tests that need omx-contract installed
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
       - uses: actions/checkout@v4
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.0' 'omx-contract-devel >= 3.20.0' 'omx-contract-data >= 3.20.0'
+      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.2' 'omx-contract-devel >= 3.20.2' 'omx-contract-data >= 3.20.0'
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: Install
@@ -112,16 +112,19 @@ jobs:
 
   # one pack per listed language from the spec and debian/control, and the catalogs through omx-contract's release
   # gate (translate --check, tools/catalogs-gate.sh): a listed language with no catalog, a missing key or a stale entry
-  # is red
+  # is red. This job only checks (fill: false): it runs where every job here runs (vars.OMX_RUNNER) and takes no cluster
+  # DNS. The gaps are filled by the fill job below.
   catalogs:
     name: language packs and catalogs
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ${{ vars.OMX_RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 30
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs
+      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs gnupg2
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
       - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.16.0' 'omx-contract-data >= 3.16.0'
@@ -138,6 +141,24 @@ jobs:
           owner: plugin-qualify
           spec: packaging/plugin-qualify.spec
           gate: tools/catalogs-gate.sh
+          fill: 'false'
+
+  # the catalogs' gaps fill themselves on the organisation's own pool, where the router answers (Open-Mixer/.github#177,
+  # owner ruling 2026-11-20): dispatched on a lane branch that heads one open pull request of this repository, the shared
+  # workflow makes the missing entries through the router, signs them and pushes them to that branch only
+  fill:
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    uses: Open-Mixer/.github/.github/workflows/langpacks-fill.yml@openmixer-v1
+    with:
+      name: plugin-qualify
+      owner: plugin-qualify
+      spec: packaging/plugin-qualify.spec
+      gate: tools/catalogs-gate.sh
+      # the codes are a bare item file: the gate script hands translate a vocabulary holding it, for a language too
+      fill-command: tools/catalogs-gate.sh
+    secrets: inherit
 
   # the RPM and the DEB are built, linted and assembled into unsigned trees; nothing is published
   packages:
@@ -151,4 +172,4 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       publish: false
-      arm: false  # aarch64/arm64 build at release only
+      arm: false  # the arm64 DEBs build at release only; no Fedora aarch64 RPM
