@@ -246,15 +246,18 @@ the English source sentence.
 # END langpacks
 
 %changelog
-* Thu Nov 19 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.7-1
-- the qualification domain (1.3.0) holds the words of the record store, the 14 kinds
-  of an adapter code and the memory-bound outcome; the adapter codes and the
-  memory-bound outcome are read from it, not spelled in the program (#113, #115)
+* Fri Nov 20 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.7-1
+- the qualification domain 1.4.0 holds the words of the record store, the 14 kinds
+  of an adapter code, the memory-bound outcome and the adapter hosts; the adapter
+  codes and the memory-bound outcome are read from it (#113, #115, #136)
+- reasons and usage errors are codes, every language filled by the router (#145)
+- the qualification record holds the package its binary came from (#124)
 - the audio thread decides: plugin-qualify's own threads are conditional and
   groupable (#119)
+- entry points decide "run, not imported" with omx-contract's isMain (#134)
 - packages are built for Fedora 45, RPM for x86_64 only (#121)
-- the release workflow's install matrix is derived from its build matrix (#117)
-- floors unchanged, no ceilings
+- the release install job takes its cells and runners from check-matrix (#117, #131)
+- floors: omx-contract rises to 3.20.2 (#139); no ceilings
 
 * Wed Nov 18 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.6-1
 - the qualification domain ships in the new plugin-qualify-contract package and is
