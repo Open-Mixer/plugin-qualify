@@ -17,7 +17,22 @@ import { measuredPluginsFromSweep } from "./measurement/sweep-jsonl.js";
 import { attributeCrash } from "./hosting-suitability.js";
 
 const PROBE_DIR = process.env.PLUGIN_HOSTD_CONTRACT_DIR ?? "/usr/share/omx-contract/contract.d";
-const QUICK = { uri: "urn:swept", instantiated: true, rate: 192000, block: 512, audioInputs: 1, audioOutputs: 1 };
+const QUICK = {
+  uri: "urn:swept",
+  instantiated: true,
+  rate: 192000,
+  block: 512,
+  audioInputs: 1,
+  audioOutputs: 1,
+  cvPorts: 0,
+  controlInputs: 3,
+  requiredFeatures: ["http://lv2plug.in/ns/ext/urid#map"],
+  optionalFeatures: [],
+  lifecycle: { cycles: 30, instantiated: 30, failed: 0 },
+  threads: { before: 1, afterFirstInstantiate: 1, afterAllFreed: 1, leaked: 0 },
+  rtSafety: { interposer: true, blocks: 512, repeats: 3, swept: true, sweepApplicable: true, allocationsInRun: 0, allocationsMin: 0, variable: false, locksInRun: 0, syscallsInRun: 0 },
+  exit: 0,
+};
 const scratch: string[] = [];
 afterEach(() => {
   initProbeDomain(undefined);
