@@ -10,7 +10,7 @@
  * commands once they take a layer path the tests may name.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -166,5 +166,31 @@ describe("plugin-qualification-db reads what the sync asks of it", () => {
     if (out.status === 2) throw new Error(`unknown flag --layer: ${out.stderr.trim()}`);
     verdict(out, "query");
     if (out.status === 0) for (const l of out.stdout.split("\n").filter(Boolean)) expect((JSON.parse(l) as { files: unknown[] }).files.length).toBeGreaterThan(0);
+  });
+});
+
+describe("an absent base is an empty base layer: the reader's answer", () => {
+  // named places of the test's own (--base, --user): no run here opens a user's or the system's store
+  it("query and counts exit 0, standard output holds records only, standard error the one base-absent line", () => {
+    const dir = mkdtempSync(join(root, "absent-base-"));
+    const base = join(dir, "base.sqlite");
+    const places = ["--base", base, "--user", join(dir, "user.sqlite")];
+    for (const args of [["query", "--json", "--records", ...places], ["query", "--json", ...places], ["counts", "--layer", "user", "--json", ...places]]) {
+      const r = run(READ, args);
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout).toBe("");
+      expect(r.stderr).toBe(`plugin-qualification-db: base-absent: ${base}: the base layer is empty\n`);
+    }
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it("a base that exists and is no store is still refused by its name, never read as absent", () => {
+    const dir = mkdtempSync(join(root, "bad-base-"));
+    const base = join(dir, "base.sqlite");
+    writeFileSync(base, "not a database");
+    const r = run(READ, ["query", "--json", "--records", "--base", base, "--user", join(dir, "user.sqlite")]);
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/qualification-db\.(unreadable|not-a-store)/);
+    expect(r.stderr).not.toContain("base-absent");
   });
 });
