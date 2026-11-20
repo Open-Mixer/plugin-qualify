@@ -111,7 +111,7 @@ export function judgedLayerOf(record: QualificationRecord, input: JudgedLayerInp
   const tierHost = ISOLATED_TIER_HOST[record.plugin.format];
   const v = record.verdicts.find((r) => r.host === tierHost);
   if (v === undefined) return { layer: null, reason: tierHost === undefined ? { code: TEXT_CODE.judgedNoVerdictFormat, args: { format: record.plugin.format } } : { code: TEXT_CODE.judgedNoVerdict, args: { host: tierHost } } };
-  const verdict = v.measured ? pinVerdictOf(v.rating as SuitabilityRating) : undefined;
+  const verdict = v.measured ? pinVerdictOf(v.rating as SuitabilityRating, v.reasons) : undefined;
   if (verdict === undefined) return { layer: null, reason: { code: TEXT_CODE.judgedNotMeasured, args: { host: String(tierHost), deciding: v.deciding ?? v.rating } } };
   const hostVersion = versionOf(record, "plugin-hostd-probe");
   if (hostVersion === undefined) return { layer: null, reason: { code: TEXT_CODE.judgedNoProbeVersion } };

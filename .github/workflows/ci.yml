@@ -1,12 +1,11 @@
 name: ci
 
-# Type-check, the TypeScript and Python tests, and the generated Python declarations, on every
-# pull request and every push to main.
+# Type-check, the TypeScript and Python tests, the catalogs and the packages, by workflow_dispatch.
 
+# Delivery pipeline §12: no heavy Action on a push or a pull request. This workflow runs by workflow_dispatch only;
+# a pull request's head is dispatched before it merges (gh workflow run ci.yml --ref <branch>), and its fast checks
+# are lint.yml's, the one lint.
 on:
-  pull_request:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -88,20 +87,20 @@ jobs:
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           node packaging/check-tarball.mjs "$RUNNER_TEMP"/pack/openmixer-plugin-qualify-*.tgz
 
-  # the test files of .github/container-tests.txt: they need omx-contract 3.20.0 as a system package (the installer's
-  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora; the build and test job above leaves them out
+  # the test files of .github/container-tests.txt: they need omx-contract 3.20.2 as a system package (the installer's
+  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora 45; the build and test job above leaves them out
   container-tests:
     name: tests that need omx-contract installed
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
       - uses: actions/checkout@v4
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.0' 'omx-contract-devel >= 3.20.0' 'omx-contract-data >= 3.20.0'
+      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.2' 'omx-contract-devel >= 3.20.2' 'omx-contract-data >= 3.20.0'
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: Install
@@ -123,7 +122,7 @@ jobs:
     permissions:
       contents: write
     container:
-      image: fedora:44
+      image: fedora:45
       # on the organisation's runners the job's container sits in the runner's own Docker, whose resolver does not know
       # the cluster's services: it is handed the cluster DNS so the router's name resolves (a GitHub-hosted run gets none)
       options: ${{ !github.event.pull_request.head.repo.fork && !((startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && github.event.repository.private == false) && vars.OMX_RUNNER && '--dns 10.43.0.10 --dns-search llm-router.svc.cluster.local --dns-search svc.cluster.local --dns-search cluster.local' || '' }}
@@ -171,20 +170,4 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       publish: false
-      arm: false  # aarch64/arm64 build at release only
-
-  # the dependency floors: the spec, debian/control and the workflows' install lines state floors and no ceiling. This
-  # repository has no packaging/deps.txt, so the shared deps-render action only refuses ceilings (Open-Mixer/.github's
-  # deps-render, at the same openmixer-v1 ref every shared action of this repository uses)
-  deps-render:
-    name: the packaging states floors only
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: Open-Mixer/.github/.github/actions/deps-render@openmixer-v1
-
-  # the checks every OpenMixer repository runs on what it publishes: commit messages, private references, and no
-  # local copy of either (Open-Mixer/.github's public-sources-check)
-  public-sources:
-    uses: Open-Mixer/.github/.github/workflows/public-sources-check.yml@openmixer-v1
+      arm: false  # the arm64 DEBs build at release only; no Fedora aarch64 RPM

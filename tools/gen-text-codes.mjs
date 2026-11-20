@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '@openmixer/omx-contract/entry';
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const SOURCE = join(PKG, 'schema/codes.json');
@@ -74,4 +75,4 @@ function main() {
   console.log(`gen-text-codes: ${onDisk === content ? 'up to date' : 'wrote'} ${OUT}`);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();
