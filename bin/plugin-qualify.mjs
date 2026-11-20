@@ -225,7 +225,7 @@ if (process.argv[2] === "adjust") {
     process.exit(EXIT_CODE.couldNotMeasure);
   }
   if (read.records.length === 0) {
-    process.stderr.write(`plugin-qualify adjust: no record in the ${a.args.system ? "system" : "user"} layer of the qualification store\n`);
+    process.stderr.write(`plugin-qualify adjust: no record in the ${a.args.system ? "system" : "user"} scope of the qualification store (its layer over the base)\n`);
     process.exit(EXIT_CODE.couldNotMeasure);
   }
   const hashOf = (path) => {

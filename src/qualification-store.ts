@@ -161,6 +161,11 @@ export class QualificationStore {
     return this.user;
   }
 
+  /** Every record of the scope, the user layer over the base (`query --json --records`, no layer named). */
+  scopeRecords(): StoredRecord[] {
+    return lines(this.read("query", ["--json", "--records"])) as StoredRecord[];
+  }
+
   /** The user layer's record of a key. */
   record(key: ShadowKey): QualificationRecord | undefined {
     return this.userRecords().find((u) => sameKey(shadowKeyOf(u), key))?.record;

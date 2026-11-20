@@ -346,7 +346,7 @@ plugin-qualify adjust --history history --host-class aarch64/4/2400 --pins pins.
 
 plugin-hostd keeps a running history of every plugin binary on every host class it ran on (windows run alone and in a
 group, CPU, xrun windows, crashes, restarts, quarantines). `adjust` reads that file directly, so it runs without a daemon,
-and writes a second verdict beside the measured one in each record of the store's user layer (`--system`: the system layer), read through the reader and put again through the writer. The plugin's installed path, which the history is keyed by, is the install root of the installed item that holds the record's key joined with the record's `binary_path`; a record whose key no installed item holds is left as it is, under `adjust.not-installed`. Each record gets a `history` block: a `history` block per host class of the
+and writes a second verdict beside the measured one in each record of the scope, the store's user layer over the base (`--system`: the system layer over the base), read through the reader and put again into the scope's layer through the writer. The plugin's installed path, which the history is keyed by, is the install root of the installed item that holds the record's key joined with the record's `binary_path`; a record whose key no installed item holds is left as it is, under `adjust.not-installed`. Each record gets a `history` block: a `history` block per host class of the
 file, holding the line it looked for (the plugin's plugin-hostd uri and the digest of the first file of its pin), whether
 the history has it, the windows it counts, and for each `--host-profile` the measured pin verdict, the adjusted one, the
 move (`demote`, `promote` or `none`) and a reason code. The measured `verdicts` and the measurement are never changed: the
@@ -976,7 +976,8 @@ base that the reader merges under it.
 
 **Removed, with no alias:** the settings `qualification_dir` and `distributed_dir` (the places are the store's), the
 probe copy beside a record, the `.unmeasured.json` file (the plugin's outcome and code are in the sync state), and
-`readDistributedLayer`, `matchDistributed`, `applyDistributed` with the file `distributed-records.ts`. The state schema
+`readDistributedLayer`, `matchDistributed` and `applyDistributed` (`distributed-records.ts` keeps only the host class and the
+helpers the sync and its commands share). The state schema
 becomes `plugin-qualify.sync-state/2`: a state of the older schema is moved aside as an unreadable one is, and every plugin
 is qualified again. Records an older `qualification_dir` holds are not read, imported or removed.
 

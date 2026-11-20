@@ -95,7 +95,7 @@ function adjustHelpTextBody(): string {
     "  plugin-qualify adjust --history <file> [options]",
     "",
     "  --history <file>              plugin-hostd's history file ($XDG_STATE_HOME/plugin-hostd/history); required",
-    "  --system                      the system scope's layer of the qualification store (default: the user's); each record read gets a `history` block",
+    "  --system                      the system scope of the qualification store (default: the user's): its layer over the base; each record read gets a `history` block",
     "  --host-profile <file|id>      adjust the verdict of this host; repeat or comma-separate (default: openmixer-console)",
     "  --host-class <class>          read only this host class of the history (arch/cores/clock); default: every class the file holds",
     "  --pins <file>                 write the pins with the ADJUSTED verdict of the first host profile; needs exactly one host class",
@@ -111,7 +111,7 @@ function adjustHelpTextBody(): string {
   ].join("\n");
 }
 
-/** A record of the scope's user layer, with the shadow key it is held under. */
+/** A record of the scope (its layer over the base), with the shadow key it is held under. */
 export interface RecordFile {
   readonly key: ShadowKey;
   readonly record: QualificationRecord;
@@ -123,9 +123,9 @@ export const ADJUST_CODE = {
   notInstalled: "adjust.not-installed",
 } as const;
 
-/** Every record of the scope's user layer, through the reader. */
+/** Every record of the scope through the reader, the user layer over the base: a base record is adjusted and put in the scope's layer. */
 export function readRecords(store: QualificationStore): { readonly records: readonly RecordFile[] } {
-  return { records: store.userRecords().map((s) => ({ key: shadowKeyOf(s), record: s.record })) };
+  return { records: store.scopeRecords().map((s) => ({ key: shadowKeyOf(s), record: s.record })) };
 }
 
 /**
