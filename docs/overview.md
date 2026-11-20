@@ -953,9 +953,8 @@ measuring tools (`tools/lv2-measure.mjs`, the mod-host sweep). A run that would 
 
 ## The qualification store (plugin-qualify-sync)
 
-**Status:** implemented; the contract is the qualification-store spec of
-Open-Mixer/plugin-db-qualification (`docs/design/specs/qualification-sqlite.md` at 13619143e: sections 3.7, 6.1, 6.2 and
-the cases C1 to C9 and C6b of section 8).
+**Status:** implemented; the contract is the store spec, `qualification-sqlite.md` of Open-Mixer/plugin-db-qualification
+(at 13619143e: sections 3.7, 6.1, 6.2 and the cases C1 to C9 and C6b of section 8).
 
 The store replaces two things: the distributed JSON layer (`<dir>/<host class>/<set>/*.qualification.json`, read by
 `readDistributedLayer`) and the JSON files of `qualification_dir` (`*.qualification.json`, `*.probe.json`,
