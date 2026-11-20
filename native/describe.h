@@ -14,6 +14,12 @@
 #include <stddef.h>
 
 #include "plugin-json.h"
+#include "scan_words.h"
+
+/* the scopes of a field dump, the scan domain's words (scan_words_open): the parser reads them where it reads a dump, so
+ * they are set before describe_dump is called, and kept (not copied) until the next call. Without them a dump is
+ * refused by name. */
+void describe_scopes(const scan_words *words);
 
 /* the format of a target, clap:<path>#<id> or lv2:<uri>: "clap", "lv2", or NULL */
 const char *describe_format(const char *target);
