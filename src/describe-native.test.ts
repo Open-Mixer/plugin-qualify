@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 const NATIVE = join(dirname(fileURLToPath(import.meta.url)), "..", "native");
 const ORACLE = join(NATIVE, "build", "describe_test");
 // the oracle reads the scan domain (the scopes of a dump) where omx-clap-core-contract installs it; OMX_CLAP_CORE_CONTRACT_DIR
-// names a checkout's contract.d instead
+// names a checkout's contract.d instead. It is built and run by ci.yml's container job (the channel's loader is Fedora 45's)
 const SCAN_DIR = process.env["OMX_CLAP_CORE_CONTRACT_DIR"] ?? "/usr/share/omx-contract/contract.d";
 
 describe("describe, live — the format table fixtures", () => {
