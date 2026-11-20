@@ -112,28 +112,16 @@ jobs:
 
   # one pack per listed language from the spec and debian/control, and the catalogs through omx-contract's release
   # gate (translate --check, tools/catalogs-gate.sh): a listed language with no catalog, a missing key or a stale entry
-  # is red. On a pull request of this repository the job runs on the organisation's own runners (vars.OMX_RUNNER), where
-  # the router answers, and the gaps fill themselves: the langpacks action makes the missing entries through the router
-  # (draft-prose), signs them and pushes them to the branch (Open-Mixer/.github#46); a fork, or a run elsewhere, names them
+  # is red. This job only checks (fill: false): it runs where every job here runs (vars.OMX_RUNNER) and takes no cluster
+  # DNS. The gaps are filled by the fill job below.
   catalogs:
     name: language packs and catalogs
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || (startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && github.event.repository.private == false && 'ubuntu-latest' || vars.OMX_RUNNER || 'ubuntu-latest' }}
+    runs-on: ${{ vars.OMX_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
-    permissions:
-      contents: write
     container:
       image: fedora:45
-      # on the organisation's runners the job's container sits in the runner's own Docker, whose resolver does not know
-      # the cluster's services: it is handed the cluster DNS so the router's name resolves (a GitHub-hosted run gets none)
-      options: ${{ !github.event.pull_request.head.repo.fork && !((startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && github.event.repository.private == false) && vars.OMX_RUNNER && !startsWith(vars.OMX_RUNNER, 'ubuntu-') && '--dns 10.43.0.10 --dns-search llm-router.svc.cluster.local --dns-search svc.cluster.local --dns-search cluster.local' || '' }}
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs gnupg2
-      # say whether this container reaches the router before the fill needs it
-      - name: The router from this container
-        run: |
-          echo "resolve: $(getent hosts llm-router.llm-router.svc.cluster.local || echo 'does not resolve')"
-          echo "health/liveliness: $(curl -sS -m 10 -o /dev/null -w '%{http_code}' http://llm-router.llm-router.svc.cluster.local:4000/health/liveliness 2>&1 || true)"
-          echo "health: $(curl -sS -m 10 -o /dev/null -w '%{http_code}' http://llm-router.llm-router.svc.cluster.local:4000/health 2>&1 || true)"
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -153,10 +141,24 @@ jobs:
           owner: plugin-qualify
           spec: packaging/plugin-qualify.spec
           gate: tools/catalogs-gate.sh
-          # the codes are a bare item file: the gate script hands translate a vocabulary holding it, for a language too
-          fill-command: tools/catalogs-gate.sh
-          router-key: ${{ secrets.OMX_ROUTER_KEY }}
-          signing-key: ${{ secrets.OPENMIXER_CI_SIGNING_KEY }}
+          fill: 'false'
+
+  # the catalogs' gaps fill themselves on the organisation's own pool, where the router answers (Open-Mixer/.github#177,
+  # owner ruling 2026-11-20): dispatched on a lane branch that heads one open pull request of this repository, the shared
+  # workflow makes the missing entries through the router, signs them and pushes them to that branch only
+  fill:
+    if: github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    uses: Open-Mixer/.github/.github/workflows/langpacks-fill.yml@openmixer-v1
+    with:
+      name: plugin-qualify
+      owner: plugin-qualify
+      spec: packaging/plugin-qualify.spec
+      gate: tools/catalogs-gate.sh
+      # the codes are a bare item file: the gate script hands translate a vocabulary holding it, for a language too
+      fill-command: tools/catalogs-gate.sh
+    secrets: inherit
 
   # the RPM and the DEB are built, linted and assembled into unsigned trees; nothing is published
   packages:
