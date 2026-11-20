@@ -163,13 +163,17 @@ $(BUILD)/no_task_dir.so: fixtures/no-task-dir.c | $(BUILD)
 $(BUILD)/lv2_measure_path_test: lv2_measure_path.test.c lv2-measure-path.c lv2-measure-path.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror -I. $(LDFLAGS) -o $@ lv2_measure_path.test.c lv2-measure-path.c
 
-DESCRIBE_SRC := describe.c plugin-json.c transforms.c
-DESCRIBE_HDR := describe.h plugin-json.h transforms.h
+# the scopes of a dump are the scan domain's words, read through omx-contract's C loader (libomx-domain)
+DOMAIN_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags libomx-domain)
+DOMAIN_LIBS ?= $(shell $(PKG_CONFIG) --libs libomx-domain)
+
+DESCRIBE_SRC := describe.c plugin-json.c transforms.c scan_words.c
+DESCRIBE_HDR := describe.h plugin-json.h transforms.h scan_words.h
 
 # describe's oracle, never installed: the format tables (../data/formats/*.json) against the field dump
 # fixtures (fixtures/fields/), run with the working directory at native/
 $(BUILD)/describe_test: describe.test.c $(DESCRIBE_SRC) $(DESCRIBE_HDR) | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CONTRACT_CFLAGS) $(CJSON_CFLAGS) -I. $(LDFLAGS) -o $@ describe.test.c $(DESCRIBE_SRC) $(CJSON_LIBS) -lm
+	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CONTRACT_CFLAGS) $(CJSON_CFLAGS) $(DOMAIN_CFLAGS) -I. $(LDFLAGS) -o $@ describe.test.c $(DESCRIBE_SRC) $(CJSON_LIBS) $(DOMAIN_LIBS) -lm
 
 $(BUILD)/isolated_signal: isolated-signal.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< -ldl -lm

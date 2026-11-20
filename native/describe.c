@@ -28,6 +28,17 @@
 #define SCHEMA_URL "https://openmixer.org/schema/omx-contract/v3/omx-contract.schema.json"
 #define SCHEMA_FLOOR ">= 3.0.0"
 
+/* the scope words of a dump, the scan domain's (describe_scopes): the parser holds what each is, never its name */
+static const scan_words *g_scopes;
+
+void describe_scopes(const scan_words *words) {
+  g_scopes = words;
+}
+
+static const char *scope_word(enum scan_scope s) {
+  return g_scopes != NULL ? g_scopes->scope[s] : "";
+}
+
 static char *g_why;
 static size_t g_why_size;
 
@@ -312,7 +323,7 @@ static void carry(scan_t *s, const char *scope, const char *field, const char *v
     size_t i;
     bag_t *b = NULL;
 
-    if (!strcmp(scope, "plugin"))
+    if (!strcmp(scope, scope_word(SCAN_SCOPE_PLUGIN)))
         snprintf(key, sizeof(key), "%s", field);
     else
         snprintf(key, sizeof(key), "%s/%s", scope, field);
@@ -422,25 +433,29 @@ static int record(scan_t *s, const table_t *t, entry_t *e, const char *field, co
 
 static int parse_scope(const char *format, const char *scope, char *kind, long *index)
 {
+    /* what the parser makes of each scope: the entry's kind and the format it is read in. The word is the domain's. */
     static const struct
     {
-        const char *name;
+        enum scan_scope scope;
         char kind;
         const char *format;
-    } SCOPES[] = { { "param", 'p', "clap" },    { "audio_in", 'i', "clap" }, { "audio_out", 'o', "clap" },
-                   { "note_in", 'n', "clap" },  { "note_out", 'N', "clap" }, { "port", 'l', "lv2" },
-                   { "section", 'd', "clap" },  { "control", 'd', "clap" },  { "role", 'd', "clap" },
-                   { "display", 'd', "clap" },  { "placement_default", 'd', "clap" } };
+    } SCOPES[] = { { SCAN_SCOPE_PARAM, 'p', "clap" },    { SCAN_SCOPE_AUDIO_IN, 'i', "clap" }, { SCAN_SCOPE_AUDIO_OUT, 'o', "clap" },
+                   { SCAN_SCOPE_NOTE_IN, 'n', "clap" },  { SCAN_SCOPE_NOTE_OUT, 'N', "clap" }, { SCAN_SCOPE_PORT, 'l', "lv2" },
+                   { SCAN_SCOPE_METER, 'm', "clap" },
+                   { SCAN_SCOPE_SECTION, 'd', "clap" },  { SCAN_SCOPE_CONTROL, 'd', "clap" },  { SCAN_SCOPE_ROLE, 'd', "clap" },
+                   { SCAN_SCOPE_DISPLAY, 'd', "clap" },  { SCAN_SCOPE_PLACEMENT_DEFAULT, 'd', "clap" } };
     const char *colon = strchr(scope, ':');
     size_t i;
     char *end;
 
-    if (!strcmp(scope, "plugin"))
+    if (g_scopes == NULL)
+        return -1;
+    if (!strcmp(scope, scope_word(SCAN_SCOPE_PLUGIN)))
     {
         *kind = 'g', *index = -1;
         return 0;
     }
-    if (!strcmp(scope, "panel") && !strcmp(format, "clap"))
+    if (!strcmp(scope, scope_word(SCAN_SCOPE_PANEL)) && !strcmp(format, "clap"))
     {
         *kind = 'd', *index = -1;
         return 0;
@@ -448,7 +463,8 @@ static int parse_scope(const char *format, const char *scope, char *kind, long *
     if (colon == NULL)
         return -1;
     for (i = 0; i < sizeof(SCOPES) / sizeof(SCOPES[0]); i++)
-        if (strlen(SCOPES[i].name) == (size_t)(colon - scope) && !strncmp(scope, SCOPES[i].name, (size_t)(colon - scope))
+        if (strlen(scope_word(SCOPES[i].scope)) == (size_t)(colon - scope)
+            && !strncmp(scope, scope_word(SCOPES[i].scope), (size_t)(colon - scope))
             && !strcmp(SCOPES[i].format, format))
         {
             *index = strtol(colon + 1, &end, 10);
@@ -499,7 +515,7 @@ static int read_dump(const table_t *t, const char *text, scan_t *s)
                 return refuse("%s %s: a field of the panel description is dropped, never a word or the bag", scope, field);
             continue;
         }
-        if (record(s, t, kind == 'g' ? entry(s, "plugin", 'g', -1) : entry(s, scope, kind, index), field, value))
+        if (record(s, t, kind == 'g' ? entry(s, scope_word(SCAN_SCOPE_PLUGIN), 'g', -1) : entry(s, scope, kind, index), field, value))
             return -1;
     }
     if (n == 0)

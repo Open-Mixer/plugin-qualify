@@ -27,6 +27,10 @@ BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
 BuildRequires: pkgconfig(omxdsp) >= 0.32.1
 # describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
 BuildRequires: pkgconfig(libcjson) >= 1.7.15
+# describe's oracle reads the scopes of a field dump from omx-clap-core's scan domain through omx-contract's C loader
+# (native/scan_words.c): the loader, and omx-clap-core's package of the domain; floors only
+BuildRequires: pkgconfig(libomx-domain) >= 3.20.0
+BuildRequires: omx-clap-core-contract >= 0.33.1
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18

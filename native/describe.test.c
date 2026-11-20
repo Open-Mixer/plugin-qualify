@@ -203,7 +203,23 @@ static int scope_mode(const char *format, const char *scope) {
 }
 
 int main(int argc, char **argv) {
-  if (argc == 4 && !strcmp(argv[1], "scope")) return scope_mode(argv[2], argv[3]);
+  scan_words scopes;
+  char scan_why[1024];
+  int mode;
+
+  /* the scopes of a dump are the scan domain's words: OMX_CONTRACT_PATH is this oracle's test entry (a ':' list whose first
+     directory holding the domain wins, else the installed contract directory); a domain absent, invalid, too old or short
+     of a scope ends the start-up with 78 naming it */
+  if (scan_words_open(getenv("OMX_CONTRACT_PATH"), &scopes, scan_why, sizeof scan_why) != 0) {
+    fprintf(stderr, "describe_test: %s\n", scan_why);
+    return 78;
+  }
+  describe_scopes(&scopes);
+  if (argc == 4 && !strcmp(argv[1], "scope")) {
+    mode = scope_mode(argv[2], argv[3]);
+    scan_words_close(&scopes);
+    return mode;
+  }
   format_and_id();
   sabotage_mapping_changes_descriptor();
 
@@ -255,6 +271,7 @@ int main(int argc, char **argv) {
   expect_panel("panel of a plugin the scan states no panel for", "fixtures/fields/clap-panel-scan.json",
                "clap:controls.clap#org.example.broken", -1, "the scan states no panel for org.example.broken");
 
+  scan_words_close(&scopes);
   if (failures) return 1;
   printf("PASS describe\n");
   return 0;

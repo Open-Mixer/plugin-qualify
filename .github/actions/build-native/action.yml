@@ -14,4 +14,14 @@ runs:
         set -euo pipefail
         sudo apt-get update -qq
         sudo apt-get install -y --no-install-recommends liblilv-dev lv2-dev libcjson-dev
+        # describe's oracle reads the scan domain through omx-contract's C loader: libomx-domain-dev and omx-clap-core's
+        # package of the domain, from the OpenMixer channel (the source install-plugin-hostd writes, written here first)
+        sudo install -d /etc/apt/keyrings
+        sudo curl -fsSL --retry 5 --retry-all-errors -o /etc/apt/keyrings/openmixer.asc https://www.openmixer.org/deb/openmixer.asc
+        echo "deb [signed-by=/etc/apt/keyrings/openmixer.asc] https://www.openmixer.org/deb/debian/bookworm ./" | sudo tee /etc/apt/sources.list.d/openmixer.list
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends libomx-domain-dev omx-clap-core-contract
+        # a floor only, checked on what apt installed: omx-clap-core-contract 0.33.1 is the first with the scan domain
+        c=$(dpkg-query -W -f='${Version}' omx-clap-core-contract)
+        dpkg --compare-versions "$c" ge 0.33.1 || { echo "::error::omx-clap-core-contract $c in the channel; the scan domain needs 0.33.1 or later"; exit 1; }
         make -C native deps all asan
