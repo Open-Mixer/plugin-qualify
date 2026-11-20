@@ -10,6 +10,7 @@
 //
 //   pool-step.mjs <clap uri> <window ms>
 //   environment: OMX_ISOLATED_SIGNAL (the signal tool), PLUGIN_HOSTD
+import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";

@@ -32,6 +32,8 @@ import { HOSTING_CODE } from "./hosting-codes.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
 import { NO_JACK_SERVER } from "./host-admission.js";
 import { iriPath, lv2BundlesOnPath, manifestPlugins } from "./lv2-loader.js";
+import type { PluginDbRun } from "./plugin-db-cli.js";
+import { storeJudgedLayers } from "./plugin-db-store.js";
 import { judgmentPinEntries, pinClearLine, pinLineUri, pinsFile, type PinEntry } from "./pins-file.js";
 import { POOL_RESULT, completePool, judgePoolRun, pinAfterPool, pinFromRecordWithPool, poolEnv, spawnedPoolRunner, type PoolRunner } from "./qualify-pool.js";
 import { hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
@@ -47,6 +49,8 @@ import { QUALIFICATION_RECORD_SCHEMA, descriptorNamePart, latencyNeverTaken, rew
 import { ADMIT_STEP_MS_ENV, DESCRIPTOR_DIR_STATE_SUBDIR, DESCRIPTOR_DIR_SYSTEM, MEMORY_PASS_PROBE_NOTES, QUALIFY_QUANTA, QUALIFY_RATES } from "./qualify-declarations.js";
 import { toolsDir } from "./tool-paths.js";
 import { writeFileWhole } from "./whole-file.js";
+import { withContractPathHelp } from "./qualification-domain.js";
+import { type ReasonText, TEXT_CODE, type TextRef } from "./text-codes.js";
 
 // --- the settings -----------------------------------------------------------------------------------------------------
 
@@ -199,6 +203,10 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
 }
 
 export function syncHelpText(): string {
+  return withContractPathHelp(syncHelpTextBody());
+}
+
+function syncHelpTextBody(): string {
   const rows = SYNC_SETTINGS.map((s) => `  ${`${flagOf(s.key)} <value>`.padEnd(36)}${s.meaning}${s.default === "" ? "" : ` (default: ${s.default})`}`);
   return [
     "plugin-qualify-sync: qualify every plugin on the search paths once, and again when its files change",
@@ -235,7 +243,7 @@ export function resolveSyncSettings(
   boardModel: () => string | undefined = readBoardModel,
   machineArch: () => string | undefined = readMachine,
   searchPathRun: SearchPathRun = SPAWNED_SEARCH_PATH,
-): { ok: true; settings: SyncSettings; warnings: string[] } | { ok: false; error: string } {
+): { ok: true; settings: SyncSettings; warnings: TextRef[] } | { ok: false; error: string } {
   const get = (key: string): string | undefined => args.values.get(key) ?? file.get(key);
   const state = env["XDG_STATE_HOME"] !== undefined && env["XDG_STATE_HOME"] !== "" ? env["XDG_STATE_HOME"] : join(home, ".local", "state");
   const place = (key: string, system: string, user: string): string => {
@@ -245,7 +253,7 @@ export function resolveSyncSettings(
   const hostdConfNamed = get("hostd_conf");
   const hostdConf = hostdConfNamed !== undefined && hostdConfNamed !== "" ? hostdConfNamed : undefined;
   const search = hostdSearchPath(hostdConf, env, searchPathRun);
-  if (!search.ok) return { ok: false, error: `the directories to scan: ${search.error}` };
+  if (!search.ok) return { ok: false, error: `the directories to scan: ${reasonText(search.error)}` };
   const number = (key: string, min: number): number | undefined => {
     const v = Number(get(key) ?? SYNC_SETTINGS.find((s) => s.key === key)!.default);
     return Number.isFinite(v) && v >= min ? v : undefined;
@@ -534,10 +542,11 @@ export const SYNC_CODE = {
  */
 export function machineReason(p: Pick<SyncPlugin, "outcome" | "code" | "detail">): string | undefined {
   if (p.outcome !== "unmeasured" || p.code !== SYNC_CODE.notMeasured) return undefined;
-  const errno = /\b(EACCES|EPERM|ENOSPC)\b/.exec(p.detail ?? "")?.[1];
+  const said = typeof p.detail === "string" ? p.detail : "";
+  const errno = /\b(EACCES|EPERM|ENOSPC)\b/.exec(said)?.[1];
   if (errno !== undefined) return errno;
-  if ((p.detail ?? "").startsWith(NO_JACK_SERVER)) return NO_JACK_SERVER;
-  return /wrote no document|cannot run the probe runner/.test(p.detail ?? "") ? "the measurement wrote no document" : undefined;
+  if (said.startsWith(NO_JACK_SERVER)) return NO_JACK_SERVER;
+  return /wrote no document|cannot run the probe runner/.test(said) ? TEXT_CODE.syncNoDocument : undefined;
 }
 
 /**
@@ -568,7 +577,7 @@ export interface SyncPlugin {
   readonly outcome: SyncOutcome;
   /** The code that decided a plugin that is not qualified. */
   readonly code?: string;
-  readonly detail?: string;
+  readonly detail?: ReasonText;
   /** Why its descriptor was not written, when the descriptor writer failed or timed out on it. */
   readonly descriptorProblem?: string;
   /** Its pin, when the run took a whole one. */
@@ -914,7 +923,7 @@ export function qualifyItem(ctx: SyncContext, item: SyncItem, files: readonly Fi
   } catch (e) {
     plugins = [{ uri: item.uri ?? item.key, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: (e as Error).message }];
   }
-  if (plugins.length === 0) plugins = [{ uri: item.uri ?? item.key, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: "no plugin was listed" }];
+  if (plugins.length === 0) plugins = [{ uri: item.uri ?? item.key, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: { code: TEXT_CODE.syncNoPluginListed } }];
   plugins = plugins.map((p) => (p.record !== undefined ? p : { ...p, record: writeUnmeasuredRecord(ctx, item, files, p) }));
   // the pin's own files join the set, so a file the manifest reader missed still makes a change seen
   const pinned = plugins.flatMap((p) => p.pin?.integrity.files?.map((f) => f.path) ?? []);
@@ -1451,6 +1460,8 @@ const againMarker = (stateFile: string): string => `${stateFile}.again`;
 export const pendingMarker = (stateFile: string): string => join(dirname(stateFile), "qualify-pending");
 
 export interface SyncRunOptions {
+  /** After a full run, write each recorded, pinned plugin into plugin-db's store (#73); `system` names the service's store. */
+  readonly store?: { readonly system: boolean; readonly run?: PluginDbRun };
   readonly force?: boolean;
   /** `--refresh-pins`: only refresh the pins' files from plugin-hostd and send the changed ones; measure nothing. */
   readonly refreshOnly?: boolean;
@@ -1679,7 +1690,7 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
           const why = machineReason(p);
           if (why !== undefined) byMachine.set(why, (byMachine.get(why) ?? 0) + 1);
           if (why !== undefined && byMachine.get(why)! > 1) continue;
-          log(`${p.uri}: ${p.outcome}${p.code === undefined ? "" : ` (${p.code})`}${p.detail === undefined ? "" : `: ${p.detail}`}`);
+          log(`${p.uri}: ${p.outcome}${p.code === undefined ? "" : ` (${p.code})`}${p.detail === undefined ? "" : `: ${reasonText(p.detail, localeOf(env))}`}`);
         }
         state = { schema: SYNC_STATE_SCHEMA, entries };
         writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
@@ -1694,6 +1705,10 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     if (after !== before) writeFileWhole(settings.pinFile, after);
     writeLv2Descriptors(ctx, lv2Pinned);
     for (const line of descriptorAccessProblems(settings.descriptorDir)) log(line);
+    if (options.store !== undefined) {
+      const stored = storeJudgedLayers(state, { machineClass: settings.hostClass, system: options.store.system, lv2Path: settings.lv2Dirs.join(":"), stampFile: `${settings.stateFile}.stored`, env: ctx.env, ...(options.store.run === undefined ? {} : { run: options.store.run }) });
+      for (const line of stored.lines) log(line);
+    }
     // the files of a plugin that is gone, or was replaced by other bytes: only when every directory could be read, so
     // an unreadable one is never taken for an uninstall
     if (unreadable) log("a plugin directory could not be read; no record or descriptor is removed this run");

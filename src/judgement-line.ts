@@ -12,7 +12,7 @@ export const LATENCY_LINE_MS = 5;
 /** A measured latency in milliseconds at its rate, rounded to the microsecond. */
 export const latencyMsOf = (frames: number, rate: number): number => Math.round((frames * 1e9) / rate) / 1e6;
 
-const VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
+export const VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 
 /** The rules a plugin-qualify of this version judges by: `plugin-qualify-rules/<major>.<minor>`. */
 export function judgementRules(version: string = VERSION): string {

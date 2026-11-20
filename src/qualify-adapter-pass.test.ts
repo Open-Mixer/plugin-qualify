@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { classifyProtocolRun, type AdmissionRuns, type ModHostRun } from "./host-admission.js";
-import { AdapterPassRefused, NO_PRIVATE_SERVER, adapterBlockOf, adapterFinished, hostVersions, parseVersion, type AdapterPassOptions, type PrivateJack } from "./qualify-adapter-pass.js";
+import { AdapterPassRefused, noPrivateServerCode, adapterBlockOf, adapterFinished, hostVersions, parseVersion, type AdapterPassOptions, type PrivateJack } from "./qualify-adapter-pass.js";
 import type { QualificationRecord } from "./qualification-record.js";
 import { OWED_CODE, owedFile } from "./qualify-rejudge.js";
 import { parseSyncArgs, runSync, summaryLine } from "./qualify-sync.js";
@@ -155,10 +155,10 @@ describe("--adapter-only: a crash or a timeout is a recorded outcome", () => {
   });
 
   it("a cell no private server came up for is not measured either, and a refusal elsewhere still decides", () => {
-    const off = { host: "omx-clap-host" as const, measured: false, admitted: false, code: NO_PRIVATE_SERVER, params: {} };
+    const off = { host: "omx-clap-host" as const, measured: false, admitted: false, code: noPrivateServerCode(), params: {} };
     const no = { host: "omx-clap-host" as const, measured: true, admitted: false, code: "omx-clap-host.resp-512", params: {} };
     const cell = (quantum: number) => ({ rate: 48000, quantum });
-    expect(adapterBlockOf([{ cell: cell(128), run: off }, { cell: cell(256), run: { ...off, admitted: true, measured: true, code: undefined as never } }], VERSIONS, "t")).toMatchObject({ measured: false, code: NO_PRIVATE_SERVER });
+    expect(adapterBlockOf([{ cell: cell(128), run: off }, { cell: cell(256), run: { ...off, admitted: true, measured: true, code: undefined as never } }], VERSIONS, "t")).toMatchObject({ measured: false, code: noPrivateServerCode() });
     expect(adapterBlockOf([{ cell: cell(128), run: off }, { cell: cell(256), run: no }], VERSIONS, "t")).toMatchObject({ measured: true, admitted: false, code: "omx-clap-host.resp-512" });
   });
 });
@@ -237,7 +237,7 @@ describe("--adapter-only: it starts only when it can say what it runs under", ()
   it("no jackd: refused, naming why, and the device's server is not used instead", async () => {
     const d = device([LV2_CLEAN]);
     const seen: Seen[] = [];
-    await expect(pass(d, stand(seen, () => admitted, { jackdPresent: false }))).rejects.toThrow(NO_PRIVATE_SERVER);
+    await expect(pass(d, stand(seen, () => admitted, { jackdPresent: false }))).rejects.toThrow(noPrivateServerCode());
     expect(seen).toEqual([]);
   });
 

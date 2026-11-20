@@ -38,6 +38,7 @@
  * `@progress `. A supervising process (the OpenMixer console's Setup screen) parses those and
  * ignores everything else, so the human log stays readable.
  */
+import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { constants, hostname } from "node:os";

@@ -37,17 +37,18 @@ BUILD ?= build
 
 CLAP_REF := 1.2.6
 # protocol.h (the pin path codec, phd_pin_path_encode) is plugin-hostd-protocol's: the packages' floor
-PLUGIN_HOSTD_PROTOCOL_REF := v0.5.7
-PLUGIN_DB_REF := v0.4.1
+PLUGIN_HOSTD_PROTOCOL_REF := v0.5.9
+PLUGIN_DB_REF := v0.4.4
 # the omx-contract `make deps` fetches where no omx-contract-devel is installed: the packages' floor, so the build
-# reads the contract the packages do (3.12.0, the floor; 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer
-# every tool here spells its literals through).
-OMX_CONTRACT_VERSION := 3.12.0
+# reads the contract the packages do (3.20.0, the floor: the installer's domain mode and %{omx_contract_domain_dir};
+# 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer every tool here spells its
+# literals through).
+OMX_CONTRACT_VERSION := 3.20.0
 # the omx-clap-core whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
 # packages' floor
-OMX_CLAP_CORE_VERSION := 0.32.3
+OMX_CLAP_CORE_VERSION := 0.32.5
 # the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap-core's provider read: the packages' floor
-OMX_DSP_VERSION := 0.32.0
+OMX_DSP_VERSION := 0.32.1
 
 ifeq ($(shell $(PKG_CONFIG) --exists clap && echo true),true)
 CLAP_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags clap)
@@ -104,7 +105,7 @@ CFLAGS ?= -O2 -g
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type
 
 
-all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/describe_test $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap \
+all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/describe_test $(BUILD)/rt_interpose_test $(BUILD)/no_task_dir.so $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap $(BUILD)/fixtures/worker-allocates.clap $(BUILD)/fixtures/worker-idle.clap \
 	$(BUILD)/fixtures/controls.clap $(BUILD)/fixtures/params-2048.clap $(BUILD)/fixtures/params-2049.clap \
 	$(BUILD)/fixtures/info-fails.clap $(BUILD)/fixtures/leaky-delay.clap $(BUILD)/fixtures/undeclared-delay.clap \
 	$(BUILD)/fixtures-faulty/crashes-at-load.clap $(BUILD)/fixtures-faulty/hangs.clap $(BUILD)/fixtures-faulty/rate-pinned.clap \
@@ -114,7 +115,7 @@ all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)
 	$(BUILD)/fixtures/pool-synth.clap $(BUILD)/fixtures/pool-synth-slow.clap $(BUILD)/fixtures/pool-synth-quiet.clap $(BUILD)/fixtures/pool-synth-serial.clap $(BUILD)/fixtures/pool-synth-helper.clap \
 	$(BUILD)/fixtures/requires-voice-info.clap $(BUILD)/fixtures/requires-timer.clap $(BUILD)/fixtures/requires-thread-pool.clap \
 	$(BUILD)/fixtures/fail-alloc.so $(BUILD)/fixtures-faulty/hogs-memory.clap \
-	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
+	$(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so $(BUILD)/fixtures/lv2/rt-unsafe.lv2/gain.so $(BUILD)/fixtures/lv2/worker-allocates.lv2/gain.so $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so $(BUILD)/fixtures/lv2/needs-display.lv2/gain.so $(BUILD)/fixtures/lv2/abi-breaker.lv2/gain.so \
 	$(BUILD)/fixtures/lv2/host-faithfulness.lv2/host-faithfulness.so \
 	$(BUILD)/fixtures/lv2/synth.lv2/synth.so $(BUILD)/fixtures/lv2/synth-alloc.lv2/synth.so $(BUILD)/fixtures/lv2/synth-drum.lv2/synth.so \
 	$(BUILD)/fixtures/lv2/synth-attack.lv2/synth.so $(BUILD)/fixtures/lv2/synth-delay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-late.lv2/synth.so $(BUILD)/fixtures/lv2/synth-decay.lv2/synth.so $(BUILD)/fixtures/lv2/synth-crash.lv2/synth.so $(BUILD)/fixtures/lv2/synth-input.lv2/synth.so $(BUILD)/fixtures/lv2/synth-thru.lv2/synth.so $(BUILD)/fixtures/lv2/synth-sweep.lv2/synth.so \
@@ -150,6 +151,13 @@ $(BUILD)/asan/lv2_measure: $(LV2_MEASURE_SRC) $(LV2_MEASURE_HDR) | $(BUILD)
 $(BUILD)/lv2_measure_options_test: lv2_measure_options.test.c lv2-measure-options.c lv2-measure-options.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CLAP_LV2_CFLAGS) $(LV2_CFLAGS) $(OMX_CONTRACT_CFLAGS) -I. $(LDFLAGS) -o $@ lv2_measure_options.test.c \
 		lv2-measure-options.c $(OMX_CLAP_LV2_LIBS) -ldl -lpthread
+
+# the interposer's counters for other threads, exact under N threads at once; and a preload that hides /proc/self/task
+$(BUILD)/rt_interpose_test: rt_interpose.test.c rt-interpose.c rt-interpose.h | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -I. $(LDFLAGS) -o $@ rt_interpose.test.c -ldl -lpthread
+
+$(BUILD)/no_task_dir.so: fixtures/no-task-dir.c | $(BUILD)
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared -fPIC -o $@ $< -ldl
 
 # the search path's oracle, never installed
 $(BUILD)/lv2_measure_path_test: lv2_measure_path.test.c lv2-measure-path.c lv2-measure-path.h | $(BUILD)
@@ -187,6 +195,13 @@ $(BUILD)/fixtures/rt-safe.clap: fixtures/gain.c | $(BUILD)/fixtures
 
 $(BUILD)/fixtures/rt-unsafe.clap: fixtures/gain.c | $(BUILD)/fixtures
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_ALLOCATES -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
+
+# the rt-safe gain with a thread of its own, which allocates or only waits (D20)
+$(BUILD)/fixtures/worker-allocates.clap: fixtures/gain.c | $(BUILD)/fixtures
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_WORKER=1 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lpthread
+
+$(BUILD)/fixtures/worker-idle.clap: fixtures/gain.c | $(BUILD)/fixtures
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(CLAP_CFLAGS) -DFIXTURE_WORKER=2 -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lpthread
 
 # the host's parameter cap and one past it
 $(BUILD)/fixtures/params-%.clap: fixtures/gain.c | $(BUILD)/fixtures
@@ -304,6 +319,13 @@ $(BUILD)/fixtures/lv2/rt-safe.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.
 	mkdir -p $(@D)
 	cp fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl $(@D)/
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $<
+
+# the rt-safe bundle under another uri, with a thread of its own that allocates while run() spins (D20, #53)
+$(BUILD)/fixtures/lv2/worker-allocates.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl
+	mkdir -p $(@D)
+	sed 's/lv2-rt-safe/lv2-worker-allocates/' fixtures/rt-safe.lv2/manifest.ttl > $(@D)/manifest.ttl
+	sed 's/lv2-rt-safe/lv2-worker-allocates/' fixtures/rt-safe.lv2/gain.ttl > $(@D)/gain.ttl
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LV2_CFLAGS) -DFIXTURE_WORKER -shared -fPIC -fvisibility=hidden $(LDFLAGS) -o $@ $< -lpthread
 
 # the rt-safe bundle under another uri, reading its control at activate: every host connects the ports before it
 $(BUILD)/fixtures/lv2/activate-reads.lv2/gain.so: fixtures/lv2-gain.c fixtures/rt-safe.lv2/manifest.ttl fixtures/rt-safe.lv2/gain.ttl

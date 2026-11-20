@@ -25,6 +25,10 @@ override_dh_auto_install:
 	install -d $(CURDIR)/debian/tmp/usr/share/plugin-qualify/catalogs
 	install -m 0644 catalogs/*.json $(CURDIR)/debian/tmp/usr/share/plugin-qualify/catalogs/
 	rm -r $(CURDIR)/debian/plugin-qualify/usr/lib/node_modules/@openmixer/plugin-qualify/catalogs
+	# the qualification domain, into omx-contract's contract directory, by the installer's domain mode (catalogs included);
+	# debian/plugin-qualify-contract.install takes it from debian/tmp
+	sh "$$(pkg-config --variable=datadir omx-contract)/install-contract-dir.sh" --domain contract.d/qualification \
+	  "$(CURDIR)/debian/tmp$$(pkg-config --variable=contractdir omx-contract)"
 
 # the units are handed to dh_installsystemd as its own files, so it installs them where this release's systemd
 # reads them (/lib/systemd/system on bookworm, /usr/lib/systemd/system on trixie). The timer and the path unit are

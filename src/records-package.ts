@@ -24,6 +24,8 @@ import { cellKey, type GridCell } from "./measurement-grid.js";
 import { DISTRIBUTED_DIR_SYSTEM, recordCells, DISTRIBUTED_PROVENANCE_FILE, DISTRIBUTED_PROVENANCE_SCHEMA, type DistributedProvenance } from "./distributed-records.js";
 import { sha256Hex } from "./probe-output.js";
 import { QUALIFICATION_RECORD_SCHEMA } from "./qualification-record.js";
+import { withContractPathHelp } from "./qualification-domain.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 export interface RecordsPackageArgs {
   /** Qualification directories, or run roots holding `b<rate>-<quantum>/qualification`: one set per cell. */
@@ -48,6 +50,10 @@ const KIB = 2 ** 10;
 const DEB_VERSION = /^[0-9][A-Za-z0-9.+~]*$/;
 
 export function recordsPackageHelp(): string {
+  return withContractPathHelp(recordsPackageHelpBody());
+}
+
+function recordsPackageHelpBody(): string {
   return [
     "plugin-qualify-records-package: the Debian package of a device's qualification records, for the distributed layer",
     "",
@@ -71,7 +77,7 @@ export function recordsPackageHelp(): string {
   ].join("\n");
 }
 
-export function parseRecordsPackageArgs(argv: readonly string[]): { ok: true; args: RecordsPackageArgs } | { ok: true; help: true } | { ok: false; error: string } {
+export function parseRecordsPackageArgs(argv: readonly string[]): { ok: true; args: RecordsPackageArgs } | { ok: true; help: true } | { ok: false; error: TextRef } {
   const values = new Map<string, string>();
   const positional: string[] = [];
   const valued = new Set(["--host-class", "--set", "--cell", "--provenance", "--version", "--out", "--maintainer"]);
@@ -80,24 +86,24 @@ export function parseRecordsPackageArgs(argv: readonly string[]): { ok: true; ar
     if (a === "--help") return { ok: true, help: true };
     if (valued.has(a)) {
       const v = argv[++i];
-      if (v === undefined) return { ok: false, error: `${a} needs a value` };
+      if (v === undefined) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: a } } };
       values.set(a, v);
-    } else if (a.startsWith("--")) return { ok: false, error: `unknown argument ${a}` };
+    } else if (a.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliUnknownArgument, args: { argument: a } } };
     else positional.push(a);
   }
-  if (positional.length === 0) return { ok: false, error: "name a qualification directory or a run root" };
-  for (const flag of ["--host-class", "--set", "--provenance"]) if (!values.has(flag)) return { ok: false, error: `${flag} is needed` };
+  if (positional.length === 0) return { ok: false, error: { code: TEXT_CODE.recordsNameDirectory } };
+  for (const flag of ["--host-class", "--set", "--provenance"]) if (!values.has(flag)) return { ok: false, error: { code: TEXT_CODE.cliIsNeeded, args: { option: flag } } };
   const hostClass = values.get("--host-class")!;
   const set = values.get("--set")!;
   for (const [what, v] of [["--host-class", hostClass], ["--set", set]] as const) {
-    if (!DEB_WORD.test(v)) return { ok: false, error: `${what} ${v}: a package name holds lowercase letters, digits, + - and . only` };
+    if (!DEB_WORD.test(v)) return { ok: false, error: { code: TEXT_CODE.recordsPackageWord, args: { what: what, value: v } } };
   }
   const cellText = values.get("--cell");
   const cell = cellText === undefined ? undefined : parseCell(cellText);
-  if (cellText !== undefined && cell === undefined) return { ok: false, error: `--cell ${cellText} is not <rate>/<quantum>` };
-  if (cell !== undefined && positional.length !== 1) return { ok: false, error: "--cell names the cell of one directory; name one" };
+  if (cellText !== undefined && cell === undefined) return { ok: false, error: { code: TEXT_CODE.recordsCellUnread, args: { cell: cellText } } };
+  if (cell !== undefined && positional.length !== 1) return { ok: false, error: { code: TEXT_CODE.recordsCellOneDirectory } };
   const version = values.get("--version");
-  if (version !== undefined && !DEB_VERSION.test(version)) return { ok: false, error: `--version ${version} is not a Debian version` };
+  if (version !== undefined && !DEB_VERSION.test(version)) return { ok: false, error: { code: TEXT_CODE.recordsVersionUnread, args: { version: version } } };
   return {
     ok: true,
     args: {
@@ -178,13 +184,10 @@ export function recordsSources(args: readonly string[]): RecordsSource[] {
 /** The package of a class and a set. */
 export const recordsPackageName = (hostClass: string, set: string): string => `plugin-db-qualification-${hostClass}-${set}`;
 
-/** The plugin-qualify a package of records depends on: the minor that wrote them, up to the next minor. */
-export function recordsDependsRange(version: string): { floor: string; ceiling: string } | undefined {
+/** The plugin-qualify a package of records depends on: the minor that wrote them, as a floor and no ceiling. */
+export function recordsDependsFloor(version: string): string | undefined {
   const m = /^(\d+)\.(\d+)\.\d+/.exec(version);
-  if (m === null) return undefined;
-  const major = Number(m[1]);
-  const minor = Number(m[2]);
-  return { floor: `${String(major)}.${String(minor)}.0`, ceiling: `${String(major)}.${String(minor + 1)}` };
+  return m === null ? undefined : `${String(Number(m[1]))}.${String(Number(m[2]))}.0`;
 }
 
 /** This plugin-qualify's own version, read where it is installed. */
@@ -200,14 +203,14 @@ export function today(now = new Date()): { version: string; date: string } {
 }
 
 /** The files of a qualification directory that go in the package: each record with its probe output, and what stays out, by name and why. */
-export function collectRecords(stateDir: string, cell?: GridCell): { records: string[]; files: string[]; left: { name: string; why: string }[] } {
+export function collectRecords(stateDir: string, cell?: GridCell): { records: string[]; files: string[]; left: { name: string; why: TextRef }[] } {
   const names = readdirSync(stateDir).sort();
   const records: string[] = [];
   const files: string[] = [];
-  const left: { name: string; why: string }[] = [];
+  const left: { name: string; why: TextRef }[] = [];
   for (const name of names) {
     if (name.endsWith(".unmeasured.json")) {
-      left.push({ name, why: "unmeasured, never applies" });
+      left.push({ name, why: { code: TEXT_CODE.recordsLeftUnmeasured } });
       continue;
     }
     if (!name.endsWith(".qualification.json")) continue;
@@ -215,27 +218,27 @@ export function collectRecords(stateDir: string, cell?: GridCell): { records: st
     try {
       record = JSON.parse(readFileSync(join(stateDir, name), "utf8"));
     } catch {
-      left.push({ name, why: "does not read" });
+      left.push({ name, why: { code: TEXT_CODE.recordsLeftUnreadable } });
       continue;
     }
     if (record.schema !== QUALIFICATION_RECORD_SCHEMA || typeof record.probe?.file !== "string" || record.probe.file.includes("/")) {
-      left.push({ name, why: `not a ${QUALIFICATION_RECORD_SCHEMA} naming its probe output` });
+      left.push({ name, why: { code: TEXT_CODE.recordsLeftNotRecord, args: { schema: QUALIFICATION_RECORD_SCHEMA } } });
       continue;
     }
     const cells = gridCellsOf(record);
     if (cell !== undefined && !cells.includes(cellKey(cell))) {
-      left.push({ name, why: `measured at ${cells.length === 0 ? "no cell" : cells.join(", ")}, not at its set's ${cellKey(cell)}` });
+      left.push({ name, why: cells.length === 0 ? { code: TEXT_CODE.recordsLeftNoCell, args: { cell: cellKey(cell) } } : { code: TEXT_CODE.recordsLeftOtherCell, args: { cells: cells.join(", "), cell: cellKey(cell) } } });
       continue;
     }
     let probe: Buffer;
     try {
       probe = readFileSync(join(stateDir, record.probe.file));
     } catch {
-      left.push({ name, why: `its probe output ${record.probe.file} is not there` });
+      left.push({ name, why: { code: TEXT_CODE.recordsLeftNoProbeOutput, args: { file: record.probe.file } } });
       continue;
     }
     if (sha256Hex(probe) !== record.probe.sha256) {
-      left.push({ name, why: `its probe output ${record.probe.file} is not the copy it names` });
+      left.push({ name, why: { code: TEXT_CODE.recordsLeftProbeOutputOther, args: { file: record.probe.file } } });
       continue;
     }
     records.push(name);
@@ -317,7 +320,7 @@ export interface BuiltRecordsPackage {
   readonly records: number;
   /** The files the package installs. */
   readonly files: number;
-  readonly left: readonly { name: string; why: string }[];
+  readonly left: readonly { name: string; why: TextRef }[];
 }
 
 /**
@@ -343,8 +346,8 @@ export function buildRecordsPackages(args: RecordsPackageArgs, now = new Date())
 function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: string; readonly cell: GridCell }, now: Date): BuiltRecordsPackage {
   const set = recordsSetName(args.set, args.cell);
   const name = recordsPackageName(args.hostClass, set);
-  const range = recordsDependsRange(ownVersion());
-  if (range === undefined) throw new Error("this plugin-qualify names no version, so the package cannot say which one reads it");
+  const floor = recordsDependsFloor(ownVersion());
+  if (floor === undefined) throw new Error("this plugin-qualify names no version, so the package cannot say which one reads it");
   const day = today(now);
   const version = args.version ?? day.version;
   statSync(args.stateDir);
@@ -385,7 +388,7 @@ function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: str
         "Architecture: all",
         `Maintainer: ${args.maintainer}`,
         `Installed-Size: ${String(kib)}`,
-        `Depends: plugin-qualify (>= ${range.floor}~), plugin-qualify (<< ${range.ceiling}~)`,
+        `Depends: plugin-qualify (>= ${floor}~)`,
         "Section: sound",
         "Priority: optional",
         "Multi-Arch: foreign",

@@ -16,6 +16,8 @@ import { writeQualification } from "./qualification-record.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
 import { EXIT_CODE, OUTPUT_FORMATS, type OutputFormat } from "./qualify-options.js";
 import { OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
+import { withContractPathHelp } from "./qualification-domain.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 export interface JudgeArgs {
   readonly files: readonly string[];
@@ -25,7 +27,7 @@ export interface JudgeArgs {
   readonly help: boolean;
 }
 
-export type ParseJudgeResult = { ok: true; args: JudgeArgs } | { ok: false; error: string };
+export type ParseJudgeResult = { ok: true; args: JudgeArgs } | { ok: false; error: TextRef };
 
 const VALUE_FLAGS = ["--host-profile", "--qualification-dir", "--format"];
 
@@ -45,15 +47,15 @@ export function parseJudgeArgs(argv: readonly string[]): ParseJudgeResult {
       help = true;
       continue;
     }
-    if (!VALUE_FLAGS.includes(a)) return { ok: false, error: `unknown option ${a}` };
+    if (!VALUE_FLAGS.includes(a)) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     const v = argv[++i];
-    if (v === undefined || v.startsWith("--")) return { ok: false, error: `${a} needs a value` };
+    if (v === undefined || v.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: a } } };
     if (a === "--host-profile") specs.push(...v.split(",").map((t) => t.trim()).filter((t) => t !== ""));
     else if (a === "--qualification-dir") dir = v;
     else format = v;
   }
-  if (!(OUTPUT_FORMATS as readonly string[]).includes(format)) return { ok: false, error: `--format must be one of ${OUTPUT_FORMATS.join(", ")}` };
-  if (!help && files.length === 0) return { ok: false, error: "name at least one probe output" };
+  if (!(OUTPUT_FORMATS as readonly string[]).includes(format)) return { ok: false, error: { code: TEXT_CODE.cliFormatOneOf, args: { formats: OUTPUT_FORMATS.join(", ") } } };
+  if (!help && files.length === 0) return { ok: false, error: { code: TEXT_CODE.judgeNameProbeOutput } };
   return {
     ok: true,
     args: {
@@ -67,6 +69,10 @@ export function parseJudgeArgs(argv: readonly string[]): ParseJudgeResult {
 }
 
 export function judgeHelpText(): string {
+  return withContractPathHelp(judgeHelpTextBody());
+}
+
+function judgeHelpTextBody(): string {
   return [
     "plugin-qualify judge — judge probe outputs and write the qualification records",
     "",
