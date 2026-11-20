@@ -9,11 +9,20 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, w
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { parsePinLine } from "./pins-file.js";
 import { parseSyncArgs, resolveSyncSettings, runSync } from "./qualify-sync.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
+import { QualificationStore } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
+
+/** The qualification store of the test: a stand-in that follows the commands' documented interface. */
+let fake = fakeStore();
+beforeEach(() => {
+  fake = fakeStore();
+});
+const store = (): QualificationStore => new QualificationStore("user", { run: fake.run });
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-multi-id-"));
@@ -50,7 +59,8 @@ function stands(ids: readonly string[]): { env: Record<string, string>; clap: st
   const runner = script(
     "probe-runner",
     `while [ "$1" != "--out" ]; do shift; done; o="$2"; shift 2; while [ "\${1#--}" != "$1" ]; do shift 2; done; f="$1"; id="$2"
-sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib64/clap/example-plate.clap|$f|" ${JSON.stringify(join(root, "probe.json"))} > "$o"`,
+s=$(sha256sum "$f" | cut -d" " -f1)
+sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib64/clap/example-plate.clap|$f|" -e "s|356902794a4eec2122989e072271ef995968131145db918d9a3084ce582f244b|$s|g" -e "s|\\"example-plate.clap\\"|\\"$(basename "$f")\\"|g" ${JSON.stringify(join(root, "probe.json"))} > "$o"`,
   );
   // plugin-hostd --pin-files clap:<path>#<id>: the file and its directory, as the daemon's CLAP collector names them
   const hostd = script("plugin-hostd", `while [ "$1" != "--pin-files" ]; do shift; done; u="$2"; p="\${u#clap:}"; p="\${p%#*}"; echo "root $(dirname "$p")"; echo "file $(basename "$p")"; echo "file multi.clap.resources"`);
@@ -60,7 +70,7 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
     out,
     flags: [
       "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "lv2"), "--lv2-extra", "",
-      "--pin-file", join(out, "qualified.pins"), "--qualification-dir", join(out, "qualification"),
+      "--pin-file", join(out, "qualified.pins"),
       "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
       "--budget-s", "4", "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed",
     ],
@@ -77,18 +87,19 @@ describe("a .clap that declares two plugin ids", () => {
     const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const lines: string[] = [];
-    const summary = await runSync(r.settings, { env: m.env, log: (l) => lines.push(l) });
+    const summary = await runSync(r.settings, { qualificationStore: store(), env: m.env, log: (l) => lines.push(l) });
     const said = lines.join("\n");
     const file = join(m.clap, "multi.clap");
     const pins = readFileSync(join(m.out, "qualified.pins"), "utf8").split("\n").map((l) => parsePinLine(l)).filter((p) => p !== undefined);
     expect(pins.map((p) => p!.uri).sort(), said).toEqual(ids.map((id) => `clap:${file}#${id}`).sort());
     // the files of each pin are plugin-hostd's (plugin-qualify#228), not the probe's: the one it adds is held
     for (const p of pins) expect(p!.files.map((f) => f.path).sort(), said).toEqual(["multi.clap", "multi.clap.resources"]);
-    const records = readdirSync(join(m.out, "qualification")).filter((f) => f.endsWith(".qualification.json")).sort();
-    expect(records.map((f) => f.split("@")[0])).toEqual([...ids].sort());
+    expect(fake.user().map((r) => r.uri).sort()).toEqual([...ids].sort());
+    // no record is a file: the sync wrote the store and nothing else
+    expect(readdirSync(m.out).filter((f) => /\.(qualification|probe|unmeasured)\.json$/.test(f))).toEqual([]);
     expect(summary?.qualified, said).toBe(2);
     // the next run finds both recorded as they are
-    const again = await runSync(r.settings, { env: m.env, log: () => {} });
+    const again = await runSync(r.settings, { qualificationStore: store(), env: m.env, log: () => {} });
     expect([again?.skipped, again?.qualified]).toEqual([2, 0]);
   });
 
@@ -99,10 +110,10 @@ describe("a .clap that declares two plugin ids", () => {
     if (!args.ok) throw new Error(args.error);
     const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
-    const summary = await runSync(r.settings, { env: m.env, log: () => {} });
+    const summary = await runSync(r.settings, { qualificationStore: store(), env: m.env, log: () => {} });
     const pins = readFileSync(join(m.out, "qualified.pins"), "utf8").split("\n").map((l) => parsePinLine(l)).filter((p) => p !== undefined);
     expect(pins.map((p) => p!.uri)).toEqual([`clap:${join(m.clap, "multi.clap")}#org.example.one`]);
     expect(summary?.qualified).toBe(1);
-    expect(readdirSync(join(m.out, "qualification")).filter((f) => f.endsWith(".qualification.json"))[0]).toMatch(/^org\.example\.one@/);
+    expect(fake.user().map((r) => r.uri)).toEqual(["org.example.one"]);
   });
 });

@@ -18,6 +18,7 @@
  */
 import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
 import { pinVerdictOf, type PinVerdict } from "./pins-file.js";
+import type { ShadowKey } from "./qualification-store.js";
 import { QUALIFICATION_RECORD_SCHEMA, ISOLATED_TIER_HOST, type QualificationRecord } from "./qualification-record.js";
 import type { SuitabilityRating } from "./rating.js";
 import { withContractPathHelp } from "./qualification-domain.js";
@@ -136,7 +137,10 @@ export function judgedLayerOf(record: QualificationRecord, input: JudgedLayerInp
 }
 
 export interface JudgedLayerArgs {
-  readonly record: string;
+  /** The record, by its shadow key (the store spec's section 4). */
+  readonly key: ShadowKey;
+  /** `user` or `base`: that layer only; absent, the merged answer. */
+  readonly layer?: "user" | "base";
   readonly machineClass: string;
   readonly files: string;
   readonly layout: string | null;
@@ -152,10 +156,11 @@ export function judgedLayerHelpText(): string {
 
 function judgedLayerHelpTextBody(): string {
   return [
-    "usage: plugin-qualify judged-layer <record.qualification.json> --machine-class <word> --files <sha256>",
-    "                                   [--layout <scheme>:<sha256>] [--judged-by <version>] [--address <address>] [--body]",
+    "usage: plugin-qualify judged-layer --sha256 <hex> --format <clap|lv2> --uri <uri> --offer <word> --host-class <word> [--layer user|base]",
+    "                                   --machine-class <word> --files <sha256> [--layout <scheme>:<sha256>] [--judged-by <version>]",
+    "                                   [--address <address>] [--body]",
     "",
-    "Print the plugin-db judged layer of a qualification record, for the pin plugin-db holds (its files digest and",
+    "Print the plugin-db judged layer of a record of the qualification store (read through its reader), for the pin plugin-db holds (its files digest and",
     "layout). --judged-by names the plugin-qualify that judged a record stating no rules (the set's provenance). --body",
     "prints the body only, for `plugin-db put <address> judged --writer plugin-qualify`. A record whose verdict under",
     "plugin-hostd's worker was not measured has no layer: the reason is printed and the exit status is 1.",
@@ -169,18 +174,21 @@ export function parseJudgedLayerArgs(argv: readonly string[]): ParsedJudgedLayer
   const opts: Record<string, string> = {};
   const files: string[] = [];
   let body = false;
+  const KEY_FLAGS = ["--sha256", "--format", "--uri", "--offer", "--host-class"];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === "--help" || a === "-h") return { ok: true, help: true };
     if (a === "--body") body = true;
-    else if (["--machine-class", "--files", "--layout", "--judged-by", "--address"].includes(a)) {
+    else if ([...KEY_FLAGS, "--layer", "--machine-class", "--files", "--layout", "--judged-by", "--address"].includes(a)) {
       const v = argv[++i];
       if (v === undefined || v.startsWith("--")) return { ok: false, error: `${a} needs a value` };
       opts[a] = v;
     } else if (a.startsWith("--")) return { ok: false, error: `unknown option ${a}` };
     else files.push(a);
   }
-  if (files.length !== 1) return { ok: false, error: "name one record" };
+  if (files.length > 0) return { ok: false, error: `judged-layer takes a shadow key, not a file: ${files[0]!}` };
+  for (const f of KEY_FLAGS) if (opts[f] === undefined) return { ok: false, error: `${f} is required` };
+  if (opts["--layer"] !== undefined && opts["--layer"] !== "user" && opts["--layer"] !== "base") return { ok: false, error: "--layer must be user or base" };
   const machineClass = opts["--machine-class"];
   const pinFiles = opts["--files"];
   if (machineClass === undefined) return { ok: false, error: "--machine-class is required" };
@@ -190,7 +198,8 @@ export function parseJudgedLayerArgs(argv: readonly string[]): ParsedJudgedLayer
   return {
     ok: true,
     args: {
-      record: files[0]!,
+      key: { sha256: opts["--sha256"]!, format: opts["--format"]!, uri: opts["--uri"]!, offer: opts["--offer"]!, hostClass: opts["--host-class"]! },
+      ...(opts["--layer"] === undefined ? {} : { layer: opts["--layer"] as "user" | "base" }),
       machineClass,
       files: pinFiles,
       layout,

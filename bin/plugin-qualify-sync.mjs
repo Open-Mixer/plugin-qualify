@@ -9,7 +9,7 @@
 import "../dist/qualification-cli-start.js";
 import { readFileSync } from "node:fs";
 
-import { SYNC_CONF, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText } from "../dist/index.js";
+import { QualificationStore, SYNC_CONF, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText } from "../dist/index.js";
 
 const log = (line) => process.stderr.write(`plugin-qualify-sync: ${line}\n`);
 
@@ -57,7 +57,7 @@ try {
   if (summary !== undefined) {
     process.stdout.write(`${summaryLine(summary)}\n`);
     // the records counted per plugin over its offers: a CLAP plugin has a record per offer
-    process.stdout.write(`${pluginCountsLine(pluginCounts(s.qualificationDir))}\n`);
+    process.stdout.write(`${pluginCountsLine(pluginCounts(new QualificationStore(s.system ? "system" : "user")))}\n`);
     log(`pins in ${s.pinFile}${summary.sent ? `, ${String(summary.sent)} sent to plugin-hostd` : ""}`);
     // every plugin left unmeasured by one reason of the machine: the run failed, and the unit says so (#192)
     if (summary.machineFailure !== undefined) process.exit(1);

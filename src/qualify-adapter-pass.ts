@@ -25,7 +25,6 @@ import { defaultAddressSpaceLimit } from "./direct-limit.js";
 import { QUALIFICATION_RECORD_SCHEMA, type AdapterBlock, type QualificationRecord } from "./qualification-record.js";
 import { ADMIT_ADDRESS_KB_ENV, ADMIT_STATE_DIR_ENV, ADMIT_STEP_MS_ENV, PI_CELLS } from "./qualify-declarations.js";
 import { digestFiles, type SyncContext, type SyncState } from "./qualify-sync.js";
-import { writeFileWhole } from "./whole-file.js";
 
 /** The cells the pass runs at: the ones a Pi runs. */
 export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
@@ -33,7 +32,6 @@ export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
 /** The code of a cell no private server could be had for: the run did not happen. */
 export const noPrivateServerCode = (): string => adapterCode(ADAPTER_HOST, "noPrivateServer");
 
-const RECORD_SUFFIX = ".qualification.json";
 const SERVER_WAIT_MS = 5000;
 const SERVER_SETTLE_MS = 300;
 // a TERM is waited for this long: jackd on a Pi can take seconds to end, and a jackd that is KILLed keeps its row in
@@ -233,17 +231,8 @@ export interface AdapterPassResult {
 /** The pass could not start: nothing was run and nothing written. */
 export class AdapterPassRefused extends Error {}
 
-const readRecord = (path: string): QualificationRecord | undefined => {
-  try {
-    const r = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
-    return r.schema === QUALIFICATION_RECORD_SCHEMA ? r : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
 /**
- * The run of each LV2 plugin of the state, whatever its probe ended with, at each cell. Each record is written whole as its plugin ends.
+ * The run of each LV2 plugin of the state, whatever its probe ended with, at each cell. Each record is put whole as its plugin ends.
  */
 export function adapterPass(ctx: SyncContext, state: SyncState, options: AdapterPassOptions = {}): AdapterPassResult {
   const read = hostVersions(ctx.env, options.versions);
@@ -275,11 +264,10 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
         continue;
       }
       for (const plugin of entry.plugins) {
-        if (plugin.record === undefined || !plugin.record.endsWith(RECORD_SUFFIX)) continue;
-        const path = join(ctx.settings.qualificationDir, basename(plugin.record));
-        const record = readRecord(path);
+        if (plugin.record === undefined) continue;
+        const record = ctx.store.record(plugin.record);
         if (record === undefined) {
-          ctx.log(`${plugin.uri}: its record does not read; no adapter run`);
+          ctx.log(`${plugin.uri}: its record is not in the store; no adapter run`);
           count.failed++;
           continue;
         }
@@ -303,7 +291,7 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
           }
         });
         const block = adapterBlockOf(done, versions, now());
-        writeFileWhole(path, `${JSON.stringify(mergeAdapterRun(record, block), null, 2)}\n`);
+        ctx.store.put(plugin.record, mergeAdapterRun(record, block));
         if (block.measured) count.measured++;
         else count.failed++;
         ctx.log(`${plugin.uri}: adapter ${block.measured ? (block.admitted ? "admitted" : `refused (${block.code ?? ""})`) : `not run (${block.code ?? ""})`} in ${((Date.now() - started) / 1000).toFixed(1)} s`);

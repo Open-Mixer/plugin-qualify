@@ -22,6 +22,7 @@ import { manifestPlugins } from "./lv2-loader.js";
 import { parsePinLine } from "./pins-file.js";
 import {
   SYNC_SETTINGS,
+  SYNC_STATE_SCHEMA,
   changedPinLines,
   digestFiles,
   discoverSyncItems,
@@ -39,6 +40,8 @@ import { clapQualifyToolPath, lv2MeasureNativePath, rtInterposePath } from "./to
 import type { SearchPathRun } from "./hostd-search-path.js";
 import { searchPathClause, searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
+import { QualificationStore } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(PKG, "native", "build", "fixtures");
 const FAULTY = join(PKG, "native", "build", "fixtures-faulty");
@@ -99,7 +102,7 @@ describe("the settings", () => {
     expect(r.settings.budgetS).toBe(9);
     expect(r.settings.lv2Dirs).toEqual(["/x/lv2"]);
     expect(r.settings.pinFile).toBe("/var/lib/omx/qualified.pins");
-    expect(r.settings.qualificationDir).toBe("/var/lib/omx/qualification");
+    expect(r.settings.system).toBe(true);
     expect(r.settings.descriptorDir).toBe("/var/lib/omx/descriptors");
     expect(r.settings.hostProfile.id).toBe("omx-clap-host");
   });
@@ -314,7 +317,7 @@ function machine(): { root: string; clap: string; lv2: string; out: string; flag
     out,
     flags: (port = 0, feedbackPort = 0) => [
       "--config", "/dev/null", "--clap-path", clap, "--lv2-path", lv2, "--lv2-extra", "",
-      "--pin-file", join(out, "qualified.pins"), "--qualification-dir", join(out, "qualification"),
+      "--pin-file", join(out, "qualified.pins"),
       "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
       "--grid-hosts", "--budget-s", "4", "--hostd-port", String(port), "--hostd-feedback-port", String(feedbackPort),
     ],
@@ -334,6 +337,24 @@ let sweepJack: PrivateJack | undefined;
 afterAll(() => sweepJack?.stop());
 const sweepJackName = (): string | undefined => (sweepJack ??= startPrivateJack({ rate: 48000, quantum: 256 }))?.name;
 
+/** A store of the run's own, for the runs that read it and measure nothing. */
+const own = (): QualificationStore => new QualificationStore("user", { run: fakeStore().run });
+
+/** The store's two commands as stand-in processes with a store of the run's own, beside its state file (never the user's layer). */
+const STAND_IN = join(PKG, "src", "store-stand-in.support.mjs");
+function standInEnv(argv: readonly string[]): Record<string, string> {
+  const state = argv[argv.indexOf("--state-file") + 1]!;
+  const bin = mkdtempSync(join(scratch, "store-bin-"));
+  for (const [name, tool] of [["plugin-qualification-db-write", "write"], ["plugin-qualification-db", "read"]] as const) {
+    writeFileSync(join(bin, name), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(STAND_IN)} ${tool} "$@"\n`);
+    chmodSync(join(bin, name), 0o755);
+  }
+  return { PLUGIN_QUALIFICATION_DB_WRITE: join(bin, "plugin-qualification-db-write"), PLUGIN_QUALIFICATION_DB: join(bin, "plugin-qualification-db"), STAND_IN_STORE: join(dirname(state), "store.json") };
+}
+
+/** The records the sync put in the run's own user layer. */
+const storedRecords = (out: string): { uri: string; offer: string; record: Record<string, any> }[] => (JSON.parse(readFileSync(join(out, "store.json"), "utf8")) as { user: { uri: string; offer: string; record: Record<string, any> }[] }).user;
+
 /** The entry point as the service runs it, and its summary line read back into numbers. */
 function sync(flags: readonly string[]): SyncRun {
   const started = Date.now();
@@ -343,7 +364,7 @@ function sync(flags: readonly string[]): SyncRun {
   writeFileSync(hostd, `#!/bin/sh\n${searchPathClause(lv2, clap)}\n${HOSTD === undefined ? "exit 127" : `exec ${JSON.stringify(HOSTD)} "$@"`}\n`);
   chmodSync(hostd, 0o755);
   // the sync fills plugin-db's store (#73): a store of the run's own, never the store of whoever runs the tests
-  const r = spawnSync(process.execPath, [SYNC, ...argv], { encoding: "utf8", env: { ...process.env, PLUGIN_HOSTD: hostd, PLUGIN_DB_STORE: mkdtempSync(join(scratch, "plugin-db-")), ...(RUNNER === undefined ? {} : { OMX_PROBE_RUNNER: RUNNER }), ...(jack === undefined ? {} : { JACK_DEFAULT_SERVER: jack, JACK_NO_START_SERVER: "1" }) } });
+  const r = spawnSync(process.execPath, [SYNC, ...argv], { encoding: "utf8", env: { ...process.env, PLUGIN_HOSTD: hostd, PLUGIN_DB_STORE: mkdtempSync(join(scratch, "plugin-db-")), ...standInEnv(argv), ...(RUNNER === undefined ? {} : { OMX_PROBE_RUNNER: RUNNER }), ...(jack === undefined ? {} : { JACK_DEFAULT_SERVER: jack, JACK_NO_START_SERVER: "1" }) } });
   const summary: Record<string, number> = {};
   for (const m of r.stdout.matchAll(/(qualified|skipped|refused|crashed|hung|unmeasured) (\d+)/g)) summary[m[1]!] = Number(m[2]);
   return { status: r.status, summary, stderr: r.stderr, ms: Date.now() - started };
@@ -381,16 +402,16 @@ describe("a sweep over a good CLAP, one that crashes at load, one that hangs and
     ]);
     expect(pins[0]!.files).toEqual([{ path: "rt-safe.clap", sha256: fileSha256(join(m.clap, "rt-safe.clap")) }]);
     expect(pins[1]!.files.map((f) => f.path)).toEqual(["gain.so", "gain.ttl", "manifest.ttl"]);
-    // every record says the soak was not measured; the crasher's says nothing was
-    const records = readdirSync(join(m.out, "qualification"));
+    // every record says the soak was not measured; the crasher's has no record at all, its outcome and code are in the state
+    const judged = storedRecords(m.out).map((r) => r.record);
     // the hanger took the isolated step in this same pass, and its record says so
-    const judged = records.filter((f) => f.endsWith(".qualification.json")).map((f) => JSON.parse(readFileSync(join(m.out, "qualification", f), "utf8")));
     expect(judged.filter((j) => j.probe.outcome === "probe.timeout").flatMap((j) => j.run.steps.map((x: { step: string }) => x.step))).toContain("isolated");
-    const good = JSON.parse(readFileSync(join(m.out, "qualification", records.find((f) => f.startsWith(GOOD_ID) && f.endsWith(".qualification.json"))!), "utf8"));
+    const good = storedRecords(m.out).find((r) => r.uri === GOOD_ID)!.record;
     expect(good.notMeasured).toEqual([{ dimension: "stability", code: "hosting.stability.unsoaked" }]);
     expect(good.verdicts[0].rating).toBe("suitable");
-    const crashed = JSON.parse(readFileSync(join(m.out, "qualification", records.find((f) => f.endsWith(".unmeasured.json"))!), "utf8"));
-    expect([crashed.outcome, crashed.code]).toEqual(["crashed", "qualify.sync.scan-crashed"]);
+    expect(good.binary.path).toBe("rt-safe.clap");
+    // the sync wrote the store and no file: none of the records of the old layer exists under any directory it used
+    expect(readdirSync(m.out).filter((f) => /\.(qualification|probe|unmeasured)\.json$/.test(f))).toEqual([]);
     expect(readdirSync(join(m.out, "descriptors")).some((f) => f.startsWith(GOOD_ID))).toBe(true);
   });
 
@@ -540,7 +561,7 @@ describe("a scoped run (#247)", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const values = new Map([
-      ["pin_file", join(root, "q.pins")], ["qualification_dir", join(root, "qualification")], ["descriptor_dir", join(root, "descriptors")],
+      ["pin_file", join(root, "q.pins")], ["descriptor_dir", join(root, "descriptors")],
       ["state_file", join(root, "state", "qualify-sync.json")], ["hostd_port", "0"], ["host_class", ""], ["settle_s", "0"],
     ]);
     const r = resolveSyncSettings(values, args.args, {}, root, undefined, undefined, searchPathOf([join(root, "lv2-scanned")], [join(root, "clap-scanned")]));
@@ -552,7 +573,7 @@ describe("a scoped run (#247)", () => {
     const goneClap = `clap:${join(root, "clap-scanned", "removed.clap")}`;
     const elsewhereLv2 = "lv2:urn:test:elsewhere";
     const before: SyncState = {
-      schema: "plugin-qualify.sync-state/1",
+      schema: SYNC_STATE_SCHEMA,
       entries: {
         [elsewhereClap]: entry("clap", join(root, "clap-elsewhere"), `${elsewhereClap}#surge`),
         [goneClap]: entry("clap", join(root, "clap-scanned"), `${goneClap}#gone`),
@@ -562,7 +583,7 @@ describe("a scoped run (#247)", () => {
     mkdirSync(join(root, "state"));
     writeFileSync(r.settings.stateFile, JSON.stringify(before));
     const lines: string[] = [];
-    await runSync(r.settings, { log: (l) => lines.push(l) });
+    await runSync(r.settings, { qualificationStore: own(), log: (l) => lines.push(l) });
     const after = JSON.parse(readFileSync(r.settings.stateFile, "utf8")) as SyncState;
     expect(Object.keys(after.entries).sort()).toEqual([elsewhereClap, elsewhereLv2].sort());
     expect(lines).toContain(`${goneClap}: gone, its pin is dropped`);
@@ -579,7 +600,7 @@ describe("the lock", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const values = new Map([
-      ["pin_file", join(root, "q.pins")], ["qualification_dir", join(root, "qualification")], ["descriptor_dir", join(root, "descriptors")],
+      ["pin_file", join(root, "q.pins")], ["descriptor_dir", join(root, "descriptors")],
       ["state_file", join(root, "state", "qualify-sync.json")], ["hostd_port", "0"], ["host_class", ""], ["settle_s", settleS],
     ]);
     const r = resolveSyncSettings(values, args.args, {}, root, undefined, undefined, searchPathOf([join(root, "lv2")], [join(root, "clap")]));
@@ -589,7 +610,7 @@ describe("the lock", () => {
 
   /** Runs recorded as they begin and end, on one clock. */
   function traced(settings: SyncSettings, name: string, events: string[], options: { wait?: boolean } = {}): Promise<unknown> {
-    return runSync(settings, { ...options, log: (line) => line === "sync run begins" && events.push(`${name} begins`) }).then((r) => {
+    return runSync(settings, { ...options, qualificationStore: own(), log: (line) => line === "sync run begins" && events.push(`${name} begins`) }).then((r) => {
       events.push(`${name} ends`);
       return r;
     });
@@ -632,7 +653,7 @@ describe("the lock", () => {
     const marker = join(dirname(settings.stateFile), "qualify-pending");
     expect(pendingMarker(settings.stateFile)).toBe(marker);
     writeFileSync(marker, "");
-    expect(await runSync(settings, {})).toBeDefined();
+    expect(await runSync(settings, { qualificationStore: own() })).toBeDefined();
     expect(existsSync(marker)).toBe(false);
   });
 

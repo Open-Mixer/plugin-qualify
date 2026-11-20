@@ -25,7 +25,7 @@ import { HOSTING_CODE } from "./hosting-codes.js";
 import type { IsolatedFigures, QualificationRecord, RecordVerdict, RunBlock, RunStep } from "./qualification-record.js";
 import { ISOLATED_SIGNAL_TOOL_ENV, ISOLATED_SIGNAL_TOOL_NAME } from "./qualify-declarations.js";
 import { locateNativeTool, toolsDir } from "./tool-paths.js";
-import { writeFileWhole } from "./whole-file.js";
+import type { QualificationStore, ShadowKey } from "./qualification-store.js";
 
 /** The steps of a pass, in the order they run. */
 export const RUN_STEP = { scan: "scan", describe: "describe", probe: "probe", rtSafety: "rt-safety", isolated: "isolated" } as const;
@@ -121,13 +121,13 @@ export function owesIsolated(record: QualificationRecord): boolean {
  * The pin a record can give back to a plugin whose state lost it: the bytes the probe pinned, and the word of a decided
  * isolated step (`isolated` or `refused`). `undefined` when the record holds no whole pin or the step decided nothing.
  */
-export function pinFromRecord(record: QualificationRecord): PinEntry | undefined {
+export function pinFromRecord(record: QualificationRecord, root: string): PinEntry | undefined {
   const step = record.run?.steps.find((s) => s.step === RUN_STEP.isolated);
   if (step === undefined || step.result === ISOLATED_RESULT.notRun) return undefined;
   const { files, layout } = record.binary;
   if (files === undefined || files.length === 0 || layout === undefined) return undefined;
   const sorted = [...files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  const uri = record.plugin.format === "clap" ? clapPinUri(record.binary.path, record.plugin.id) : record.plugin.id;
+  const uri = record.plugin.format === "clap" ? clapPinUri(join(root, record.binary.path), record.plugin.id) : record.plugin.id;
   return pinAfterStep({ uri, integrity: { files: sorted, layout } }, step);
 }
 
@@ -162,9 +162,13 @@ export function stepsCalledFor(record: QualificationRecord): readonly string[] {
   ];
 }
 
-/** The steps a record that carries a `run` lacks, for the sync to refuse it by. A record from before the steps has none to lack. */
+/**
+ * The steps a record that carries a `run` lacks, for the sync to refuse it by. A record from before the steps has none to
+ * lack: it has no `run`, or, in the store (whose `run_id` column is required), a run with no step at all, which no sync
+ * ever writes.
+ */
 export function missingSteps(record: QualificationRecord): readonly string[] {
-  if (record.run === undefined) return [];
+  if (record.run === undefined || record.run.steps.length === 0) return [];
   const had = new Set(record.run.steps.map((s) => s.step));
   return stepsCalledFor(record).filter((s) => !had.has(s));
 }
@@ -223,30 +227,23 @@ export function pinAfterStep(pin: PinEntry | undefined, step: RunStep): PinEntry
   return rest;
 }
 
-/** The run id of a record from before the steps: its probe output's, read from the copy beside it. */
-export function runIdOf(record: QualificationRecord, dir: string): string | undefined {
-  if (record.run !== undefined) return record.run.id;
-  if (record.rejudged !== undefined) return record.rejudged.figures.runId;
-  try {
-    const read = readProbeOutput(readFileSync(join(dir, basename(record.probe.file)), "utf8"));
-    return read.ok ? read.output.run.id : undefined;
-  } catch {
-    return undefined;
-  }
+/** The run id of a record: its run's, else the one its last re-judge names; a record the store exports always has a run. */
+export function runIdOf(record: QualificationRecord): string | undefined {
+  return record.run?.id ?? record.rejudged?.figures.runId;
 }
 
 /**
  * The missing isolated step of a record already judged: the run keeps its id and gains the step, and nothing else is
- * measured. `undefined` when it owes none, or has no run id to extend. Writes the record whole.
+ * measured. `undefined` when it owes none, or has no run id to extend. Puts the record whole.
  */
-export function completeIsolated(path: string, record: QualificationRecord, uri: string, cell: GridCell, runner: IsolatedRunner, env: Readonly<Record<string, string | undefined>>): { readonly record: QualificationRecord; readonly step: RunStep } | undefined {
+export function completeIsolated(store: QualificationStore, key: ShadowKey, record: QualificationRecord, uri: string, cell: GridCell, runner: IsolatedRunner, env: Readonly<Record<string, string | undefined>>): { readonly record: QualificationRecord; readonly step: RunStep } | undefined {
   const isStep = (s: RunStep): boolean => s.step === RUN_STEP.isolated;
   if (!owesIsolated(record) || isolatedFinished(record)) return undefined;
-  const id = runIdOf(record, join(path, ".."));
+  const id = runIdOf(record);
   if (id === undefined) return undefined;
   const step = judgeIsolatedRun(runner(uri, cell, env));
   const run: RunBlock = { id, steps: [...(record.run?.steps ?? baseSteps(record)).filter((s) => !isStep(s)), step] };
   const next = { ...record, run };
-  writeFileWhole(path, `${JSON.stringify(next, null, 2)}\n`);
+  store.put(key, next);
   return { record: next, step };
 }

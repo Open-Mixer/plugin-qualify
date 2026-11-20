@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * `plugin-qualify adjust --history <file>`: read the qualification records `judge` (or a run with `--out`) wrote, read
+ * `plugin-qualify adjust --history <file>`: read the records of the scope's layer of the qualification store (through the reader), read
  * plugin-hostd's running history, and write a second verdict beside each measured one, for the host class of the history,
  * with a reason code (`history-adjust.ts` holds the rules). The measurement and the measured verdicts of a record are
  * never touched: the second verdict lives in the record's `history` block, one entry per host class. `--pins` writes the
  * adjusted verdict instead of the measured one. `bin/plugin-qualify.mjs` only reads argv and prints.
  */
-import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { findHistory, historyClasses, readHistory, type HistoryRead, type HistoryRecord } from "./history-file.js";
@@ -15,7 +14,9 @@ import { adjustVerdict, summariseHistory, type Adjustment } from "./history-adju
 import type { HostProfile } from "./host-profiles.js";
 import { OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import { clapPinUri, pinVerdictOf, type PinEntry, type PinVerdict } from "./pins-file.js";
-import { QUALIFICATION_RECORD_SCHEMA, type HistoryBlock, type QualificationRecord, type RecordVerdict } from "./qualification-record.js";
+import { type HistoryBlock, type QualificationRecord, type RecordVerdict } from "./qualification-record.js";
+import { shadowKeyOf, type QualificationStore, type ShadowKey } from "./qualification-store.js";
+import type { SyncItem } from "./qualify-sync.js";
 import { EXIT_CODE, OUTPUT_FORMATS, type OutputFormat } from "./qualify-options.js";
 import type { SuitabilityRating } from "./rating.js";
 import { withContractPathHelp } from "./qualification-domain.js";
@@ -23,7 +24,8 @@ import { withContractPathHelp } from "./qualification-domain.js";
 export interface AdjustArgs {
   readonly history: string;
   readonly hostProfiles: readonly string[];
-  readonly qualificationDir?: string;
+  /** `--system`: the system scope's layer of the store, else the user's. */
+  readonly system: boolean;
   readonly hostClass?: string;
   readonly pins?: string;
   /** UTC seconds the history is read at; the clock when absent. */
@@ -34,17 +36,22 @@ export interface AdjustArgs {
 
 export type ParseAdjustResult = { ok: true; args: AdjustArgs } | { ok: false; error: string };
 
-const VALUE_FLAGS = ["--history", "--host-profile", "--qualification-dir", "--host-class", "--pins", "--now", "--format"];
+const VALUE_FLAGS = ["--history", "--host-profile", "--host-class", "--pins", "--now", "--format"];
 
 export function parseAdjustArgs(argv: readonly string[]): ParseAdjustResult {
   const specs: string[] = [];
   const got = new Map<string, string>();
   let help = false;
+  let system = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (!a.startsWith("--")) return { ok: false, error: `${a}: adjust takes options only; the records are read from --qualification-dir` };
+    if (!a.startsWith("--")) return { ok: false, error: `${a}: adjust takes options only; the records are the scope's, read through the reader` };
     if (a === "--help") {
       help = true;
+      continue;
+    }
+    if (a === "--system") {
+      system = true;
       continue;
     }
     if (!VALUE_FLAGS.includes(a)) return { ok: false, error: `unknown option ${a}` };
@@ -60,7 +67,6 @@ export function parseAdjustArgs(argv: readonly string[]): ParseAdjustResult {
   if (now !== undefined && !(Number.isInteger(now) && now >= 0)) return { ok: false, error: "--now must be UTC seconds, a whole number" };
   const history = got.get("--history");
   if (!help && history === undefined) return { ok: false, error: "name the history file with --history" };
-  const dir = got.get("--qualification-dir");
   const hostClass = got.get("--host-class");
   const pins = got.get("--pins");
   return {
@@ -68,7 +74,7 @@ export function parseAdjustArgs(argv: readonly string[]): ParseAdjustResult {
     args: {
       history: history ?? "",
       hostProfiles: [...new Set(specs.length > 0 ? specs : [OPENMIXER_CONSOLE_PROFILE.id])],
-      ...(dir === undefined ? {} : { qualificationDir: dir }),
+      system,
       ...(hostClass === undefined ? {} : { hostClass }),
       ...(pins === undefined ? {} : { pins }),
       ...(now === undefined ? {} : { now }),
@@ -89,7 +95,7 @@ function adjustHelpTextBody(): string {
     "  plugin-qualify adjust --history <file> [options]",
     "",
     "  --history <file>              plugin-hostd's history file ($XDG_STATE_HOME/plugin-hostd/history); required",
-    "  --qualification-dir <dir>     the records `judge` wrote; each gets a `history` block (default: the one judge writes to)",
+    "  --system                      the system scope of the qualification store (default: the user's): its layer over the base; each record read gets a `history` block",
     "  --host-profile <file|id>      adjust the verdict of this host; repeat or comma-separate (default: openmixer-console)",
     "  --host-class <class>          read only this host class of the history (arch/cores/clock); default: every class the file holds",
     "  --pins <file>                 write the pins with the ADJUSTED verdict of the first host profile; needs exactly one host class",
@@ -105,43 +111,39 @@ function adjustHelpTextBody(): string {
   ].join("\n");
 }
 
-/** A record read from the qualification directory, with the file it came from. */
+/** A record of the scope (its layer over the base), with the shadow key it is held under. */
 export interface RecordFile {
-  readonly path: string;
+  readonly key: ShadowKey;
   readonly record: QualificationRecord;
 }
 
-/** Every `*.qualification.json` of the directory with this reader's schema; a file that does not read is a failure, and the others go on. */
-export function readRecords(dir: string, read: (path: string) => string = (p) => readFileSync(p, "utf8")): {
-  readonly records: readonly RecordFile[];
-  readonly failures: readonly { readonly file: string; readonly problem: string }[];
-} {
-  const records: RecordFile[] = [];
-  const failures: { file: string; problem: string }[] = [];
-  let names: string[];
-  try {
-    names = readdirSync(dir).filter((n) => n.endsWith(".qualification.json")).sort();
-  } catch (e) {
-    return { records, failures: [{ file: dir, problem: `cannot read: ${e instanceof Error ? e.message : String(e)}` }] };
-  }
-  for (const name of names) {
-    const path = join(dir, name);
-    try {
-      const doc = JSON.parse(read(path)) as QualificationRecord;
-      if (doc.schema !== QUALIFICATION_RECORD_SCHEMA) failures.push({ file: path, problem: `schema ${String(doc.schema)}, not ${QUALIFICATION_RECORD_SCHEMA}` });
-      else records.push({ path, record: doc });
-    } catch (e) {
-      failures.push({ file: path, problem: `cannot read: ${e instanceof Error ? e.message : String(e)}` });
-    }
-  }
-  return { records, failures };
+/** The codes of a record `adjust` leaves as it is. */
+export const ADJUST_CODE = {
+  /** No installed item holds the record's key: its history is keyed by where the plugin is installed, which is unknown. */
+  notInstalled: "adjust.not-installed",
+} as const;
+
+/** Every record of the scope through the reader, the user layer over the base: a base record is adjusted and put in the scope's layer. */
+export function readRecords(store: QualificationStore): { readonly records: readonly RecordFile[] } {
+  return { records: store.scopeRecords().map((s) => ({ key: shadowKeyOf(s), record: s.record })) };
 }
 
-/** plugin-hostd's key of a record's plugin: its uri and the digest of the first file of its pin (files sorted by path, as the pin lists them). `undefined` when the record holds no whole pin. */
-export function historyKeyOf(record: QualificationRecord): { readonly uri: string; readonly digest: string } | undefined {
+/**
+ * The install root of the installed item that holds a record's key (the store spec's section 3.7): the item of the record's
+ * format and plugin whose file at the record's `binary_path` hashes to the key. The absolute path of the plugin is that root
+ * joined with `binary_path`; it is never stored and never an argument. `undefined` when no installed item holds the key.
+ */
+export function installedRootOf(items: readonly SyncItem[], key: ShadowKey, record: QualificationRecord, hashOf: (absolutePath: string) => string | undefined): string | undefined {
+  const at = record.binary.path;
+  const item = items.find((i) => i.format === key.format && (i.format === "clap" ? i.files.includes(at) : i.uri === key.uri) && hashOf(join(i.root, at)) === key.sha256);
+  return item?.root;
+}
+
+/** plugin-hostd's key of a record's plugin: its uri (the installed `.clap`'s path is `root` and the record's relative path) and the digest of the first file of its pin (files sorted by path, as the pin lists them). `undefined` when the record holds no whole pin. */
+export function historyKeyOf(record: QualificationRecord, root: string): { readonly uri: string; readonly digest: string } | undefined {
   const files = [...record.binary.files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   if (files.length === 0 || record.binary.layout === undefined) return undefined;
-  const uri = record.plugin.format === "clap" ? clapPinUri(record.binary.path, record.plugin.id) : record.plugin.id;
+  const uri = record.plugin.format === "clap" ? clapPinUri(join(root, record.binary.path), record.plugin.id) : record.plugin.id;
   return { uri, digest: files[0]!.sha256 };
 }
 
@@ -156,9 +158,9 @@ export function historyBlock(
   history: readonly HistoryRecord[],
   hostClass: string,
   profiles: readonly HostProfile[],
-  options: { file: string; now: number },
+  options: { file: string; now: number; root: string },
 ): HistoryBlock {
-  const key = historyKeyOf(record);
+  const key = historyKeyOf(record, options.root);
   const found = key === undefined ? undefined : findHistory(history, key.uri, key.digest, hostClass);
   const verdicts = profiles.flatMap((profile) => {
     const row = record.verdicts.find((v) => v.host === profile.id);
@@ -190,7 +192,7 @@ export function historyBlock(
 }
 
 export interface AdjustedRecord {
-  readonly path: string;
+  readonly key: ShadowKey;
   readonly record: QualificationRecord;
 }
 
@@ -201,6 +203,8 @@ export type AdjustResult =
       /** The host classes read. */
       readonly hostClasses: readonly string[];
       readonly ignored: Extract<HistoryRead, { ok: true }>["ignored"];
+      /** The records left as they are because no installed item holds their key. */
+      readonly notInstalled: readonly { readonly key: ShadowKey; readonly code: typeof ADJUST_CODE.notInstalled }[];
     }
   | { readonly ok: false; readonly problem: string };
 
@@ -211,18 +215,25 @@ export type AdjustResult =
 export function adjustRecords(
   records: readonly RecordFile[],
   historyText: string,
-  options: { profiles: readonly HostProfile[]; file: string; now: number; hostClass?: string },
+  options: { profiles: readonly HostProfile[]; file: string; now: number; hostClass?: string; rootOf: (key: ShadowKey, record: QualificationRecord) => string | undefined },
 ): AdjustResult {
   const read = readHistory(historyText);
   if (!read.ok) return { ok: false, problem: `${options.file}: ${read.problem}` };
   const hostClasses = options.hostClass === undefined ? historyClasses(read.records) : [options.hostClass];
   if (hostClasses.length === 0) return { ok: false, problem: `${options.file} holds no record, so there is no host class to adjust for` };
-  const adjusted = records.map(({ path, record }) => {
-    const fresh = hostClasses.map((c) => historyBlock(record, read.records, c, options.profiles, { file: options.file, now: options.now }));
+  const notInstalled: { key: ShadowKey; code: typeof ADJUST_CODE.notInstalled }[] = [];
+  const adjusted: AdjustedRecord[] = [];
+  for (const { key, record } of records) {
+    const root = options.rootOf(key, record);
+    if (root === undefined) {
+      notInstalled.push({ key, code: ADJUST_CODE.notInstalled });
+      continue;
+    }
+    const fresh = hostClasses.map((c) => historyBlock(record, read.records, c, options.profiles, { file: options.file, now: options.now, root }));
     const kept = (record.history ?? []).filter((b) => !hostClasses.includes(b.hostClass));
-    return { path, record: { ...record, history: [...kept, ...fresh].sort((a, b) => (a.hostClass < b.hostClass ? -1 : a.hostClass > b.hostClass ? 1 : 0)) } };
-  });
-  return { ok: true, records: adjusted, hostClasses, ignored: read.ignored };
+    adjusted.push({ key, record: { ...record, history: [...kept, ...fresh].sort((a, b) => (a.hostClass < b.hostClass ? -1 : a.hostClass > b.hostClass ? 1 : 0)) } });
+  }
+  return { ok: true, records: adjusted, hostClasses, ignored: read.ignored, notInstalled };
 }
 
 /** The adjusted verdict of a record's host for a host class: the pin verdict, `null` when it has none, `undefined` when the record holds no block for the pair. */
@@ -236,7 +247,7 @@ export function adjustedVerdictOf(record: QualificationRecord, hostClass: string
  */
 export function adjustedPinEntries(records: readonly AdjustedRecord[], hostClass: string, host: string): PinEntry[] {
   return records.flatMap(({ record }) => {
-    const key = historyKeyOf(record);
+    const key = record.history?.find((b) => b.hostClass === hostClass)?.key;
     if (key === undefined) return [];
     const adjusted = adjustedVerdictOf(record, hostClass, host);
     return [

@@ -1,5 +1,8 @@
-# Test files that need omx-contract 3.20.0 as a system package (the installer domain mode, fmt, omx-contract.pc).
+# Test files that need system packages of the OpenMixer channel: omx-contract 3.20.0 (the installer domain mode, fmt,
+# omx-contract.pc), and the qualification store's commands (plugin-qualification-db, plugin-qualification-db-write) with
+# a contract directory that holds the domains they check words against (STORE_CONTRACT_DIR, built by the job).
 # One list, two readers: vitest.config.ts leaves them out of an ordinary run (the Ubuntu job, publish.yml, a checkout
 # without that package), and the container job of ci.yml runs exactly these with OMX_CONTAINER_TESTS=1;
 # src/workflows-agree.test.ts holds the two to this file.
 src/qualification-domain-install.test.ts
+src/qualification-store.contract.test.ts

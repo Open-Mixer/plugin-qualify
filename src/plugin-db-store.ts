@@ -7,6 +7,7 @@
  * plugin's files itself, from where the pin's uri says they are; the layout is the pin's, the body the record's
  * (`judged-layer.ts`). Nothing here measures or judges.
  */
+import { keyLabel, type QualificationStore } from "./qualification-store.js";
 import { createHash } from "node:crypto";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 
@@ -25,6 +26,8 @@ export interface StoreOptions {
   /** The LV2 directories the sync scanned, as one search path: plugin-db finds an LV2 plugin's bundle in it. */
   readonly lv2Path: string;
   readonly env: Readonly<Record<string, string | undefined>>;
+  /** The qualification store the records are read from. */
+  readonly records: QualificationStore;
   readonly run?: PluginDbRun;
   /**
    * What was written, by address, so an unchanged plugin is not written again (plugin-db hashes every file of a pin, a
@@ -110,18 +113,16 @@ export function storeJudgedLayers(state: SyncState, opts: StoreOptions): StoreOu
         noPin++;
         continue;
       }
-      let record: QualificationRecord;
-      try {
-        record = JSON.parse(readFileSync(p.record, "utf8")) as QualificationRecord;
-      } catch (e) {
+      const record = opts.records.record(p.record);
+      if (record === undefined) {
         noLayer++;
-        add(layerless, `the record does not read (${(e as Error).message})`, p.record);
+        add(layerless, "the record is not in the qualification store", keyLabel(p.record));
         continue;
       }
       const layer = judgedLayerOf(record, { machineClass: opts.machineClass, pin, judgedBy: judgedByOf(record) });
       if (layer.layer === null) {
         noLayer++;
-        add(layerless, layer.reason, p.record);
+        add(layerless, layer.reason, keyLabel(p.record));
         continue;
       }
       const where = whereOf(p.pin!.uri, opts.lv2Path);

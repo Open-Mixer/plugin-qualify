@@ -2,13 +2,11 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * The qualification record: what plugin-qualify wrote down about one plugin binary and one offer
- * after judging its probe output, kept in `qualification_dir`. Evidence, not a constraint: no
+ * after judging its probe output, kept in the qualification store. Evidence, not a constraint: no
  * reader refuses a descriptor because of it.
  *
- * Two files, always together. The record is the judgment; beside it is a byte copy of the probe
- * output it judged, because the probe directory is runtime and may be wiped. The record names the
- * copy and the SHA-256 of the copy's bytes, so the facts outlive the run without hostd keeping a
- * second store, and a reader can tell that the figures it holds are the ones the verdict came from.
+ * The record is the judgment. It names the probe output it judged (its file name, SHA-256 and size) as evidence of where
+ * the figures came from; no copy of that output is kept, and every figure a later judge needs is in the record.
  *
  * Not yet in the record: the fingerprint of the descriptor's controls, since the descriptor is
  * written by the scan (stage 5) and plugin-qualify does not read one yet.
@@ -354,6 +352,13 @@ export interface QualificationRecord {
   readonly testedVersion?: string;
   readonly binary: ProbeOutput["binary"];
   /**
+   * The host extensions the run offered a CLAP plugin (the probe output's `offer.clapExtensions`): a profile is judged
+   * only against the extensions it offers, so the row judge reads them from here. Present on a CLAP record whose probe
+   * reached the offer, empty when none was offered; absent on an LV2 record, and on a CLAP record whose probe crashed or
+   * timed out first: absent is "not measured", never an empty set.
+   */
+  readonly hostExtensions?: readonly string[];
+  /**
    * The installed package the binary came from (format, name, version, release, distro, arch), read from the package
    * manager's owner of `binary.path` when the record was written: null when no package owns it or a field is not stated.
    * Absent on a record written before the field existed, which is not filled in afterwards. Never part of the identity.
@@ -521,6 +526,32 @@ export const verdictRows = (judgment: Judgment): RecordVerdict[] =>
     reasons: h.reasons,
   }));
 
+const byBytes = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+/**
+ * The binary as the store holds it (the store spec's section 3.7): its path below the install root, never an absolute one,
+ * and the list of files in ascending byte order of their paths. The key is the entry at that path, which the probe
+ * output already names. The sync puts its records in this form; a record the `judge` command writes to a directory keeps
+ * the path the probe measured.
+ */
+export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
+  const files = [...b.files].sort((x, y) => byBytes(x.path, y.path));
+  const below = b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path;
+  // a probe that named the bundle (not its binary) leaves the path no entry of the list: the binary is the entry of the key
+  const path = files.some((f) => f.path === below) ? below : (files.find((f) => f.sha256 === b.sha256)?.path ?? below);
+  return { ...b, path, files };
+}
+
+/**
+ * The record as the store takes it: its binary in the store's form (`storedBinary`), the list of what was not measured
+ * always present (empty when nothing was left out), and without `provenance`, which is its set's and which a layer's own
+ * record has none of. Every other field the record carries has a column.
+ */
+export function storedForm(record: QualificationRecord): QualificationRecord {
+  const { provenance: _set, ...rest } = record;
+  return { ...rest, notMeasured: record.notMeasured ?? [], binary: storedBinary(record.binary) };
+}
+
 export function buildQualificationRecord(
   judgment: Judgment,
   copy: { file: string; sha256: string; bytes: number },
@@ -533,6 +564,7 @@ export function buildQualificationRecord(
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
     binary: o.binary,
+    ...(o.plugin.format === "clap" && o.offer.clapExtensions !== undefined ? { hostExtensions: [...o.offer.clapExtensions] } : {}),
     ...(pkg === undefined ? {} : { package: pkg }),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),
