@@ -87,14 +87,14 @@ jobs:
           pnpm pack --pack-destination "$RUNNER_TEMP/pack"
           node packaging/check-tarball.mjs "$RUNNER_TEMP"/pack/openmixer-plugin-qualify-*.tgz
 
-  # the test files of .github/container-tests.txt: they need omx-contract 3.20.0 as a system package (the installer's
-  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora; the build and test job above leaves them out
+  # the test files of .github/container-tests.txt: they need omx-contract 3.20.2 as a system package (the installer's
+  # domain mode, fmt, omx-contract.pc), which the channel serves for Fedora 45; the build and test job above leaves them out
   container-tests:
     name: tests that need omx-contract installed
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
       - uses: actions/checkout@v4
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     container:
-      image: fedora:44
+      image: fedora:45
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs
       - uses: actions/checkout@v4
@@ -151,4 +151,4 @@ jobs:
     uses: ./.github/workflows/release.yml
     with:
       publish: false
-      arm: false  # aarch64/arm64 build at release only
+      arm: false  # the arm64 DEBs build at release only; no Fedora aarch64 RPM

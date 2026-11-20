@@ -7,7 +7,7 @@
 # the plugin package with a changed bundle and see them change; remove it and see them go.
 #
 #   podman run --rm -v "$PWD":/src:ro,Z docker.io/library/debian:trixie bash /src/tools/install-roundtrip.sh /src
-#   podman run --rm -v "$PWD":/src:ro,Z docker.io/library/fedora:44     bash /src/tools/install-roundtrip.sh /src
+#   podman run --rm -v "$PWD":/src:ro,Z docker.io/library/fedora:45     bash /src/tools/install-roundtrip.sh /src
 #
 # Runs as root inside a throwaway container; rootless podman has no systemd, which is the "direct run" branch of
 # packaging/trigger-scan.sh (the image-build and chroot case). The scan is never started by hand: every record, descriptor and
