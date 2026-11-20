@@ -181,6 +181,20 @@ def unit_words(env=None):
     return {t["uri"]: t["word"] for t in terms.values() if t.get("kind") == "unit" and "word" in t}
 
 
+def meaning_words(env=None):
+    """omx-contract's closed list of control meanings (the schema's `$defs.meaning`), in its order. The schema is the
+    owner: a meaning this package names is held to this list, and there is no list of meanings in this package."""
+    found = [p for p in schema_candidates(env) if os.path.isfile(p)]
+    if not found:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-schema", places=", ".join(schema_candidates(env)))
+    try:
+        with open(found[0], encoding="utf-8") as f:
+            return tuple(json.load(f)["$defs"]["meaning"]["enum"])
+    except (OSError, ValueError, KeyError) as e:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where="$defs/meaning",
+                         message=f"{found[0]} has no list of meanings ({type(e).__name__})") from e
+
+
 class SchemaValidator:
     """omx-contract's schema, compiled once; `check` refuses a document it does not hold."""
 

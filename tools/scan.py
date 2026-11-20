@@ -75,12 +75,26 @@ def unit_words():
         _UNIT_WORDS = desc.unit_words()
     return _UNIT_WORDS
 
-# lv2:designation -> the descriptor's meaning, where the meaning carries the LV2 term's name
-DESIGNATED_MEANINGS = {
-    **{PARAM + m: m for m in ("gain", "threshold", "ratio", "attack", "release", "hold", "decay", "frequency",
-                              "cutoffFrequency", "resonance", "bypass", "wetDryRatio", "delay")},
-    LV2 + "enabled": "enabled",
-}
+# lv2:designation -> the descriptor's meaning, where the meaning carries the LV2 term's name. The meaning is a word of
+# omx-contract's closed list (the schema's `$defs.meaning`, desc.meaning_words): the names here are held to that list at the
+# first use, and a name the list lacks is refused by name, so no meaning of this package is a word the contract does not have.
+_DESIGNATED_NAMES = ("gain", "threshold", "ratio", "attack", "release", "hold", "decay", "frequency", "cutoffFrequency",
+                     "resonance", "bypass", "wetDryRatio", "delay")
+_ENABLED_NAME = "enabled"
+_DESIGNATED_MEANINGS = None
+
+
+def designated_meanings(env=None):
+    """lv2:designation URI -> the contract's meaning word it names; each word checked against omx-contract's list."""
+    global _DESIGNATED_MEANINGS
+    if _DESIGNATED_MEANINGS is None:
+        listed = desc.meaning_words(env)
+        missing = [m for m in (*_DESIGNATED_NAMES, _ENABLED_NAME, "unknown") if m not in listed]
+        if missing:
+            raise desc.refused_as(desc.DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where="$defs/meaning",
+                                  message="omx-contract's list of meanings has no " + ", ".join(missing))
+        _DESIGNATED_MEANINGS = {**{PARAM + m: m for m in _DESIGNATED_NAMES}, LV2 + "enabled": _ENABLED_NAME}
+    return _DESIGNATED_MEANINGS
 
 # LV2 classes -> the descriptor's plugin features; a plugin of none of them is an audio effect
 CLASS_FEATURES = {
@@ -367,8 +381,8 @@ class Scanner:
         if not des:
             return "unknown"
         for d in des:
-            if d in DESIGNATED_MEANINGS:
-                return DESIGNATED_MEANINGS[d]
+            if d in designated_meanings():
+                return designated_meanings()[d]
         return None
 
     def port_group(self, port):

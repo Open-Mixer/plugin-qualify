@@ -147,6 +147,44 @@ class Annotate(unittest.TestCase):
         self.assertEqual([e["uri"] for e in catalog], ["urn:a", "urn:b"])
 
 
+class MeaningsFromTheContract(unittest.TestCase):
+    """The meanings a designation names are words of omx-contract's closed list (the schema's `$defs.meaning`)."""
+
+    GOLDEN = {
+        s.PARAM + "gain": "gain", s.PARAM + "threshold": "threshold", s.PARAM + "ratio": "ratio", s.PARAM + "attack": "attack",
+        s.PARAM + "release": "release", s.PARAM + "hold": "hold", s.PARAM + "decay": "decay", s.PARAM + "frequency": "frequency",
+        s.PARAM + "cutoffFrequency": "cutoffFrequency", s.PARAM + "resonance": "resonance", s.PARAM + "bypass": "bypass",
+        s.PARAM + "wetDryRatio": "wetDryRatio", s.PARAM + "delay": "delay", s.LV2 + "enabled": "enabled",
+    }
+
+    def setUp(self):
+        s._DESIGNATED_MEANINGS = None
+        self.addCleanup(setattr, s, "_DESIGNATED_MEANINGS", None)
+
+    def schema_without(self, root, word):
+        path = os.path.join(root, "omx-contract.schema.json")
+        listed = [m for m in desc.meaning_words() if m != word]
+        with open(path, "w") as f:
+            json.dump({"$defs": {"meaning": {"enum": listed}}}, f)
+        return {desc.DESCRIPTOR_SCHEMA_ENV: path}
+
+    def test_the_designations_name_the_golden_meanings(self):
+        self.assertEqual(s.designated_meanings(), self.GOLDEN)
+        self.assertTrue(set(self.GOLDEN.values()) <= set(desc.meaning_words()))
+
+    def test_a_meaning_the_contract_lacks_is_refused_by_name(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.schema_without(root, "wetDryRatio")
+            with self.assertRaises(desc.DescriptorRefused) as raised:
+                s.designated_meanings(env)
+            self.assertIn("wetDryRatio", raised.exception.problem)
+
+    def test_no_schema_is_a_refusal_not_a_table(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(desc.DescriptorRefused):
+                desc.meaning_words({desc.DESCRIPTOR_SCHEMA_ENV: os.path.join(root, "absent.json")})
+
+
 class UnitsFromTheSheet(unittest.TestCase):
     """A port's unit is spelled by omx-contract's units sheet, the owner of the words; no table of units is kept here."""
 
