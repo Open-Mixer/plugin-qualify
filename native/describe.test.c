@@ -181,7 +181,29 @@ static void sabotage_mapping_changes_descriptor(void) {
   free(want_raw);
 }
 
-int main(void) {
+/* describe_test scope <format> <scope>: describe over a dump of one line, `<scope>\tno_such_field\tx`, prints `no-scope`
+   when the parser says the scope is none of the format's and `accepted` when it reads the scope (and refuses the field,
+   which no table has a row for); the call src/describe-scan-scopes.test.ts makes with the scan domain it names */
+static int scope_mode(const char *format, const char *scope) {
+  char path[64], dump[256], target[128], why[1024] = { 0 }, needle[64];
+  char *table;
+  sb_t out = { 0 };
+  int rc;
+
+  snprintf(path, sizeof path, "../data/formats/%s.json", format);
+  snprintf(dump, sizeof dump, "# omx-clap-scan --fields 1\n%s\tno_such_field\tx\n", scope);
+  snprintf(target, sizeof target, "%s", !strcmp(format, "clap") ? "clap:controls.clap#org.example.x" : "lv2:urn:example:x");
+  snprintf(needle, sizeof needle, "is no %s scope", format);
+  if ((table = slurp(path)) == NULL) return 1;
+  rc = describe_dump(table, dump, target, &out, why, sizeof why);
+  printf("%s\n", rc != 0 && strstr(why, needle) ? "no-scope" : "accepted");
+  free(table);
+  free(out.s);
+  return 0;
+}
+
+int main(int argc, char **argv) {
+  if (argc == 4 && !strcmp(argv[1], "scope")) return scope_mode(argv[2], argv[3]);
   format_and_id();
   sabotage_mapping_changes_descriptor();
 
