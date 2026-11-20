@@ -12,9 +12,10 @@
 import { vi } from "vitest";
 import "./qualification-domain-node.js";
 import "./probe-domain-node.js";
+import "./history-domain-node.js";
 
 /**
- * The place the tests read: the qualification domain (plugin-hostd's) and the probe domain (plugin-hostd-protocol's) in
+ * The place the tests read: the qualification and history domains (plugin-hostd's) and the probe domain (plugin-hostd-protocol's) in
  * one directory, as the installed contract directory holds them. Each domain comes from the first directory of
  * OMX_CONTRACT_PATH that holds it, else from the installed place; a domain found nowhere is not linked, and the first read of
  * it refuses by name. The CLIs a test spawns read the same variable, which names this directory.
@@ -24,9 +25,9 @@ const CONTRACT_DIR = vi.hoisted(() => {
   const os = process.getBuiltinModule("node:os");
   const dirs = [...(process.env.OMX_CONTRACT_PATH ?? "").split(":").filter((d) => d !== ""), "/usr/share/omx-contract/contract.d"];
   const dir = fs.mkdtempSync(`${os.tmpdir()}/qualify-contract-dir-`);
-  for (const domain of ["qualification", "probe"]) {
+  for (const domain of ["qualification", "probe", "history"]) {
     const holder = dirs.find((d) => fs.existsSync(`${d}/${domain}/${domain}.json`));
-    if (holder !== undefined) fs.symlinkSync(`${holder}/${domain}`, `${dir}/${domain}`);
+    if (holder !== undefined) fs.cpSync(`${holder}/${domain}`, `${dir}/${domain}`, { recursive: true });
   }
   process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
   process.env.OMX_CONTRACT_PATH = dir;
