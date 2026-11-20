@@ -3,7 +3,7 @@
 /**
  * The pool step: the one place that grants a plugin the CLAP thread pool. omx-clap-host sizes a pool of helper threads
  * from its worker's cpu set, and plugin-hostd starts a worker with it only for a plugin whose pin says `pool=cores`
- * (plugin-db's `PLUGIN_DB_PIN_POOLS`: "measured real-time safe and faster at the quantum"). That word is the plugin's
+ * (plugin-hostd-protocol's `pin` domain, `PIN_POOLS`: "measured real-time safe and faster at the quantum"). That word is the plugin's
  * qualification to give, so nothing writes it but this step.
  *
  * A plugin that does not offer `clap.thread-pool` is never asked: its record says `not-asked` and its pin has no pool
