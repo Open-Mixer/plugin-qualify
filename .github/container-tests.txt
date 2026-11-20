@@ -1,7 +1,6 @@
 # Test files that need the qualification domain installed as a system package (plugin-hostd-contract, which ships plugin-hostd's
-# contract.d/qualification). One list, two readers: vitest.config.ts leaves them out of an ordinary run (the Ubuntu job,
+# contract.d/qualification) or plugin-hostd 0.21.0's describe (plugin-hostd-probe). One list, two readers: vitest.config.ts leaves them out of an ordinary run (the Ubuntu job,
 # publish.yml, a checkout without that package), and the container job of ci.yml runs exactly these with OMX_CONTAINER_TESTS=1;
 # src/workflows-agree.test.ts holds the two to this file.
 src/qualification-domain-installed.test.ts
-src/describe-scan-scopes.test.ts
-src/describe-native.test.ts
+src/describe-hostd.test.ts

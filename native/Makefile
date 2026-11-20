@@ -95,9 +95,6 @@ LILV_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lilv-0)
 LILV_LIBS ?= $(shell $(PKG_CONFIG) --libs lilv-0)
 LV2_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lv2 2>/dev/null)
 
-# describe's JSON reader and writer (plugin-json.c): cJSON, moved from plugin-hostd with it
-CJSON_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags libcjson)
-CJSON_LIBS ?= $(shell $(PKG_CONFIG) --libs libcjson)
 
 LIBEXECDIR ?= /usr/libexec/plugin-qualify
 
@@ -162,23 +159,6 @@ $(BUILD)/no_task_dir.so: fixtures/no-task-dir.c | $(BUILD)
 # the search path's oracle, never installed
 $(BUILD)/lv2_measure_path_test: lv2_measure_path.test.c lv2-measure-path.c lv2-measure-path.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror -I. $(LDFLAGS) -o $@ lv2_measure_path.test.c lv2-measure-path.c
-
-# the scopes of a dump are the scan domain's words, read through omx-contract's C loader (libomx-domain)
-DOMAIN_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags libomx-domain)
-DOMAIN_LIBS ?= $(shell $(PKG_CONFIG) --libs libomx-domain)
-
-DESCRIBE_SRC := describe.c plugin-json.c transforms.c scan_words.c
-DESCRIBE_HDR := describe.h plugin-json.h transforms.h scan_words.h
-
-# describe's oracle, never installed: the format tables (../data/formats/*.json) against the field dump
-# fixtures (fixtures/fields/), run with the working directory at native/
-# not part of `all`: it needs libomx-domain, which the channel serves for Fedora 45 and Debian trixie; ci.yml builds and runs
-# it in its Fedora 45 container job (`make describe-oracle`)
-.PHONY: describe-oracle
-describe-oracle: $(BUILD)/describe_test
-
-$(BUILD)/describe_test: describe.test.c $(DESCRIBE_SRC) $(DESCRIBE_HDR) | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CONTRACT_CFLAGS) $(CJSON_CFLAGS) $(DOMAIN_CFLAGS) -I. $(LDFLAGS) -o $@ describe.test.c $(DESCRIBE_SRC) $(CJSON_LIBS) $(DOMAIN_LIBS) -lm
 
 $(BUILD)/isolated_signal: isolated-signal.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< -ldl -lm

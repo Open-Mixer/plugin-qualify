@@ -25,8 +25,6 @@ BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.9
 BuildRequires: pkgconfig(omx-contract) >= 3.20.2
 BuildRequires: pkgconfig(omx-clap-lv2) >= 0.32.5
 BuildRequires: pkgconfig(omxdsp) >= 0.32.1
-# describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
-BuildRequires: pkgconfig(libcjson) >= 1.7.15
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
@@ -42,7 +40,8 @@ Requires: python3-jsonschema
 # plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
 # 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
-Requires: plugin-hostd >= 0.20.8
+# 0.21.0: plugin-hostd-probe describe, the one describe (this package keeps no copy)
+Requires: plugin-hostd >= 0.21.0
 # the probe domain (the words of a probe's outcomes and signals, contract.d/probe/ there) that the judging code reads at run
 # time (src/probe-domain.ts); it is plugin-hostd-protocol's, and 0.8.0 is the release it lands in; a floor only
 Requires: plugin-hostd-protocol-contract >= 0.8.0
