@@ -16,14 +16,14 @@ const ACTION = readFileSync(join(ROOT, ".github/actions/install-plugin-hostd/act
 
 describe("the packages name plugin-hostd-protocol-contract at the floor of the probe domain", () => {
   it("the spec requires it", () => {
-    expect(SPEC).toMatch(/^Requires: plugin-hostd-protocol-contract >= 0\.7\.0$/m);
+    expect(SPEC).toMatch(/^Requires: plugin-hostd-protocol-contract >= 0\.8\.0$/m);
   });
   it("debian/control depends on it at the same floor", () => {
-    expect(CONTROL).toMatch(/plugin-hostd-protocol-contract \(>= 0\.7\.0~\)/);
+    expect(CONTROL).toMatch(/plugin-hostd-protocol-contract \(>= 0\.8\.0~\)/);
   });
   it("the CI install checks the floor on what it installed", () => {
     expect(ACTION).toContain("dpkg-query -W -f='${Version}' plugin-hostd-protocol-contract");
-    expect(ACTION).toContain("0.7.0");
+    expect(ACTION).toContain("0.8.0");
   });
   it("it is a floor only: no relation of another kind names the package", () => {
     for (const text of [SPEC, CONTROL]) expect(text).not.toMatch(/(Breaks|Replaces|Conflicts|Provides):[^\n]*plugin-hostd-protocol-contract/);
