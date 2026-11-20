@@ -76,6 +76,12 @@ function writePins(path, file) {
   process.stderr.write(`plugin-qualify: ${file.written.length} pin${file.written.length === 1 ? "" : "s"} written to ${path}\n`);
 }
 
+// the one-line answer a version probe reads, as plugin-hostd, omx-clap-host and mod-host give it (#72)
+if (process.argv[2] === "--version") {
+  process.stdout.write(`plugin-qualify version: ${JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version}\n`);
+  process.exit(0);
+}
+
 if (process.argv[2] === "compare") {
   const { compareMain } = await import("../tools/compare-run.mjs");
   process.exit(await compareMain(process.argv.slice(3)));

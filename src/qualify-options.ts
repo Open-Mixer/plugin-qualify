@@ -61,4 +61,5 @@ export const QUALIFY_OPTIONS: readonly QualifyOption[] = [
       "write one pin per qualified plugin to this file, with its verdict, for plugin-hostd's pin_file (the verdict is the first host profile's)",
   },
   { flag: "--help", describe: "this text" },
+  { flag: "--version", describe: "print `plugin-qualify version: <x.y.z>`, as plugin-hostd and the other tools do, and exit" },
 ];
