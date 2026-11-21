@@ -19,7 +19,7 @@
 #   make -C native asan      build/asan/lv2_measure, the measurer under AddressSanitizer, for the tests'
 #                            leak check; never installed, and not in `all` (Fedora's gcc lacks libasan)
 #   make -C native deps      fetch the CLAP, plugin-db and plugin-hostd headers at the pinned tags into deps/, the
-#                            omx-contract header the LV2 measurer reads its rates from, and omx-clap-core's
+#                            omx-contract header the LV2 measurer reads its rates from, and omx-clap's
 #                            LV2 feature provider (libomx-clap-lv2), built and installed into deps/
 #   make -C native install DESTDIR=... LIBEXECDIR=...   the prober, the measurer, the interposer and the LV2 host
 #                            probe, for a package
@@ -28,7 +28,7 @@
 # `pkg-config plugin-db` (plugin-db-devel) and the protocol's from `pkg-config plugin-hostd-protocol`
 # (plugin-hostd-protocol-devel), else deps/plugin-db and deps/plugin-hostd-protocol. omx-contract's limits
 # header from `pkg-config omx-contract` (omx-contract-devel, libomx-contract-dev), else deps/omx-contract. lilv and the LV2
-# headers from `pkg-config lilv-0` (lilv-devel, liblilv-dev). The LV2 measurer's host features are omx-clap-core's
+# headers from `pkg-config lilv-0` (lilv-devel, liblilv-dev). The LV2 measurer's host features are omx-clap's
 # provider, `pkg-config omx-clap-lv2` (omx-clap-lv2-devel, libomx-clap-lv2-dev), else deps/omx-clap-lv2.
 
 CC ?= cc
@@ -44,10 +44,10 @@ PLUGIN_DB_REF := v0.4.4
 # 3.9.1 was the first with <omxcontract/omx_json_write.h>, the one JSON string writer every tool here spells its
 # literals through).
 OMX_CONTRACT_VERSION := 3.20.0
-# the omx-clap-core whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
+# the omx-clap whose LV2 feature provider `make deps` builds where no omx-clap-lv2-devel is installed: the
 # packages' floor
 OMX_CLAP_CORE_VERSION := 0.32.5
-# the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap-core's provider read: the packages' floor
+# the omx-dsp headers the measurers (omx_lin_to_db_d) and omx-clap's provider read: the packages' floor
 OMX_DSP_VERSION := 0.32.1
 
 ifeq ($(shell $(PKG_CONFIG) --exists clap && echo true),true)
@@ -95,9 +95,6 @@ LILV_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lilv-0)
 LILV_LIBS ?= $(shell $(PKG_CONFIG) --libs lilv-0)
 LV2_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags lv2 2>/dev/null)
 
-# describe's JSON reader and writer (plugin-json.c): cJSON, moved from plugin-hostd with it
-CJSON_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags libcjson)
-CJSON_LIBS ?= $(shell $(PKG_CONFIG) --libs libcjson)
 
 LIBEXECDIR ?= /usr/libexec/plugin-qualify
 
@@ -105,7 +102,7 @@ CFLAGS ?= -O2 -g
 CFLAGS += -std=gnu11 -Wall -Wextra -Werror=implicit-function-declaration -Werror=return-type
 
 
-all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/describe_test $(BUILD)/rt_interpose_test $(BUILD)/no_task_dir.so $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap $(BUILD)/fixtures/worker-allocates.clap $(BUILD)/fixtures/worker-idle.clap \
+all: $(BUILD)/clap-qualify $(BUILD)/lv2_measure $(BUILD)/lv2_host_probe $(BUILD)/isolated_signal $(BUILD)/jack_peak $(BUILD)/rt_watch.so $(BUILD)/jack_compare $(BUILD)/lv2_measure_options_test $(BUILD)/lv2_measure_path_test $(BUILD)/rt_interpose_test $(BUILD)/no_task_dir.so $(BUILD)/rt_interpose.so $(BUILD)/fixtures/rt-safe.clap $(BUILD)/fixtures/rt-unsafe.clap $(BUILD)/fixtures/worker-allocates.clap $(BUILD)/fixtures/worker-idle.clap \
 	$(BUILD)/fixtures/controls.clap $(BUILD)/fixtures/params-2048.clap $(BUILD)/fixtures/params-2049.clap \
 	$(BUILD)/fixtures/info-fails.clap $(BUILD)/fixtures/leaky-delay.clap $(BUILD)/fixtures/undeclared-delay.clap \
 	$(BUILD)/fixtures-faulty/crashes-at-load.clap $(BUILD)/fixtures-faulty/hangs.clap $(BUILD)/fixtures-faulty/rate-pinned.clap \
@@ -162,14 +159,6 @@ $(BUILD)/no_task_dir.so: fixtures/no-task-dir.c | $(BUILD)
 # the search path's oracle, never installed
 $(BUILD)/lv2_measure_path_test: lv2_measure_path.test.c lv2-measure-path.c lv2-measure-path.h | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror -I. $(LDFLAGS) -o $@ lv2_measure_path.test.c lv2-measure-path.c
-
-DESCRIBE_SRC := describe.c plugin-json.c transforms.c
-DESCRIBE_HDR := describe.h plugin-json.h transforms.h
-
-# describe's oracle, never installed: the format tables (../data/formats/*.json) against the field dump
-# fixtures (fixtures/fields/), run with the working directory at native/
-$(BUILD)/describe_test: describe.test.c $(DESCRIBE_SRC) $(DESCRIBE_HDR) | $(BUILD)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -Werror $(OMX_CONTRACT_CFLAGS) $(CJSON_CFLAGS) -I. $(LDFLAGS) -o $@ describe.test.c $(DESCRIBE_SRC) $(CJSON_LIBS) -lm
 
 $(BUILD)/isolated_signal: isolated-signal.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -o $@ $< -ldl -lm

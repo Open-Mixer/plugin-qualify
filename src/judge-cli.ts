@@ -6,13 +6,13 @@
  * record beside a byte copy of each. `bin/plugin-qualify.mjs` only reads argv and prints.
  */
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
 import type { HostProfile } from "./host-profiles.js";
 import { judgeProbeOutput, judgmentVerdicts } from "./probe-judge.js";
-import { readProbeOutput } from "./probe-output.js";
-import { writeQualification } from "./qualification-record.js";
+import { readProbeOutput, sha256Hex } from "./probe-output.js";
+import { buildQualificationRecord, probeCopyFileName, storedForm } from "./qualification-record.js";
+import { StoreError, type QualificationStore, type ShadowKey } from "./qualification-store.js";
+import { baseSteps } from "./qualify-isolated.js";
 import type { QualifyVerdict } from "./qualify-cli.js";
 import { EXIT_CODE, OUTPUT_FORMATS, type OutputFormat } from "./qualify-options.js";
 import { OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
@@ -22,19 +22,23 @@ import { TEXT_CODE, type TextRef } from "./text-codes.js";
 export interface JudgeArgs {
   readonly files: readonly string[];
   readonly hostProfiles: readonly string[];
-  readonly qualificationDir?: string;
+  /** `--system`: the system scope's layer of the qualification store, else the user's. */
+  readonly system: boolean;
+  /** The host class the records are put under; the machine's own when absent. */
+  readonly hostClass?: string;
   readonly format: OutputFormat;
   readonly help: boolean;
 }
 
 export type ParseJudgeResult = { ok: true; args: JudgeArgs } | { ok: false; error: TextRef };
 
-const VALUE_FLAGS = ["--host-profile", "--qualification-dir", "--format"];
+const VALUE_FLAGS = ["--host-profile", "--host-class", "--format"];
 
 export function parseJudgeArgs(argv: readonly string[]): ParseJudgeResult {
   const files: string[] = [];
   const specs: string[] = [];
-  let dir: string | undefined;
+  let hostClass: string | undefined;
+  let system = false;
   let format: string = "text";
   let help = false;
   for (let i = 0; i < argv.length; i++) {
@@ -47,11 +51,15 @@ export function parseJudgeArgs(argv: readonly string[]): ParseJudgeResult {
       help = true;
       continue;
     }
+    if (a === "--system") {
+      system = true;
+      continue;
+    }
     if (!VALUE_FLAGS.includes(a)) return { ok: false, error: { code: TEXT_CODE.cliUnknownOption, args: { option: a } } };
     const v = argv[++i];
     if (v === undefined || v.startsWith("--")) return { ok: false, error: { code: TEXT_CODE.cliNeedsValue, args: { option: a } } };
     if (a === "--host-profile") specs.push(...v.split(",").map((t) => t.trim()).filter((t) => t !== ""));
-    else if (a === "--qualification-dir") dir = v;
+    else if (a === "--host-class") hostClass = v;
     else format = v;
   }
   if (!(OUTPUT_FORMATS as readonly string[]).includes(format)) return { ok: false, error: { code: TEXT_CODE.cliFormatOneOf, args: { formats: OUTPUT_FORMATS.join(", ") } } };
@@ -61,7 +69,8 @@ export function parseJudgeArgs(argv: readonly string[]): ParseJudgeResult {
     args: {
       files,
       hostProfiles: [...new Set(specs.length > 0 ? specs : [OPENMIXER_CONSOLE_PROFILE.id])],
-      ...(dir === undefined ? {} : { qualificationDir: dir }),
+      system,
+      ...(hostClass === undefined ? {} : { hostClass }),
       format: format as OutputFormat,
       help,
     },
@@ -74,14 +83,14 @@ export function judgeHelpText(): string {
 
 function judgeHelpTextBody(): string {
   return [
-    "plugin-qualify judge — judge probe outputs and write the qualification records",
+    "plugin-qualify judge — judge probe outputs and put the qualification records in the store",
     "",
     "  plugin-qualify judge [options] <probe-output.json>...",
     "",
     "  --host-profile <file|id>      judge against this host; repeat or comma-separate for one verdict per profile",
     `                                (default: ${OPENMIXER_CONSOLE_PROFILE.id})`,
-    "  --qualification-dir <dir>     where the records and the copies of the probe outputs go",
-    "                                (default: $XDG_STATE_HOME/omx/qualification, else ~/.local/state/omx/qualification)",
+    "  --system                      the system scope's layer of the qualification store (default: the user's)",
+    "  --host-class <class>          the host class the records are put under (default: this machine's: rpi5, x86-64)",
     "  --format <json|text>          json = the records; text = plugin, verdict, deciding reason (default: text)",
     "",
     `exit ${EXIT_CODE.allQualified} all qualified / ${EXIT_CODE.someNotQualified} some not / ${EXIT_CODE.couldNotMeasure} something could not be read or judged`,
@@ -89,27 +98,23 @@ function judgeHelpTextBody(): string {
   ].join("\n");
 }
 
-/** The qualification directory when none is named: the state directory of owner spec section 6.9, per user. */
-export function defaultQualificationDir(env: Readonly<Record<string, string | undefined>>, home: string = homedir()): string {
-  const state = env["XDG_STATE_HOME"];
-  return join(state !== undefined && state !== "" ? state : join(home, ".local", "state"), "omx", "qualification");
-}
 
 export interface JudgeFilesResult {
   readonly verdicts: readonly QualifyVerdict[];
-  readonly records: readonly { readonly recordPath: string; readonly probePath: string }[];
+  /** The shadow key of each record put in the store. */
+  readonly records: readonly ShadowKey[];
   /** Each file that was refused or could not be read, with the code or the reason. */
   readonly failures: readonly { readonly file: string; readonly problem: string }[];
 }
 
-/** Judge each file under every profile and write its record; a file that does not read is a failure, and the others go on. */
+/** Judge each file under every profile and put its record in the store; a file that does not read is a failure, and the others go on. */
 export function judgeFiles(
   files: readonly string[],
-  options: { profiles: readonly HostProfile[]; dir: string; read?: (path: string) => Buffer },
+  options: { profiles: readonly HostProfile[]; store: QualificationStore; hostClass: string; read?: (path: string) => Buffer },
 ): JudgeFilesResult {
   const read = options.read ?? ((p: string) => readFileSync(p));
   const verdicts: QualifyVerdict[] = [];
-  const records: { recordPath: string; probePath: string }[] = [];
+  const records: ShadowKey[] = [];
   const failures: { file: string; problem: string }[] = [];
   for (const file of files) {
     let bytes: Buffer;
@@ -125,8 +130,18 @@ export function judgeFiles(
       continue;
     }
     const judgment = judgeProbeOutput(r.output, options.profiles);
-    const w = writeQualification(options.dir, bytes, judgment);
-    records.push({ recordPath: w.recordPath, probePath: w.probePath });
+    // the probe output is evidence the record names (file name, SHA-256, size); no copy of it is kept
+    const made = buildQualificationRecord(judgment, { file: probeCopyFileName(r.output), sha256: sha256Hex(bytes), bytes: bytes.length });
+    const record = storedForm({ ...made, run: { id: r.output.run.id, steps: baseSteps(made) } });
+    const key: ShadowKey = { sha256: record.binary.sha256, format: record.plugin.format, uri: record.plugin.id, offer: r.output.offer.id, hostClass: options.hostClass };
+    try {
+      options.store.put(key, record);
+    } catch (e) {
+      if (!(e instanceof StoreError)) throw e;
+      failures.push({ file, problem: e.message });
+      continue;
+    }
+    records.push(key);
     verdicts.push(...judgmentVerdicts(judgment));
   }
   return { verdicts, records, failures };

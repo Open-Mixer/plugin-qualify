@@ -31,6 +31,7 @@ import type {
 } from "./format.js";
 import { readAbi, readIntegrity, readLifecycle, readNoteSweep, readSoakAtRate, readThreads } from "./format.js";
 import { booleanValue, finiteNumber, isRecord, mapArray, nonEmptyString, optional, positiveNumber } from "./guards.js";
+import { probeSignal } from "../probe-domain.js";
 
 /** The sweep's three passes, each a list of parsed JSONL lines. Only `measurements` is required. */
 export interface SweepPasses {
@@ -42,16 +43,18 @@ export interface SweepPasses {
 /** A process exit status that IS a signal death, as the signal's name. Anything else is not a
  *  crash this reader can name — a timeout (124) or an early refusal is the run failing, not the
  *  plugin dying, and it is not written as a crash. */
+/** (the exit status maps to the title of the signal's word in the probe domain) */
 const SIGNAL_EXITS: Readonly<Record<number, string>> = {
-  134: "SIGABRT",
-  135: "SIGBUS",
-  139: "SIGSEGV",
+  134: "sigabrt",
+  135: "sigbus",
+  139: "sigsegv",
 };
 
 function crashOf(row: Record<string, unknown>): CrashReading | undefined {
   if (row.crashed !== true) return undefined;
   const exit = finiteNumber(row.exit);
-  const signal = exit === undefined ? undefined : SIGNAL_EXITS[exit];
+  const title = exit === undefined ? undefined : SIGNAL_EXITS[exit];
+  const signal = title === undefined ? undefined : probeSignal(title);
   return signal === undefined ? undefined : { signal };
 }
 

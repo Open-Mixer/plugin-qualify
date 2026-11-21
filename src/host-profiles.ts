@@ -25,7 +25,7 @@ import type { HostProfile } from "./measurement/format.js";
  * which builds one provider per URI and refuses a URI it cannot provide; there is no C copy (the
  * console's native test reads this export).
  *
- * Equal to omx-clap-core's `LV2_CORE_PROVIDED_INIT` (`lv2/core/lv2_core.h`), same URIs in the same
+ * Equal to omx-clap's `LV2_CORE_PROVIDED_INIT` (`lv2/core/lv2_core.h`), same URIs in the same
  * order: the original seven, then the three rtmempool URIs (the header's `LV2_RTSAFE_MEMORY_POOL__Pool`,
  * the `#Pool` spelling some TTLs require, and the deprecated v1 URI), the three state-path features,
  * then uri-map and event (omx-clap-core #94).
@@ -52,7 +52,7 @@ export const OMX_INPROCESS_FEATURES: readonly string[] = [
  * The CLAP host object's extensions — what the console's control-thread host provides to every
  * instance it hosts (CLAP hosting spec §5), and ALL the qualifier offers, so a plugin that needs
  * more fails `init` headless in qualification and reads `hosting.clap.headless-failed` rather
- * than on the desk. The list's home is the CLAP library — libomx-clap-core's own
+ * than on the desk. The list's home is the CLAP library — libomx-clap's own
  * `clap_host_extensions.h`, what its host object offers — and this is its mirror, held equal to the
  * header at the pinned omx-clap-host (by the console's conformance test), so the verdict never
  * promises more or less than the host provides. Nothing else: no `gui`.
@@ -78,7 +78,7 @@ export const OMX_CLAP_HOST_EXTENSIONS: readonly string[] = [
 ];
 
 /**
- * The three host extensions omx-clap-host turns on beyond the library's own (omx-clap-core
+ * The three host extensions omx-clap-host turns on beyond the library's own (omx-clap
  * `src/effects.c` `configure_core`: `preset_load`, `track_info`, `remote_controls`), by the ids
  * its host object answers (`src/clap_host.c`); the prober offers them with `--offer`.
  */

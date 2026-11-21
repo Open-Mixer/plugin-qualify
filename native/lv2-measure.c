@@ -101,7 +101,7 @@
  * A plugin measured under a host that offers more than ours does would earn a
  * verdict our RT thread cannot honour; measured under one that offers less, a
  * perfectly good plugin fails to instantiate and reads as broken. So the providers
- * are the ones the engine hosts LV2 through: omx-clap-core's feature provider
+ * are the ones the engine hosts LV2 through: omx-clap's feature provider
  * (<omx-clap-lv2/omx_lv2_features.h>, host-backend-one-contract §3) — one URI table, the
  * options at the measured rate and block, a silent log — under the feature options of
  * lv2-measure-options.h, which a run's flags change and its record names. The worker's
@@ -419,7 +419,7 @@ static void atom_reset(const struct host *h, uint8_t *buf, uint32_t port) {
   }
 }
 
-/* the provider's archive carries the guarded plugin call (omx-clap-core 0.26.2): its own copy's names */
+/* the provider's archive carries the guarded plugin call (omx-clap 0.26.2): its own copy's names */
 #define OMX_ABI_LV2
 #include <omx-clap-lv2/abi_guard.h>
 
@@ -1383,7 +1383,7 @@ static void emit_cost(double rate, const struct cost_at *C, uint32_t block, int 
  * refused, OMX_RT_OOM_EXIT_STATUS) a child that reaches it ends that pass alone: the record carries memory-bound for
  * it and the run goes on. A child that dies any other way takes this process with it, by the same signal or exit
  * status, as a pass in this process always did. */
-/* the reason a memory-bound pass carries is a word of the qualification domain (contract.d/qualification, item
+/* the reason a memory-bound pass carries is a word of the qualification domain (plugin-hostd's contract.d/qualification, item
  * QUALIFICATION_MEASUREMENT_UNMEASURED_REASONS). C only writes it into the record and never switches on it, so the domain
  * marks no item for a codes header and this file spells the word; src/contract-vocabulary-conformance.test.ts holds it to
  * the document's. */

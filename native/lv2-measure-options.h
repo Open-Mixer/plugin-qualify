@@ -3,7 +3,7 @@
 /*
  * lv2-measure-options.h — the feature options the LV2 measurer runs under (lv2-measure.c).
  *
- * The features themselves are omx-clap-core's provider (<omx-clap-lv2/omx_lv2_features.h>, linked from
+ * The features themselves are omx-clap's provider (<omx-clap-lv2/omx_lv2_features.h>, linked from
  * libomx-clap-lv2): the one URI table, options:options, the buf-size declarations, the worker's slot
  * and the log, the same code the console's LV2 host builds every instance's features with. This unit
  * holds what is the measurer's own: its defaults, the run flags that change them, and the object the

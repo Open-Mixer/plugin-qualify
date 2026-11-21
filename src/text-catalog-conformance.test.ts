@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 
-import { OUT as GENERATED_TEXT_CODES, SOURCE, textCodesFile } from "../tools/gen-text-codes.mjs";
+import { OUT as GENERATED_TEXT_CODES, textCodesFile } from "../tools/gen-text-codes.mjs";
 import { catalogsDir, type CatalogEntry, declaredCodes, loadMessages, OWNER, sourceOf, textOf } from "./text-catalog.js";
 import { TEXT_CODE, TEXT_CODE_ARGS } from "./text-codes.js";
 
@@ -36,7 +36,7 @@ const sentenceIn = (entry: CatalogEntry | undefined): string | undefined => (typ
 
 describe("every code a module names is declared, with one source sentence naming exactly its args", () => {
   test("the generated key map is schema/codes.json's", () => {
-    const codes = (JSON.parse(readFileSync(SOURCE, "utf8")) as { codes: Record<string, { code: string; args?: string[] }> }).codes;
+    const codes = (JSON.parse(readFileSync(join(PKG, "schema/codes.json"), "utf8")) as { codes: Record<string, { code: string; args?: string[] }> }).codes;
     expect(readFileSync(GENERATED_TEXT_CODES, "utf8"), "stale: run node tools/gen-text-codes.mjs --write").toBe(textCodesFile(codes));
   });
 

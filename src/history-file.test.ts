@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
-import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { HISTORY_HEADER, HISTORY_KEY_WORDS, findHistory, historyClasses, readHistory } from "./history-file.js";
+import { initHistoryDomain } from "./history-domain.js";
+import { HISTORY_HEADER, historyKeyWords, findHistory, historyClasses, readHistory } from "./history-file.js";
 
 const D1 = "a".repeat(64);
 const D2 = "b".repeat(64);
@@ -120,16 +120,35 @@ describe("readHistory, the header", () => {
   });
 });
 
-describe("the keys this reader knows are plugin-hostd's", () => {
-  it("are, in order, the words of PLUGIN_HOSTD_HISTORY_KEYS when plugin-hostd's data/history.json is named", (ctx) => {
-    const path = process.env["OMX_HISTORY_JSON"];
-    if (path === undefined || !existsSync(path)) ctx.skip("OMX_HISTORY_JSON names no plugin-hostd data/history.json");
-    const doc = JSON.parse(readFileSync(path!, "utf8")) as { PLUGIN_HOSTD_HISTORY_KEYS: { words: Record<string, { word: string }> } };
-    expect(HISTORY_KEY_WORDS).toEqual(Object.values(doc.PLUGIN_HOSTD_HISTORY_KEYS.words).map((w) => w.word));
+/** The words of plugin-hostd's history domain, frozen from its data/history.json 0.20.8 (the 15 keys of the daemon's record, in order). */
+const GOLDEN_WORDS = [
+  "first", "last", "windows_solo", "windows_grouped", "cpu_p95_solo", "cpu_max_solo", "pss_mb_solo", "xrun_windows_solo",
+  "xrun_windows_grouped", "crashes_solo", "crashes_grouped", "restarts_grouped", "quarantines", "last_crash", "last_crash_grouped",
+];
+
+describe("the keys this reader knows are the words of plugin-hostd's history domain", () => {
+  it("are, in order, the 15 golden words, read from the installed domain (no skip)", () => {
+    expect(historyKeyWords()).toEqual(GOLDEN_WORDS);
   });
 
-  it("are fifteen, the daemon's count", () => {
-    expect(HISTORY_KEY_WORDS).toHaveLength(15);
-    expect(new Set(HISTORY_KEY_WORDS).size).toBe(15);
+  it("(c) a domain without a word refuses by name, and a word the domain adds stays an unknown key", () => {
+    const domain = (drop?: string, add?: { word: string; title: string }) => ({
+      words: () => [...GOLDEN_TITLES.filter((t) => t !== drop).map((title, i) => ({ title, word: GOLDEN_WORDS[GOLDEN_TITLES.indexOf(title)] ?? `w${i}` })), ...(add ? [add] : [])],
+    });
+    try {
+      initHistoryDomain(domain("lastCrash"));
+      expect(() => historyKeyWords()).toThrow(/HISTORY_KEYS: has no word titled lastCrash/);
+      initHistoryDomain(domain(undefined, { title: "newKey", word: "new_key" }));
+      const r = readHistory([HISTORY_HEADER, `history urn:x ${D1} ${CLASS} windows_solo=4 new_key=7`, ""].join("\n"));
+      expect(r.ok && r.records[0]?.windowsSolo).toBe(4);
+      expect(r.ok && r.records[0]?.unknownKeys).toEqual({ new_key: "7" });
+    } finally {
+      initHistoryDomain(undefined);
+    }
   });
 });
+
+const GOLDEN_TITLES = [
+  "first", "last", "windowsSolo", "windowsGrouped", "cpuP95Solo", "cpuMaxSolo", "pssMbSolo", "xrunWindowsSolo", "xrunWindowsGrouped",
+  "crashesSolo", "crashesGrouped", "restartsGrouped", "quarantines", "lastCrash", "lastCrashGrouped",
+];

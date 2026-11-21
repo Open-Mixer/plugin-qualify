@@ -14,9 +14,9 @@
  *
  * One run that ended well and needs nothing added is kept as the runner wrote it, byte for byte.
  */
-import { isOutOfMemory, MEMORY_CGROUP_MECHANISM, outOfMemory, PROBE_MEMORY_LIMIT, probeOom, type MemoryBound } from "./memory-bound.js";
+import { isOutOfMemory, MEMORY_CGROUP_MECHANISM, outOfMemory, probeMemoryLimit, probeOom, type MemoryBound } from "./memory-bound.js";
 import { cellKey, type RunnerInvocation } from "./measurement-grid.js";
-import { PROBE_OK, readProbeOutput, type ProbeOutput } from "./probe-output.js";
+import { probeOk, readProbeOutput, type ProbeOutput } from "./probe-output.js";
 
 /** One run of the runner, as it was read. */
 export interface ProbeRunPart {
@@ -37,7 +37,7 @@ type Json = Record<string, unknown>;
 export function mergeProbeRuns(parts: readonly ProbeRunPart[], bound: MemoryBound | undefined): { bytes: Buffer; output: ProbeOutput } {
   if (parts.length === 0) throw new ProbeMergeError("no run to merge");
   // the runner's own outcome when it says it (the kernel killed the child at memory.max), else what its exit means under the data limit
-  const outcomes = parts.map((p) => (p.output.run.outcome === PROBE_MEMORY_LIMIT ? PROBE_MEMORY_LIMIT : outOfMemory(p.output, bound) ? probeOom() : p.output.run.outcome));
+  const outcomes = parts.map((p) => (p.output.run.outcome === probeMemoryLimit() ? probeMemoryLimit() : outOfMemory(p.output, bound) ? probeOom() : p.output.run.outcome));
   const first = parts[0]!;
   for (const p of parts.slice(1)) {
     if (p.output.plugin.id !== first.output.plugin.id || p.output.binary.sha256 !== first.output.binary.sha256 || p.output.offer.id !== first.output.offer.id) {
@@ -47,7 +47,7 @@ export function mergeProbeRuns(parts: readonly ProbeRunPart[], bound: MemoryBoun
     }
   }
   const missingCell = (p: ProbeRunPart): boolean => p.invocation.cells.some((c) => !p.output.grid.some((g) => g.rate === c.rate && g.quantum === c.quantum));
-  if (parts.length === 1 && outcomes[0] === first.output.run.outcome && (outcomes[0] === PROBE_OK || !missingCell(first))) {
+  if (parts.length === 1 && outcomes[0] === first.output.run.outcome && (outcomes[0] === probeOk() || !missingCell(first))) {
     return { bytes: first.bytes, output: first.output };
   }
 
@@ -63,11 +63,11 @@ export function mergeProbeRuns(parts: readonly ProbeRunPart[], bound: MemoryBoun
       seen.add(key);
       grid.push(point);
     }
-    if (outcomes[i] !== PROBE_OK) {
+    if (outcomes[i] !== probeOk()) {
       for (const c of p.invocation.cells) {
         if (seen.has(cellKey(c))) continue;
         seen.add(cellKey(c));
-        grid.push({ rate: c.rate, quantum: c.quantum, outcome: outcomes[i], ...(isOutOfMemory(outcomes[i]!) && bound !== undefined ? { memoryLimit: { bytes: bound.bytes, mechanism: outcomes[i] === PROBE_MEMORY_LIMIT ? MEMORY_CGROUP_MECHANISM : bound.mechanism } } : {}) });
+        grid.push({ rate: c.rate, quantum: c.quantum, outcome: outcomes[i], ...(isOutOfMemory(outcomes[i]!) && bound !== undefined ? { memoryLimit: { bytes: bound.bytes, mechanism: outcomes[i] === probeMemoryLimit() ? MEMORY_CGROUP_MECHANISM : bound.mechanism } } : {}) });
       }
     }
     steps.push(...((docs[i]!["steps"] as unknown[] | undefined) ?? []));
@@ -77,8 +77,8 @@ export function mergeProbeRuns(parts: readonly ProbeRunPart[], bound: MemoryBoun
   merged["run"] = {
     ...run,
     elapsedMs: parts.reduce((sum, p) => sum + p.output.run.elapsedMs, 0),
-    complete: parts.every((p, i) => p.output.run.complete && outcomes[i] === PROBE_OK),
-    outcome: judged.length === 0 ? outcomes[0]! : (judged.find((o) => o !== PROBE_OK) ?? PROBE_OK),
+    complete: parts.every((p, i) => p.output.run.complete && outcomes[i] === probeOk()),
+    outcome: judged.length === 0 ? outcomes[0]! : (judged.find((o) => o !== probeOk()) ?? probeOk()),
     parts: parts.map((p, i) => ({ id: p.output.run.id, outcome: outcomes[i], rates: p.invocation.rates, quantum: p.invocation.quantum, elapsedMs: p.output.run.elapsedMs })),
   };
   merged["steps"] = steps;

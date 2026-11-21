@@ -995,6 +995,22 @@
         "en": "--layout must be <scheme>:<sha256>"
       },
       "args": []
+    },
+    "judgedTakesShadowKey": {
+      "code": "qualify.judged.takes-shadow-key",
+      "text": {
+        "en": "judged-layer takes a shadow key, not a file: {file}"
+      },
+      "args": [
+        "file"
+      ]
+    },
+    "judgedLayerOneOf": {
+      "code": "qualify.judged.layer-one-of",
+      "text": {
+        "en": "--layer must be user or base"
+      },
+      "args": []
     }
   }
 }

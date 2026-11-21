@@ -119,6 +119,8 @@
     "qualify.search-path.no-key": { "text": "plugin-hostd --search-path não imprimiu nenhuma {key} com sua fonte", "by": "machine", "model": "draft-prose", "source": "6c658560b79f176568fb3d3ec8fe4aa4eb1b51e4c373781814aecd4412a232c0" },
     "qualify.search-path.unsupported": { "text": "este plugin-hostd não tem --search-path (plugin-hostd 0.20.3 ou posterior nomeia os diretórios que ele procura)", "by": "machine", "model": "draft-prose", "source": "ec35ca778f5eb6e778fc9d74ea0ca84ae938e9abfb187c4b7af81b22ae115fb0" },
     "qualify.sync.no-document": { "text": "a medição não escreveu nenhum documento", "by": "machine", "model": "draft-prose", "source": "67ac6e7b5752bb3a72bf1f35531bf89ede4d9f469a603d3ee2b5951962490afb" },
-    "qualify.sync.no-plugin-listed": { "text": "nenhum plugin foi listado", "by": "machine", "model": "draft-prose", "source": "e636f943096dc6a8ff2f65dfa00b0bf7c61f2516a80c9318af133997ca620167" }
+    "qualify.sync.no-plugin-listed": { "text": "nenhum plugin foi listado", "by": "machine", "model": "draft-prose", "source": "e636f943096dc6a8ff2f65dfa00b0bf7c61f2516a80c9318af133997ca620167" },
+    "qualify.judged.layer-one-of": { "text": "--layer deve ser usuário ou base", "by": "machine", "model": "draft-prose", "source": "dd38974c96abcbd764368ff863432bbb05da77255af3dd6b00d24247b9abc41b" },
+    "qualify.judged.takes-shadow-key": { "text": "takes julgado usa uma chave sombra, não um arquivo: {file}", "by": "machine", "model": "draft-prose", "source": "402ffede41db9177898c4273c9334086571f7ec0c8ba1e9351c223d1ef6c9490" }
   }
 }

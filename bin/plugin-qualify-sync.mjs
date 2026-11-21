@@ -57,7 +57,7 @@ try {
   if (summary !== undefined) {
     process.stdout.write(`${summaryLine(summary)}\n`);
     // the records counted per plugin over its offers: a CLAP plugin has a record per offer
-    process.stdout.write(`${pluginCountsLine(pluginCounts(s.qualificationDir))}\n`);
+    process.stdout.write(`${pluginCountsLine(pluginCounts(new QualificationStore(s.system ? "system" : "user")))}\n`);
     log(`pins in ${s.pinFile}${summary.sent ? `, ${String(summary.sent)} sent to plugin-hostd` : ""}`);
     // every plugin left unmeasured by one reason of the machine: the run failed, and the unit says so (#192)
     if (summary.machineFailure !== undefined) process.exit(1);

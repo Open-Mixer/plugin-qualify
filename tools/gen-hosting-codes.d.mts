@@ -4,5 +4,5 @@
 export const OUT: string;
 /** The generated module's text for a flattened `key: code` map. */
 export function hostingCodesFile(flat: Readonly<Record<string, string>>): string;
-/** The generated module's text from the omx-clap-core modules in `dir`. */
+/** The generated module's text from the omx-clap modules in `dir`. */
 export function hostingCodesFileFrom(dir: string): Promise<string>;

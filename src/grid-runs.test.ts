@@ -18,7 +18,7 @@ import { HOSTING_CODE } from "./hosting-codes.js";
 import { HOST_PROFILES, JALV_PROFILE, MOD_HOST_PROFILE, OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import type { AdmissionRuns } from "./host-admission.js";
 import { GRID_FULL, GRID_HOSTS, cellKey, gridCells, hostCells } from "./measurement-grid.js";
-import { MEMORY_BOUND_MECHANISM, MEMORY_CGROUP_MECHANISM, PROBE_MEMORY_LIMIT, probeOom, memoryBoundOf, outOfMemory, parseMemoryLimit, defaultMemoryLimit } from "./memory-bound.js";
+import { MEMORY_BOUND_MECHANISM, MEMORY_CGROUP_MECHANISM, probeOom, memoryBoundOf, outOfMemory, parseMemoryLimit, defaultMemoryLimit } from "./memory-bound.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { mergeProbeRuns } from "./probe-merge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
@@ -356,10 +356,10 @@ describe("live: the real runner measures the full grid, an LV2 plugin like a CLA
     expect(at("192000/128")).toMatchObject({
       rate: 192000,
       quantum: 128,
-      outcome: kernel ? PROBE_MEMORY_LIMIT : probeOom(),
+      outcome: kernel ? "probe.memory-limit" : probeOom(),
       memoryLimit: { bytes: bound.bytes, mechanism: kernel ? MEMORY_CGROUP_MECHANISM : MEMORY_BOUND_MECHANISM },
     });
     const steps = run!.judgment.output.steps;
-    expect(kernel ? steps.some((s) => s.outcome === PROBE_MEMORY_LIMIT) : steps.some((s) => s.exitStatus === MEMORY_BOUND_EXIT_STATUS)).toBe(true);
+    expect(kernel ? steps.some((s) => s.outcome === "probe.memory-limit") : steps.some((s) => s.exitStatus === MEMORY_BOUND_EXIT_STATUS)).toBe(true);
   });
 });

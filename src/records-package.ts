@@ -4,8 +4,9 @@
  * `plugin-qualify-records-package`: the Debian package of a device's qualification records, so other devices of the
  * machine class install them as the distributed layer instead of measuring the same plugin set again.
  *
- * A record set is per machine class, rate and quantum (#317). In: the qualification directories of a run, one per
- * cell it was measured at, as plugin-qualify-sync leaves them, or the run's root holding `b<rate>-<quantum>/qualification`.
+ * A record set is per machine class, rate and quantum (#317). In: directories of record documents, each record with the
+ * probe output it judged, as a measuring run writes them (`plugin-qualify --out`), one per cell it was measured at, or
+ * the run's root holding `b<rate>-<quantum>/qualification`. The sync reads none of them: it reads the qualification store.
  * Out: one `plugin-db-qualification-<class>-<set>-<rate>-<quantum>_<version>_all.deb` per cell, a package of plugin-db's
  * qualification layer, installing every record of that cell and the probe output it judged under
  * `/usr/share/omx/qualification/<class>/<set>-<rate>-<quantum>/`, beside the set's `provenance.json`, which names the
@@ -28,7 +29,7 @@ import { withContractPathHelp } from "./qualification-domain.js";
 import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 export interface RecordsPackageArgs {
-  /** Qualification directories, or run roots holding `b<rate>-<quantum>/qualification`: one set per cell. */
+  /** Directories of record documents (`plugin-qualify --out`), or run roots holding `b<rate>-<quantum>/qualification`: one set per cell. */
   readonly sources: readonly string[];
   /** The cell of a lone directory whose name says none. */
   readonly cell?: GridCell;
@@ -57,9 +58,10 @@ function recordsPackageHelpBody(): string {
   return [
     "plugin-qualify-records-package: the Debian package of a device's qualification records, for the distributed layer",
     "",
-    "  plugin-qualify-records-package <qualification dir|run root>... --host-class <class> --set <set> --provenance <json> [options]",
+    "  plugin-qualify-records-package <records dir|run root>... --host-class <class> --set <set> --provenance <json> [options]",
     "",
-    "  one package per cell (rate and quantum): each qualification directory is a cell, named by its base",
+    "  one package per cell (rate and quantum): each records dir (record documents with their probe outputs, as",
+    "  plugin-qualify --out writes them) is a cell, named by its base",
     "  (<run>/b48000-512/qualification); a run root stands for every b<rate>-<quantum>/qualification under it",
     "",
     "  --host-class <class>     the machine class the records were measured on (rpi5): the directory they install in",

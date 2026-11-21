@@ -15,6 +15,7 @@ import { HISTORY_REASON } from "./history-adjust.js";
 import { PIN_VERDICTS } from "./pins-file.js";
 import { isOutOfMemory } from "./memory-bound.js";
 import { init } from "./qualification-domain.js";
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 import { ISOLATED_CODE } from "./qualify-isolated.js";
 import { POOL_CODE } from "./qualify-pool.js";
 import { noPrivateServerCode } from "./qualify-adapter-pass.js";
@@ -23,7 +24,7 @@ const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (rel: string) => readFileSync(join(PKG, rel), "utf8");
 type Word = { const: string; title: string; "x-code": number; "x-since"?: string };
 type Doc = { info: { version: string }; components: { schemas: Record<string, { "x-since"?: string; oneOf: Word[] }> } };
-const original = JSON.parse(read("contract.d/qualification/qualification.json")) as Doc;
+const original = JSON.parse(readFileSync(join(INSTALLED_CONTRACT_DIR, "qualification", "qualification.json"), "utf8")) as Doc;
 const clone = (): Doc => JSON.parse(JSON.stringify(original)) as Doc;
 const wordsOf = (doc: Doc, item: string): Word[] => doc.components.schemas[item]?.oneOf ?? [];
 const KINDS = "QUALIFICATION_ADAPTER_CODE_KINDS";
@@ -186,8 +187,9 @@ describe("QUALIFICATION_MEMORY_BOUND_OUTCOMES", () => {
     init(doc);
     expect(() => isOutOfMemory("probe.oom")).toThrow(new RegExp(OUTCOMES));
   });
-  it("leaves probe.memory-limit, plugin-hostd's word, in the source", () => {
-    expect(read("src/memory-bound.ts")).toContain('export const PROBE_MEMORY_LIMIT = "probe.memory-limit"');
+  it("reads probe.memory-limit, plugin-hostd's word, from the probe domain: it is no literal of the source", () => {
+    expect(read("src/memory-bound.ts")).toContain('probeOutcome("probeMemoryLimit")');
+    expect(read("src/memory-bound.ts")).not.toContain('"probe.memory-limit"');
   });
 });
 
@@ -216,7 +218,9 @@ describe("x-since names the version of the domain document that first carried th
       const want = V140.includes(item) ? "1.4.0" : V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
       expect(schema["x-since"], item).toBe(want);
     }
-    expect(Object.keys(original.components.schemas)).toHaveLength(17 + V120.length + V130.length + V140.length);
+    // plugin-hostd 0.21.0 ships the domain without QUALIFICATION_MACHINE_CLASSES, which nothing reads (ownership map rows 5 and 20): 16 created with it
+    expect(Object.keys(original.components.schemas)).toHaveLength(16 + V120.length + V130.length + V140.length);
+    expect(original.components.schemas.QUALIFICATION_MACHINE_CLASSES).toBeUndefined();
   });
   it("the domain is 1.4.0", () => {
     expect(original.info.version).toBe("1.4.0");
