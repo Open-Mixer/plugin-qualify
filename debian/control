@@ -13,7 +13,8 @@ Build-Depends: debhelper-compat (= 13),
                libplugin-hostd-protocol-dev (>= 0.5.9~),
                libomx-contract-dev (>= 3.20.2~),
                libomx-clap-lv2-dev (>= 0.34.0~),
-               libomxdsp-dev (>= 0.32.1~)
+               libomxdsp-dev (>= 0.34.0~),
+               omx-dsp-contract (>= 0.34.0~)
 Standards-Version: 4.6.2
 Homepage: https://github.com/Open-Mixer/plugin-qualify
 Rules-Requires-Root: no

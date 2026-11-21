@@ -24,7 +24,9 @@ BuildRequires: pkgconfig(plugin-db) >= 0.4.4
 BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.9
 BuildRequires: pkgconfig(omx-contract) >= 3.20.2
 BuildRequires: pkgconfig(omx-clap-lv2) >= 0.34.0
-BuildRequires: pkgconfig(omxdsp) >= 0.32.1
+BuildRequires: pkgconfig(omxdsp) >= 0.34.0
+# src/dsp-rates.generated.ts is rendered from omx-dsp's rates file (tools/gen-dsp-rates.mjs), which its contract package ships
+BuildRequires: omx-dsp-contract >= 0.34.0
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
