@@ -52,7 +52,7 @@ export async function hostingCodesFileFrom(dir) {
 function absent() {
   return (
     `omx-clap's TypeScript modules were not found in any of: ${clapTsDirCandidates().join(', ')}. ` +
-    'Install omx-clap (its modules in /usr/share/omx-clap/ts), set OMX_CLAP_TSDIR to its tsdir, or run make -C native deps.'
+    'Install omx-clap-libs (its modules in /usr/share/omx-clap/ts), set OMX_CLAP_TSDIR to its tsdir, or run make -C native deps.'
   );
 }
 
