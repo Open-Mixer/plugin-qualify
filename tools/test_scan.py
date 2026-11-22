@@ -270,7 +270,7 @@ class UnitsFromTheSheet(unittest.TestCase):
             self.assertIn("cent", raised.exception.problem)
 
     def test_omx_contracts_old_sheet_is_not_read(self):
-        """Putting the old read back (data/formats/lv2/units.json beside omx-contract's schema) finds nothing."""
+        """Putting the old read back (the LV2 units sheet beside omx-contract's schema, planted under data/formats) finds nothing."""
         with tempfile.TemporaryDirectory() as root:
             sheet = os.path.join(root, "data", "formats", "lv2", "units.json")
             os.makedirs(os.path.dirname(sheet))

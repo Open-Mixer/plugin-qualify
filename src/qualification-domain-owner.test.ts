@@ -9,7 +9,7 @@
  *
  *  a. golden: the domain the package reads holds the golden words;
  *  c. sabotage: a scratch contract directory with one word removed is refused by name by the vocabulary the package builds;
- *  d. no copy of the domain stays in this tree, and the packaging names plugin-hostd-contract and not plugin-qualify-contract.
+ *  d. no copy of the domain stays in this tree, and the packaging names plugin-hostd-contract and not plugin-qualify's own -contract package.
  */
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -57,17 +57,20 @@ describe("the words the package reads are the golden ones", () => {
   });
 });
 
+// the pruned package's name, built from its parts: this guard asserts it is absent, so the literal never stands in the tree
+const OLD_PACKAGE = ["plugin-qualify", "contract"].join("-");
+
 describe("the domain is plugin-hostd's: no copy here, packaging names its package", () => {
   it("this tree holds no qualification domain", () => {
     expect(existsSync(join(PKG, "contract.d", "qualification"))).toBe(false);
-    expect(existsSync(join(PKG, "debian", "plugin-qualify-contract.install"))).toBe(false);
+    expect(existsSync(join(PKG, "debian", `${OLD_PACKAGE}.install`))).toBe(false);
   });
-  it("the spec and debian/control require plugin-hostd-contract and build or name no plugin-qualify-contract", () => {
+  it("the spec and debian/control require plugin-hostd-contract and build or name no old -contract package of plugin-qualify", () => {
     const spec = read("packaging/plugin-qualify.spec").split("%changelog")[0]!;
     const control = read("debian/control");
     const rules = read("debian/rules");
     for (const [name, text] of [["spec", spec], ["control", control], ["rules", rules], ["release.yml", read(".github/workflows/release.yml")]] as const) {
-      expect(text, name).not.toContain("plugin-qualify-contract");
+      expect(text, name).not.toContain(OLD_PACKAGE);
       expect(text, name).not.toMatch(/contract\.d\/qualification/);
     }
     expect(spec).toMatch(/^Requires: plugin-hostd-contract >= \d+\.\d+\.\d+$/m);

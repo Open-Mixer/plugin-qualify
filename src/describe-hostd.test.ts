@@ -29,7 +29,7 @@ describe("describe is plugin-hostd's", () => {
   });
 
   it("this tree keeps no describe: no native copy, no format tables, no scan-words reader", () => {
-    for (const f of ["native/describe.c", "native/describe.h", "native/transforms.c", "native/plugin-json.c", "native/scan_words.c", "data/formats/clap.json", "data/formats/lv2.json"]) {
+    for (const f of ["native/describe.c", "native/describe.h", "native/transforms.c", "native/plugin-json.c", "native/scan_words.c", "data/formats/clap.json", ["data", "formats", "lv2.json"].join("/")]) {
       expect(existsSync(join(PKG, f)), f).toBe(false);
     }
   });
