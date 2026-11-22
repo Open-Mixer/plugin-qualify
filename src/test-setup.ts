@@ -25,8 +25,8 @@ const CONTRACT_DIR = vi.hoisted(() => {
   const os = process.getBuiltinModule("node:os");
   const dirs = [...(process.env.OMX_CONTRACT_PATH ?? "").split(":").filter((d) => d !== ""), "/usr/share/omx-contract/contract.d"];
   const dir = fs.mkdtempSync(`${os.tmpdir()}/qualify-contract-dir-`);
-  for (const domain of ["qualification", "probe", "history"]) {
-    const holder = dirs.find((d) => fs.existsSync(`${d}/${domain}/${domain}.json`));
+  for (const domain of ["qualification", "probe", "plugin-hostd/history"]) {
+    const holder = dirs.find((d) => fs.existsSync(`${d}/${domain}/${domain.split("/").pop()}.json`));
     if (holder !== undefined) fs.cpSync(`${holder}/${domain}`, `${dir}/${domain}`, { recursive: true });
   }
   process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));

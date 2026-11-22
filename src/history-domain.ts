@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The words of the running-history keys as this package reads them: plugin-hostd's `history` domain (contract.d/history/
- * history.json, shipped by plugin-hostd-contract), item HISTORY_KEYS, the key a record line spells (`windows_solo=400`).
+ * The words of the running-history keys as this package reads them: plugin-hostd's `plugin-hostd/history` domain
+ * (contract.d/plugin-hostd/history/history.json, shipped by plugin-hostd-contract), item PLUGIN_HOSTD_HISTORY_KEYS, the key a
+ * record line spells (`windows_solo=400`).
  * The domain gives each word a title (`windowsSolo`); this package keeps, per title, the field the value fills and how it is
  * written, which are the parser's own. A key is asked for by its title, and the call refuses by name when the domain is not at
  * hand or has no such word.
@@ -10,11 +11,11 @@
  * Free of any Node module: a Node program reads the installed domain, through `history-domain-node.ts`, at the first use.
  */
 
-/** The domain's name, its directory and its file's stem. */
-export const HISTORY_DOMAIN = "history";
+/** The domain's name and its directory; its file's stem is the last segment (`history`). */
+export const HISTORY_DOMAIN = "plugin-hostd/history";
 
 /** The item the keys are the words of. */
-export const HISTORY_KEYS_ITEM = "HISTORY_KEYS";
+export const HISTORY_KEYS_ITEM = "PLUGIN_HOSTD_HISTORY_KEYS";
 
 /** The lowest `info.version` of the domain this package works with. */
 export const HISTORY_DOMAIN_FLOOR = "1.0.0";
@@ -53,7 +54,7 @@ export function historyDomain(): HistoryWordSource {
   return handed;
 }
 
-/** The words of HISTORY_KEYS in the domain's order, each with its title. */
+/** The words of PLUGIN_HOSTD_HISTORY_KEYS in the domain's order, each with its title. */
 export function historyKeys(): readonly { readonly word: string; readonly title: string }[] {
   return historyDomain().words(HISTORY_KEYS_ITEM);
 }
