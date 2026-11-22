@@ -8,6 +8,7 @@ import os
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 import descriptors as desc
 import scan as s
@@ -241,7 +242,7 @@ class UnitsFromTheSheet(unittest.TestCase):
     def test_the_words_are_read_from_plugin_dbs_lv2_domain(self):
         with tempfile.TemporaryDirectory() as root:
             env = {"OMX_CONTRACT_PATH": root}
-            with self.assertRaises(desc.DescriptorRefused):
+            with mock.patch.object(desc, "INSTALLED_CONTRACT_DIR", os.path.join(root, "installed")), self.assertRaises(desc.DescriptorRefused):
                 desc.unit_words(env)
             env = self.env_with(root, self.lv2_domain())
             words = desc.unit_words(env)
@@ -278,7 +279,7 @@ class UnitsFromTheSheet(unittest.TestCase):
             schema = os.path.join(root, "schema", "omx-contract.schema.json")
             os.makedirs(os.path.dirname(schema))
             open(schema, "w").close()
-            with self.assertRaises(desc.DescriptorRefused):
+            with mock.patch.object(desc, "INSTALLED_CONTRACT_DIR", os.path.join(root, "installed")), self.assertRaises(desc.DescriptorRefused):
                 desc.unit_words({desc.DESCRIPTOR_SCHEMA_ENV: schema, "OMX_CONTRACT_PATH": root})
             self.assertFalse(hasattr(desc, "UNITS_SHEET"))
 
