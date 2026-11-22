@@ -1,3 +1,9 @@
+plugin-qualify (0.21.0) unstable; urgency=medium
+
+  * Sorting pass: V5, V6, V8, V9, V18, V19, V24 and V25.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Sun, 22 Nov 2026 12:30:00 +0100
+
 plugin-qualify (0.20.7) unstable; urgency=medium
 
   * The qualification domain 1.4.0 holds the words of the record store, the

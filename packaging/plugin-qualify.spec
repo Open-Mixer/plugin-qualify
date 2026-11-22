@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.7
+Version:        0.21.0
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -244,6 +244,9 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Sun Nov 22 2026 Pau Aliagas <linuxnow@gmail.com> - 0.21.0-1
+- Sorting pass: V5, V6, V8, V9, V18, V19, V24 and V25.
+
 * Fri Nov 20 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.7-1
 - the qualification domain 1.4.0 holds the words of the record store, the 14 kinds
   of an adapter code, the memory-bound outcome and the adapter hosts; the adapter
