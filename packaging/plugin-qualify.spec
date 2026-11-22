@@ -20,9 +20,9 @@ BuildRequires: pkgconfig
 BuildRequires: pkgconfig(clap) >= 1.2.10
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: pkgconfig(plugin-db) >= 0.4.4
-BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.5.9
-BuildRequires: pkgconfig(omx-contract) >= 3.20.2
+BuildRequires: pkgconfig(plugin-db) >= 0.5.0
+BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.8.0
+BuildRequires: pkgconfig(omx-contract) >= 3.21.0
 BuildRequires: pkgconfig(omx-clap-lv2) >= 0.34.0
 BuildRequires: pkgconfig(omxdsp) >= 0.34.0
 # src/dsp-rates.generated.ts is rendered from omx-dsp's rates file (tools/gen-dsp-rates.mjs), which its contract package ships
