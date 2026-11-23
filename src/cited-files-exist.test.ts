@@ -7,7 +7,8 @@
  *
  * Judged: this repository's own Python tools (`tools/<name>.py`) and its own tests (`<name>.test.ts`, under src/),
  * as the non-test sources under src/ cite them. A path into another repository (plugin-hostd's `src/history.c`,
- * omx-clap-core's `src/clap_host.c`) is that repository's to keep and is not judged here.
+ * omx-clap-core's `src/clap_host.c`, or `<repo>:<path>` as the store writer's
+ * `plugin-db-qualification:tools/qualification_db.py`) is that repository's to keep and is not judged here.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
