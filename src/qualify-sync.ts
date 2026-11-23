@@ -1648,11 +1648,11 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
         for (const p of entry.plugins) {
           count[p.outcome]++;
           measuredHere++;
-          // a reason of the machine is said once: the plugins after the first are counted, not listed
+          // every plugin is named by its key (#154); a reason of the machine is said in full once, on the first
           const why = machineReason(p);
           if (why !== undefined) byMachine.set(why, (byMachine.get(why) ?? 0) + 1);
-          if (why !== undefined && byMachine.get(why)! > 1) continue;
-          log(`${p.uri}: ${p.outcome}${p.code === undefined ? "" : ` (${p.code})`}${p.detail === undefined ? "" : `: ${reasonText(p.detail, localeOf(env))}`}`);
+          const said = why !== undefined && byMachine.get(why)! > 1 ? `by the machine (${why}), as above` : p.detail === undefined ? undefined : reasonText(p.detail, localeOf(env));
+          log(`${p.uri}: ${p.outcome}${p.code === undefined ? "" : ` (${p.code})`}${said === undefined ? "" : `: ${said}`}`);
         }
         state = { schema: SYNC_STATE_SCHEMA, entries };
         writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
@@ -1689,7 +1689,7 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     const replies = "replies" in sent ? sent.replies : [];
     for (let i = 0; i < replies.length; i++) if (replies[i] !== "resp 0") log(`plugin-hostd answered ${replies[i]!} to ${pinLineUri(changed[i]!)!}`);
     const taken = replies.filter((r) => r === "resp 0").length;
-    for (const [why, n] of byMachine) if (n > 1) log(`${String(n)} plugins unmeasured by the machine (${why}); the first is listed above`);
+    for (const [why, n] of byMachine) if (n > 1) log(`${String(n)} plugins unmeasured by the machine (${why}); each is named above`);
     const [only] = byMachine.size === 1 ? [...byMachine] : [];
     const machineFailure = only !== undefined && only[1] === measuredHere ? only[0] : undefined;
     if (machineFailure !== undefined) log(`every plugin this run measured was left unmeasured by the machine (${machineFailure}): the run failed`);
