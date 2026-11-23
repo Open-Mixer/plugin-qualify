@@ -32,6 +32,8 @@ import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 const HOSTD = process.env["PLUGIN_HOSTD"];
 const FAKE_HOST = process.env["PLUGIN_HOSTD_FAKE_HOST"];
 const URI = "urn:plugin-qualify:test:refresh";
+import { QualificationStore } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
 const scratch = mkdtempSync(join(tmpdir(), "pin-refresh-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -81,7 +83,7 @@ function stateOf(dir: string, pin: PinEntry): SyncState {
 }
 
 function ctxOf(dir: string, logs: string[]): SyncContext {
-  return { settings: settingsFor(join(scratch, "lv2")), env: {}, log: (l) => logs.push(l), pinFilesRun: standIn(dir) };
+  return { settings: settingsFor(join(scratch, "lv2")), store: new QualificationStore("user", { run: fakeStore().run }), env: {}, log: (l) => logs.push(l), pinFilesRun: standIn(dir) };
 }
 
 function settingsFor(lv2: string) {
@@ -191,7 +193,7 @@ describe("plugin-hostd on a pin from before 0.17.3, and on the same pin refreshe
     const named = hostdPinFiles(URI, [lv2], { ...process.env, PLUGIN_HOSTD: HOSTD });
     expect(named.ok && named.files.map((f) => f.path)).toContain("presets.ttl");
     const why: string[] = [];
-    const run = refreshPins({ settings: settingsFor(lv2), env: { PLUGIN_HOSTD: HOSTD }, log: (l) => why.push(l) }, stateOf(dir, oldPin(dir, layout)));
+    const run = refreshPins({ settings: settingsFor(lv2), store: new QualificationStore("user", { run: fakeStore().run }), env: { PLUGIN_HOSTD: HOSTD }, log: (l) => why.push(l) }, stateOf(dir, oldPin(dir, layout)));
     // a pin refreshPins leaves alone is the old pin again, which the daemon refuses as it refused the first: say why here
     expect({ refreshed: run.refreshed, why }).toEqual({ refreshed: [URI], why: [`${URI}: pin files refreshed, presets.ttl added`] });
     const refreshed = run.state;

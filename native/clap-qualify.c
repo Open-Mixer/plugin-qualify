@@ -34,7 +34,7 @@
  * is nanoseconds per sample, a warm-up head dropped, its median and 95th percentile; the run is
  * not under the interposer's count.
  *
- * The host offers exactly the extensions in HOST_EXTENSIONS — omx-clap-core's own host object,
+ * The host offers exactly the extensions in HOST_EXTENSIONS — omx-clap's own host object,
  * `clap_host_extensions.h` — and nothing else, so a plugin that needs more fails headless here
  * rather than on the desk; `--offer` adds those of OFFERABLE a host such as omx-clap-host offers
  * too (their host functions answer nothing). A plugin calling a main-thread host function from
@@ -78,7 +78,7 @@
 #define MAX_RATES 16
 #define MAX_PORTS 16
 #define MAX_PARAMS 4096
-/* omx-clap-core's CLAP_HOST_PARAM_COUNT_MAX: the host refuses at `add` a plugin with more parameters,
+/* omx-clap's CLAP_HOST_PARAM_COUNT_MAX: the host refuses at `add` a plugin with more parameters,
  * so the prober pins none (plugin-hostd's layout_pin_write returns -1 above it) */
 #define HOST_PARAM_COUNT_MAX 2048
 _Static_assert(HOST_PARAM_COUNT_MAX <= MAX_PARAMS, "the prober reads every parameter the host accepts");
@@ -110,7 +110,7 @@ _Static_assert(HOST_PARAM_COUNT_MAX <= MAX_PARAMS, "the prober reads every param
  * peak sits far above that leakage and far below any arrival a plugin means. */
 #define ONSET_OF_PEAK 1e-3f
 
-/* what the host offers, in the order omx-clap-core's clap_host_extensions.h lists it */
+/* what the host offers, in the order omx-clap's clap_host_extensions.h lists it */
 static const char *const HOST_EXTENSIONS[] = {
   CLAP_EXT_LOG, CLAP_EXT_THREAD_CHECK, CLAP_EXT_LATENCY, CLAP_EXT_PARAMS, CLAP_EXT_AUDIO_PORTS, CLAP_EXT_STATE,
   CLAP_EXT_NOTE_PORTS, CLAP_EXT_NOTE_NAME, CLAP_EXT_VOICE_INFO, CLAP_EXT_EVENT_REGISTRY,
@@ -120,7 +120,7 @@ static const char *const HOST_EXTENSIONS[] = {
 #define HOST_EXTENSION_COUNT (sizeof HOST_EXTENSIONS / sizeof HOST_EXTENSIONS[0])
 
 /* every dialect a note the sweep can speak, for clap.note-ports' supported_dialects: the host offers all four, as
- * omx-clap-core's own host object does with note inputs configured (OMX_CLAP_HOST_NOTE_DIALECTS) */
+ * omx-clap's own host object does with note inputs configured (OMX_CLAP_HOST_NOTE_DIALECTS) */
 #define HOST_NOTE_DIALECTS (CLAP_NOTE_DIALECT_CLAP | CLAP_NOTE_DIALECT_MIDI | CLAP_NOTE_DIALECT_MIDI_MPE | CLAP_NOTE_DIALECT_MIDI2)
 
 /* timer-support and posix-fd-support: registrations the prober accepts and never fires, since no event loop runs
@@ -323,7 +323,7 @@ static bool host_unregister_fd(const clap_host_t *h, int fd) {
 static const clap_host_posix_fd_support_t g_posix_fd_support = { host_register_fd, host_modify_fd, host_unregister_fd };
 
 /* thread-pool: [audio-thread], so gated on the process() window rather than on_main_thread. Without --pool every task
- * runs before the call returns, one after another on the calling thread, exactly as omx-clap-core's own host object runs
+ * runs before the call returns, one after another on the calling thread, exactly as omx-clap's own host object runs
  * them; with it, on the helpers of pool-host.c too, and the call returns when every task has ended. The pool is for the
  * interposer's count of what the tasks do off the audio thread: a run with a pool takes no cost figure. */
 static void pool_exec_task(void *ctx, uint32_t task) {
@@ -397,7 +397,7 @@ static const void *host_get_extension(const clap_host_t *h, const char *id) {
   if (!strcmp(id, CLAP_EXT_THREAD_POOL)) return &g_thread_pool;
   if (!strcmp(id, CLAP_EXT_TAIL)) return &g_tail;
   /* the draft ids of the two layout extensions, answered as their own; the declared list names the final ids only,
-   * as omx-clap-core's own host object does */
+   * as omx-clap's own host object does */
   if (!strcmp(id, CLAP_EXT_SURROUND) || !strcmp(id, CLAP_EXT_SURROUND_COMPAT)) return &g_surround;
   if (!strcmp(id, CLAP_EXT_AMBISONIC) || !strcmp(id, CLAP_EXT_AMBISONIC_COMPAT)) return &g_ambisonic;
   if (!strcmp(id, CLAP_EXT_AUDIO_PORTS_CONFIG)) return &g_audio_ports_config;
@@ -784,7 +784,7 @@ static void note_midi(uint32_t time, uint8_t status, uint8_t a, uint8_t b) {
 }
 
 /* a note on (velocity above 0) or off, key -1 for every key, in the dialect. Always on channel 0: every key of
- * channel 0 is what the host sends for all notes off (omx-clap-core maps controller 123 to a note off with key -1
+ * channel 0 is what the host sends for all notes off (omx-clap maps controller 123 to a note off with key -1
  * on the controller's channel), never the channel wildcard, which a plugin indexing a 16-channel table reads out of
  * bounds (Six Sines 1.2.1). */
 static void note_key(int clap_dialect, uint32_t time, int on, int16_t key, double velocity) {
@@ -848,7 +848,7 @@ static void note_block(uint32_t b, uint32_t frames, int clap_dialect, int midi_t
     break;
   case 6:
     note_key(clap_dialect, 0, 1, 72, 1.0);
-    /* all notes off as the host sends it (omx-clap-core's note input): to a port that reads MIDI too, controller
+    /* all notes off as the host sends it (omx-clap's note input): to a port that reads MIDI too, controller
      * 123 as it came; to one reading CLAP's dialect alone, a note off on every key of the channel */
     if (clap_dialect && midi_too) note_midi(frames / 2u, 0xB0, 123, 0);
     else note_key(clap_dialect, frames / 2u, 0, -1, 0.0);

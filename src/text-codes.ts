@@ -6,7 +6,7 @@
  * placeholders; translations live in catalogs the owner ships, keyed by code, checked for placeholders against the
  * code's `args`; a surface looks up the sentence for the user's locale and falls back to this source sentence).
  *
- * plugin-qualify is the owner of these codes (the hosting.* codes of {@link ../hosting-codes.js} are omx-clap-core's
+ * plugin-qualify is the owner of these codes (the hosting.* codes of {@link ../hosting-codes.js} are omx-clap's
  * instead, and that package owns their catalogs). A code, its args and its source sentence are written once, in
  * `schema/codes.json`; {@link TEXT_CODE} is that file's `key: code` map, generated (`tools/gen-text-codes.mjs`), so a
  * call site names a code by its key and no sentence is written in a module. `catalogs/<lang>.json`, read by

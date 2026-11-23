@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The reader of the `qualification` domain (contract.d/qualification/qualification.json, owner plugin-qualify), the
+ * The reader of the `qualification` domain (contract.d/qualification/qualification.json of plugin-hostd, its owner), the
  * document of the words a measurement, a verdict and a host profile speak. The document is DATA, read once at start-up
  * from the installed contract directory (docs/runtime-data.md of omx-contract): nothing here is generated from it, and
  * no copy of its words lives in the source.

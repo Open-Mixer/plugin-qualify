@@ -124,6 +124,8 @@ export const TEXT_CODE = Object.freeze({
   descriptorNotClapScan: "qualify.descriptor.not-clap-scan",
   judgedFilesPin: "qualify.judged.files-pin",
   judgedLayoutForm: "qualify.judged.layout-form",
+  judgedTakesShadowKey: "qualify.judged.takes-shadow-key",
+  judgedLayerOneOf: "qualify.judged.layer-one-of",
 } as const);
 
 /** The args each code's source sentence names, by the same key. */
@@ -244,4 +246,6 @@ export const TEXT_CODE_ARGS = Object.freeze({
   descriptorNotClapScan: [],
   judgedFilesPin: [],
   judgedLayoutForm: [],
+  judgedTakesShadowKey: ["file"],
+  judgedLayerOneOf: [],
 } as const);

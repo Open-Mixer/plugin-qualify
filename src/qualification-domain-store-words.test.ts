@@ -9,9 +9,10 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
-const doc = JSON.parse(readFileSync(join(PKG, "contract.d", "qualification", "qualification.json"), "utf8")) as {
+const doc = JSON.parse(readFileSync(join(INSTALLED_CONTRACT_DIR, "qualification", "qualification.json"), "utf8")) as {
   info: { version: string };
   components: { schemas: Record<string, { oneOf: { const: string; "x-from"?: unknown[] }[] }> };
 };

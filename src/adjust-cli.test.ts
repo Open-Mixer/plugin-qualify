@@ -6,7 +6,9 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
 import {
+  ADJUST_CODE,
   adjustRecords,
+  installedRootOf,
   adjustTable,
   adjustedPinEntries,
   historyKeyOf,
@@ -20,7 +22,9 @@ import { judgeProbeOutput } from "./probe-judge.js";
 import { readProbeOutput } from "./probe-output.js";
 import { fixtureText } from "./probe-output-fixtures.js";
 import { parsePinLine, pinsFile } from "./pins-file.js";
-import { rewriteRecord, writeQualification, type QualificationRecord } from "./qualification-record.js";
+import { rewriteRecord, storedBinary, writeQualification, type QualificationRecord } from "./qualification-record.js";
+import { QualificationStore, shadowKeyOf, type ShadowKey, type StoredRecord } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
 import { rendered } from "./text-rendered.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "adjust-cli-"));
@@ -39,7 +43,9 @@ function measured(): QualificationRecord {
   const r = readProbeOutput(text);
   if (!r.ok) throw new Error(r.problem);
   const dir = mkdtempSync(join(scratch, "rec-"));
-  return writeQualification(dir, Buffer.from(text), judgeProbeOutput(r.output, [OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE])).record;
+  const made = writeQualification(dir, Buffer.from(text), judgeProbeOutput(r.output, [OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE])).record;
+  // as the store holds it: the binary's path below the install root
+  return { ...made, binary: storedBinary(made.binary) };
 }
 
 /** The same record with the omx-clap-host verdict replaced by hand: a conditional one, a refused one, ... */
@@ -57,8 +63,11 @@ function withVerdict(rating: string, reasons: { code: string; rating: string }[]
 
 const line = (keys: string, cls = CLASS, uri = URI, digest = DIGEST): string => `history ${uri} ${digest} ${cls} ${keys}`;
 const file = (...lines: string[]): string => [HISTORY_HEADER, ...lines, ""].join("\n");
-const adjust = (record: QualificationRecord, text: string, extra: { hostClass?: string } = {}) =>
-  adjustRecords([{ path: "r.qualification.json", record }], text, { profiles: [OMX_CLAP_HOST_PROFILE], file: "history", now: NOW, ...extra });
+const KEY: ShadowKey = { sha256: DIGEST, format: "clap", uri: "org.example.plate", offer: "default", hostClass: "aarch64" };
+/** The install root of the installed item: the record's path is relative to it, the absolute one is never stored. */
+const ROOT = "/usr/lib64/clap";
+const adjust = (record: QualificationRecord, text: string, extra: { hostClass?: string; rootOf?: () => string | undefined } = {}) =>
+  adjustRecords([{ key: KEY, record }], text, { profiles: [OMX_CLAP_HOST_PROFILE], file: "history", now: NOW, rootOf: () => ROOT, ...extra });
 
 function blockOf(record: QualificationRecord, text: string, cls = CLASS) {
   const r = adjust(record, text);
@@ -73,7 +82,7 @@ const SPIKY = [{ code: "hosting.cost.spiky-tail", rating: "conditional" }];
 
 describe("the key of a record in the history", () => {
   it("is hostd's uri of the plugin and the digest of the first file of its pin", () => {
-    expect(historyKeyOf(measured())).toEqual({ uri: URI, digest: DIGEST });
+    expect(historyKeyOf(measured(), ROOT)).toEqual({ uri: URI, digest: DIGEST });
   });
 
   it("takes the first file by path, as the pin lists them", () => {
@@ -82,16 +91,16 @@ describe("the key of a record in the history", () => {
       { path: "z.so", sha256: "2".repeat(64) },
       { path: "a.so", sha256: "1".repeat(64) },
     ];
-    expect(historyKeyOf({ ...r, binary: { ...r.binary, files } })?.digest).toBe("1".repeat(64));
-    expect(historyKeyOf({ ...r, binary: { ...r.binary, files: [...files].reverse() } })?.digest).toBe("1".repeat(64));
+    expect(historyKeyOf({ ...r, binary: { ...r.binary, files } }, ROOT)?.digest).toBe("1".repeat(64));
+    expect(historyKeyOf({ ...r, binary: { ...r.binary, files: [...files].reverse() } }, ROOT)?.digest).toBe("1".repeat(64));
   });
 
   it("is an LV2 plugin's own URI, and nothing for a record with no whole pin", () => {
     const r = measured();
-    expect(historyKeyOf({ ...r, plugin: { format: "lv2", id: "urn:example:eq" } })?.uri).toBe("urn:example:eq");
-    expect(historyKeyOf({ ...r, binary: { ...r.binary, files: [] } })).toBeUndefined();
+    expect(historyKeyOf({ ...r, plugin: { format: "lv2", id: "urn:example:eq" } }, ROOT)?.uri).toBe("urn:example:eq");
+    expect(historyKeyOf({ ...r, binary: { ...r.binary, files: [] } }, ROOT)).toBeUndefined();
     const { layout: _layout, ...noLayout } = r.binary;
-    expect(historyKeyOf({ ...r, binary: noLayout })).toBeUndefined();
+    expect(historyKeyOf({ ...r, binary: noLayout }, ROOT)).toBeUndefined();
   });
 });
 
@@ -241,10 +250,10 @@ describe("--pins with --history", () => {
 });
 
 describe("parseAdjustArgs", () => {
-  it("reads the history, the directory, the class, the pins, the clock, the profiles (once each) and the format", () => {
-    expect(rendered(parseAdjustArgs(["--history", "h", "--qualification-dir", "q", "--host-class", CLASS, "--pins", "p", "--now", "5", "--host-profile", "omx-clap-host,jalv", "--host-profile", "jalv", "--format", "json"]))).toEqual({
+  it("reads the history, the scope, the class, the pins, the clock, the profiles (once each) and the format", () => {
+    expect(rendered(parseAdjustArgs(["--history", "h", "--system", "--host-class", CLASS, "--pins", "p", "--now", "5", "--host-profile", "omx-clap-host,jalv", "--host-profile", "jalv", "--format", "json"]))).toEqual({
       ok: true,
-      args: { history: "h", hostProfiles: ["omx-clap-host", "jalv"], qualificationDir: "q", hostClass: CLASS, pins: "p", now: 5, format: "json", help: false },
+      args: { history: "h", hostProfiles: ["omx-clap-host", "jalv"], system: true, hostClass: CLASS, pins: "p", now: 5, format: "json", help: false },
     });
     const d = parseAdjustArgs(["--history", "h"]);
     expect(d.ok && d.args).toMatchObject({ hostProfiles: ["openmixer-console"], format: "text" });
@@ -261,19 +270,65 @@ describe("parseAdjustArgs", () => {
     expect(rendered(parseAdjustArgs(["--history", "h", "a.json"])).ok).toBe(false);
     expect(rendered(parseAdjustArgs(["--help"])).ok).toBe(true);
   });
+
+  it("no longer takes a directory of records: --qualification-dir is refused, with no alias", () => {
+    expect(rendered(parseAdjustArgs(["--history", "h", "--qualification-dir", "q"]))).toEqual({ ok: false, error: "unknown option --qualification-dir" });
+  });
+});
+
+describe("a record whose key no installed item holds", () => {
+  const items = [{ key: `clap:${ROOT}/example-plate.clap`, format: "clap" as const, root: ROOT, files: ["example-plate.clap"] }];
+  const hashOf = (installed: Record<string, string>) => (path: string): string | undefined => installed[path];
+
+  it("takes the install root of the item that holds the key: the root of its file with the record's key hash", () => {
+    expect(installedRootOf(items, KEY, measured(), hashOf({ [`${ROOT}/example-plate.clap`]: DIGEST }))).toBe(ROOT);
+  });
+
+  it("has no root when the installed file is other bytes, or nothing is installed: it is not adjusted, under a named code", () => {
+    expect(installedRootOf(items, KEY, measured(), hashOf({ [`${ROOT}/example-plate.clap`]: "0".repeat(64) }))).toBeUndefined();
+    expect(installedRootOf([], KEY, measured(), hashOf({}))).toBeUndefined();
+    const r = adjust(measured(), file(line("windows_solo=9")), { rootOf: () => undefined });
+    if (!r.ok) throw new Error(r.problem);
+    expect(r.records).toEqual([]);
+    expect(r.notInstalled).toEqual([{ key: KEY, code: ADJUST_CODE.notInstalled }]);
+    expect(ADJUST_CODE.notInstalled).toBe("adjust.not-installed");
+  });
+});
+
+describe("readRecords reads the scope's records, the user layer over the base", () => {
+  const stored = (key: ShadowKey, record: QualificationRecord, layer: "user" | "base"): StoredRecord => ({ layer, sha256: key.sha256, format: key.format, uri: key.uri, offer: key.offer, host_class: key.hostClass, record });
+  const OTHER: ShadowKey = { ...KEY, offer: "other" };
+
+  it("a base record no user record shadows is read; a user record replaces the base record of its key; one record a key", () => {
+    const fake = fakeStore({ validate: false, base: [stored(KEY, measured(), "base"), stored(OTHER, measured(), "base")] });
+    const store = new QualificationStore("user", { run: fake.run });
+    const mine = { ...measured(), measuredAt: "2030-01-01T00:00:00.000Z" };
+    store.put(KEY, mine);
+    const r = readRecords(store);
+    expect(r.records.map((x) => x.key)).toEqual([KEY, OTHER]);
+    expect(r.records[0]!.record.measuredAt).toBe("2030-01-01T00:00:00.000Z");
+    // the merged answer of the reader, no layer named: `query --json --records`
+    expect(fake.calls.filter((c) => c.startsWith("read "))).toEqual(["read query --scope user --json --records"]);
+  });
+
+  it("under --system the system layer over the base", () => {
+    const fake = fakeStore({ validate: false, base: [stored(KEY, measured(), "base")] });
+    const r = readRecords(new QualificationStore("system", { run: fake.run }));
+    expect(r.records.map((x) => x.key)).toEqual([KEY]);
+    expect(fake.calls).toEqual(["read query --scope system --json --records"]);
+  });
 });
 
 describe("readRecords and the table", () => {
-  it("reads the records of a directory, names a file that is not one, and prints a row per plugin, host and class", () => {
-    const dir = mkdtempSync(join(scratch, "rr-"));
-    rewriteRecord(join(dir, "a.qualification.json"), measured());
-    writeFileSync(join(dir, "b.qualification.json"), "{}");
-    writeFileSync(join(dir, "c.qualification.json"), "not json");
-    writeFileSync(join(dir, "d.probe.json"), "{}");
-    const r = readRecords(dir);
-    expect(r.records.map((x: RecordFile) => x.path.replace(`${dir}/`, ""))).toEqual(["a.qualification.json"]);
-    expect(r.failures.map((f) => f.file.replace(`${dir}/`, ""))).toEqual(["b.qualification.json", "c.qualification.json"]);
-    expect(readRecords(join(dir, "none")).failures).toHaveLength(1);
+  it("reads the records of the scope's user layer through the reader, and prints a row per plugin, host and class", () => {
+    const fake = fakeStore({ validate: false });
+    const store = new QualificationStore("user", { run: fake.run });
+    const rec = measured();
+    store.put(KEY, rec);
+    const r = readRecords(store);
+    expect(r.records.map((x: RecordFile) => x.key)).toEqual([KEY]);
+    expect(r.records[0]!.record.plugin.id).toBe("org.example.plate");
+    expect(fake.calls.every((c) => /^(read|write) /.test(c))).toBe(true);
     const a = adjust(measured(), file(line("windows_solo=9")));
     if (!a.ok) throw new Error(a.problem);
     expect(adjustTable(a.records)).toBe(

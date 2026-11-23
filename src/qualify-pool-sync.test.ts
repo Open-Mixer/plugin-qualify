@@ -22,6 +22,8 @@ import { parseSyncArgs, resolveSyncSettings, runSync, summaryLine } from "./qual
 import { clapQualifyToolPath, rtInterposePath } from "./tool-paths.js";
 import { CLAP_NOTES, CLAP_RT, LV2_CLEAN, device, rejudge, removeDevices } from "./qualify-rejudge.support.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
+import { QualificationStore } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
 
 afterAll(removeDevices);
 
@@ -38,7 +40,7 @@ const steps = (r: QualificationRecord) => r.run?.steps.filter((s) => s.step === 
 async function seen(stems: readonly string[]) {
   const d = device(stems);
   await rejudge(d);
-  await runSync(d.settings, { isolatedOnly: true, isolatedRunner: () => ALONE, env: ENV, log: () => {} });
+  await runSync(d.settings, { qualificationStore: d.store, isolatedOnly: true, isolatedRunner: () => ALONE, env: ENV, log: () => {} });
   return d;
 }
 
@@ -52,7 +54,7 @@ describe("--pool-only", () => {
   it("gives the pin of a plugin that gains from the pool pool=cores, and keeps its verdict", async () => {
     const d = await seen([CLAP_RT]);
     expect(d.pins()[0]).not.toHaveProperty("pool");
-    const done = await runSync(d.settings, { poolOnly: true, poolRunner: () => FASTER, env: ENV, log: () => {} });
+    const done = await runSync(d.settings, { qualificationStore: d.store, poolOnly: true, poolRunner: () => FASTER, env: ENV, log: () => {} });
     expect(done?.poolOnly).toEqual({ cores: 1, off: 0, notAsked: 0, notRun: 0 });
     expect(summaryLine(done!)).toContain("pool granted 1");
     expect(d.pins()[0]).toMatchObject({ verdict: "isolated", pool: "cores" });
@@ -62,12 +64,12 @@ describe("--pool-only", () => {
 
   it("a plugin measured and not faster gets pool=off, and one that does not ask for the pool gets none", async () => {
     const off = await seen([CLAP_RT]);
-    await runSync(off.settings, { poolOnly: true, poolRunner: () => NOT_FASTER, env: ENV, log: () => {} });
+    await runSync(off.settings, { qualificationStore: off.store, poolOnly: true, poolRunner: () => NOT_FASTER, env: ENV, log: () => {} });
     expect(off.pins()[0]).toMatchObject({ pool: "off" });
     expect(steps(off.record(CLAP_RT))[0]).toMatchObject({ result: POOL_RESULT.off, code: POOL_CODE.notFaster });
 
     const none = await seen([CLAP_RT]);
-    const done = await runSync(none.settings, { poolOnly: true, poolRunner: () => NOT_ASKED, env: ENV, log: () => {} });
+    const done = await runSync(none.settings, { qualificationStore: none.store, poolOnly: true, poolRunner: () => NOT_ASKED, env: ENV, log: () => {} });
     expect(done?.poolOnly).toEqual({ cores: 0, off: 0, notAsked: 1, notRun: 0 });
     expect(none.pins()[0]).not.toHaveProperty("pool");
     expect(steps(none.record(CLAP_RT))[0]).toMatchObject({ result: POOL_RESULT.notAsked });
@@ -80,22 +82,22 @@ describe("--pool-only", () => {
       ran++;
       return facts;
     };
-    await runSync(d.settings, { poolOnly: true, poolRunner: runner(NO_HOST), env: ENV, log: () => {} });
+    await runSync(d.settings, { qualificationStore: d.store, poolOnly: true, poolRunner: runner(NO_HOST), env: ENV, log: () => {} });
     expect(ran).toBe(1);
     expect(d.pins()[0]).not.toHaveProperty("pool");
     expect(steps(d.record(CLAP_RT))[0]).toMatchObject({ result: POOL_RESULT.notRun, code: POOL_CODE.noHost });
-    const again = await runSync(d.settings, { poolOnly: true, poolRunner: runner(FASTER), env: ENV, log: () => {} });
+    const again = await runSync(d.settings, { qualificationStore: d.store, poolOnly: true, poolRunner: runner(FASTER), env: ENV, log: () => {} });
     expect(ran).toBe(2);
     expect(again?.poolOnly).toMatchObject({ cores: 1, notRun: 0 });
     expect(steps(d.record(CLAP_RT))).toHaveLength(1);
-    await runSync(d.settings, { poolOnly: true, poolRunner: runner(FASTER), env: ENV, log: () => {} });
+    await runSync(d.settings, { qualificationStore: d.store, poolOnly: true, poolRunner: runner(FASTER), env: ENV, log: () => {} });
     expect(ran).toBe(2);
   });
 
   it("an LV2 plugin is never asked", async () => {
     const d = await seen([LV2_CLEAN, CLAP_NOTES]);
     const asked: string[] = [];
-    await runSync(d.settings, {
+    await runSync(d.settings, { qualificationStore: d.store,
       poolOnly: true,
       poolRunner: (uri) => {
         asked.push(uri);
@@ -113,7 +115,7 @@ describe("--pool-only", () => {
 
   it("a re-judge keeps the pool word the record's step gave, measuring nothing", async () => {
     const d = await seen([CLAP_RT]);
-    await runSync(d.settings, { poolOnly: true, poolRunner: () => FASTER, env: ENV, log: () => {} });
+    await runSync(d.settings, { qualificationStore: d.store, poolOnly: true, poolRunner: () => FASTER, env: ENV, log: () => {} });
     expect(d.pins()[0]).toMatchObject({ pool: "cores" });
     await rejudge(d);
     expect(d.pins()[0]).toMatchObject({ verdict: "isolated", pool: "cores" });
@@ -142,7 +144,7 @@ describe("a sweep over CLAP plugins that ask for the pool and one that does not"
       const out = join(root, "out");
       const flags = [
         "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "none"), "--lv2-extra", "",
-        "--pin-file", join(out, "qualified.pins"), "--qualification-dir", join(out, "qualification"),
+        "--pin-file", join(out, "qualified.pins"),
         "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
         "--grid-hosts", "--budget-s", "20", "--hostd-port", "0", "--hostd-feedback-port", "0",
       ];
@@ -156,13 +158,14 @@ describe("a sweep over CLAP plugins that ask for the pool and one that does not"
         asked.push(uri);
         return uri.includes("pool-synth.clap") ? FASTER : NOT_ASKED;
       };
-      const summary = await runSync(r.settings, { poolRunner, isolatedRunner: () => ALONE, env: { ...process.env, OMX_PROBE_RUNNER: RUNNER, [PROBE_NOTES_CURVE_ENV]: "1" }, log: () => {} });
+      const fake = fakeStore();
+      const summary = await runSync(r.settings, { qualificationStore: new QualificationStore("user", { run: fake.run }), poolRunner, isolatedRunner: () => ALONE, env: { ...process.env, OMX_PROBE_RUNNER: RUNNER, [PROBE_NOTES_CURVE_ENV]: "1" }, log: () => {} });
       expect(summary?.qualified).toBe(2);
       const pins = readFileSync(join(out, "qualified.pins"), "utf8").split("\n").map(parsePinLine).filter((p) => p !== undefined);
       expect(asked.length, JSON.stringify(asked)).toBe(2);
       expect(pins.find((p) => p!.uri.endsWith("pool-synth.clap#org.freemixer.plugin-qualify.fixture.pool-synth"))).toMatchObject({ pool: "cores" });
       expect(pins.find((p) => p!.uri.includes("pool-synth-serial.clap"))).not.toHaveProperty("pool");
-      const records = readdirSync(join(out, "qualification")).filter((f) => f.endsWith(".qualification.json")).map((f) => JSON.parse(readFileSync(join(out, "qualification", f), "utf8")) as QualificationRecord);
+      const records = fake.user().map((u) => u.record);
       expect(records.flatMap((rec) => steps(rec)).map((x) => x.result).sort()).toEqual([POOL_RESULT.cores, POOL_RESULT.notAsked]);
     } finally {
       rmSync(root, { recursive: true, force: true });

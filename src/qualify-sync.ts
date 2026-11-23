@@ -12,7 +12,8 @@
  * wall clock, so a crash, a hang or a refusal is recorded and the run goes on to the next one.
  *
  * What a run leaves: the state file (what was qualified, from which bytes, and how it ended), the qualification
- * records and the descriptors in their directories, and the pin file plugin-hostd loads as `pin_file`, written whole.
+ * records in the qualification store (put through `plugin-qualification-db-write`; no record is a file) and the descriptors in
+ * their directory, and the pin file plugin-hostd loads as `pin_file`, written whole.
  * When a daemon answers on the command port, the pins that changed are also sent to it with `pin_set`, and the ones
  * of a plugin that is gone with `pin_clear`. What a gone plugin left in the records and the descriptors is removed.
  */
@@ -25,7 +26,10 @@ import { basename, dirname, join, resolve, sep } from "node:path";
 
 import { withRunHome } from "./run-home.js";
 import { clapQualifyTools } from "./clap-qualify.js";
-import { DISTRIBUTED_DIR_SYSTEM, EMPTY_LAYER, applyDistributed, distributedUri, hostClassOf, outcomeOfVerdict, matchDistributed, readBoardModel, readMachine, readDistributedLayer, type DistributedLayer } from "./distributed-records.js";
+import { hostClassOf, outcomeOfVerdict, readBoardModel, readMachine, recordCells } from "./distributed-records.js";
+import { matchStored, pinOfStored, storedUri } from "./pin-match.js";
+import { QualificationStore, keyId, keyLabel, shadowKeyOf, type ShadowKey, type StoredRecord } from "./qualification-store.js";
+import { rowsUnreadable } from "./row-judge.js";
 import { parseClapScan } from "./clap-loader.js";
 import { SPAWNED_SEARCH_PATH, hostdSearchPath, searchPathWarnings, type SearchPathRun } from "./hostd-search-path.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
@@ -34,23 +38,25 @@ import { NO_JACK_SERVER } from "./host-admission.js";
 import { iriPath, lv2BundlesOnPath, manifestPlugins } from "./lv2-loader.js";
 import type { PluginDbRun } from "./plugin-db-cli.js";
 import { storeJudgedLayers } from "./plugin-db-store.js";
-import { judgmentPinEntries, pinClearLine, pinLineUri, pinsFile, type PinEntry } from "./pins-file.js";
+import { clapPinUri, judgmentPinEntries, pinClearLine, pinLineUri, pinsFile, type PinEntry } from "./pins-file.js";
 import { POOL_RESULT, completePool, judgePoolRun, pinAfterPool, pinFromRecordWithPool, poolEnv, spawnedPoolRunner, type PoolRunner } from "./qualify-pool.js";
 import { hostdPinFiles, type PinFilesRun } from "./hostd-pin-files.js";
 import { localeOf, reasonText } from "./text-catalog.js";
 import type { Judgment } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { GRID_FULL, hostCells, parseGridSpec, type GridCell, type GridSpec } from "./measurement-grid.js";
+import { GRID_FULL, cellKey, hostCells, parseGridSpec, type GridCell, type GridSpec } from "./measurement-grid.js";
 import { adapterPass, type AdapterPassOptions, type AdapterPassResult } from "./qualify-adapter-pass.js";
 import { ISOLATED_RESULT, baseSteps, completeIsolated, isolatedCell, missingSteps, judgeIsolatedRun, owesIsolated, pinAfterStep, spawnedIsolatedRunner, type IsolatedRunner } from "./qualify-isolated.js";
-import { lv2World, rejudgeRecord, rejudgeState, rejudgeToolName, memoryPass, type MemoryPassResult, type RejudgeResult } from "./qualify-rejudge.js";
+import { lv2World, rejudgeFromRows, rejudgeState, rejudgeToolName, memoryPass, type MemoryPassResult, type RejudgeResult } from "./qualify-rejudge.js";
 import { memoryBoundOf, parseMemoryLimit, type MemoryBound } from "./memory-bound.js";
-import { QUALIFICATION_RECORD_SCHEMA, descriptorNamePart, latencyNeverTaken, rewriteRecord, writeQualification, type NotMeasured, type QualificationRecord } from "./qualification-record.js";
+import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, descriptorNamePart, latencyNeverTaken, probeCopyFileName, storedForm, type NotMeasured, type QualificationRecord } from "./qualification-record.js";
+import { sha256Hex } from "./probe-output.js";
 import { ADMIT_STEP_MS_ENV, DESCRIPTOR_DIR_STATE_SUBDIR, DESCRIPTOR_DIR_SYSTEM, MEMORY_PASS_PROBE_NOTES, QUALIFY_QUANTA, QUALIFY_RATES } from "./qualify-declarations.js";
 import { toolsDir } from "./tool-paths.js";
 import { writeFileWhole } from "./whole-file.js";
 import { withContractPathHelp } from "./qualification-domain.js";
 import { type ReasonText, TEXT_CODE, type TextRef } from "./text-codes.js";
+import { probeOutcome } from "./probe-domain.js";
 
 // --- the settings -----------------------------------------------------------------------------------------------------
 
@@ -68,7 +74,6 @@ export interface SyncSetting {
 export const SYNC_SETTINGS: readonly SyncSetting[] = [
   { key: "hostd_conf", meaning: "plugin-hostd's settings file: the LV2 and CLAP directories scanned are the ones plugin-hostd --search-path -c <file> prints", default: "plugin-hostd's own (its XDG_CONFIG_HOME/plugin-hostd.conf, else ~/.config/plugin-hostd.conf)" },
   { key: "pin_file", meaning: "the pin file plugin-hostd loads as pin_file", default: "/var/lib/omx/qualified.pins (system), else $XDG_STATE_HOME/omx/qualified.pins" },
-  { key: "qualification_dir", meaning: "where the qualification records go", default: "/var/lib/omx/qualification (system), else $XDG_STATE_HOME/omx/qualification" },
   { key: "descriptor_dir", meaning: "where the scanned descriptors go", default: `${DESCRIPTOR_DIR_SYSTEM} (system), else $XDG_STATE_HOME/${DESCRIPTOR_DIR_STATE_SUBDIR}` },
   { key: "state_file", meaning: "what was qualified, from which bytes, and how it ended", default: "/var/lib/omx/qualify-sync.json (system), else $XDG_STATE_HOME/omx/qualify-sync.json" },
   { key: "budget_s", meaning: "the wall clock one run gets (one cell of an LV2 plugin, one quantum of a CLAP one), in seconds; past it the plugin is recorded as hung", default: "60" },
@@ -80,8 +85,7 @@ export const SYNC_SETTINGS: readonly SyncSetting[] = [
   { key: "hostd_port", meaning: "plugin-hostd's command port the new pins are sent to; 0 sends none", default: "5555" },
   { key: "hostd_feedback_port", meaning: "plugin-hostd's feedback port, connected before the command port; 0 is the command port's next", default: "0" },
   { key: "settle_s", meaning: "wait until the plugin directories have been quiet this long before a run", default: "0" },
-  { key: "host_class", meaning: "the machine class whose distributed records are read (a directory name)", default: "the board's own from the device tree (rpi5 on a Raspberry Pi 5), else none" },
-  { key: "distributed_dir", meaning: "the directories of distributed records, colon-separated, each holding <host class>/<set>/", default: `${DISTRIBUTED_DIR_SYSTEM} (system), else $XDG_DATA_HOME/omx/qualification and each $XDG_DATA_DIRS/omx/qualification` },
+  { key: "host_class", meaning: "the machine class the stored records are read and written for (a word of the store: rpi5, x86-64)", default: "the board's own from the device tree (rpi5 on a Raspberry Pi 5), else none" },
 ];
 
 /** The search path settings that moved to plugin-hostd's settings file (plugin-qualify#9): refused here, with where they went. */
@@ -91,12 +95,13 @@ const movedText = (key: string): string =>
   `${key} is plugin-hostd's setting now: write it in plugin-hostd's settings file (plugin-hostd.conf, named here by hostd_conf); the directories scanned are the ones plugin-hostd --search-path prints${key === "clap_extra" ? " (plugin-hostd has no clap_extra: add the directories to clap_path)" : ""}`;
 
 export interface SyncSettings {
+  /** `--system`: the system scope's layer of the store, not the user's. */
+  readonly system: boolean;
   /** The LV2 directories, as plugin-hostd searches them with hostd_conf (plugin-hostd --search-path). */
   readonly lv2Dirs: readonly string[];
   /** The CLAP directories, as plugin-hostd searches them with hostd_conf. */
   readonly clapDirs: readonly string[];
   readonly pinFile: string;
-  readonly qualificationDir: string;
   readonly descriptorDir: string;
   readonly stateFile: string;
   readonly budgetS: number;
@@ -111,10 +116,9 @@ export interface SyncSettings {
   readonly hostdPort: number;
   readonly hostdFeedbackPort: number;
   readonly settleS: number;
-  /** The machine class the distributed records are read for; none, and the layer is not read. */
-  readonly hostClass?: string;
-  readonly distributedDirs: readonly string[];
-  /** False under `--no-distributed`. */
+  /** The machine class of the records the store holds for this machine. */
+  readonly hostClass: string;
+  /** False under `--no-distributed`: no shipped record is taken. */
   readonly distributed: boolean;
 }
 
@@ -213,9 +217,9 @@ function syncHelpTextBody(): string {
     "",
     `  ${"--config <file>".padEnd(36)}the settings file (default: ${SYNC_CONF}; a missing file is the defaults)`,
     "  --system                            a system service's directories, under /var/lib/omx",
-    "  --force                             qualify every plugin again, recorded or not; no distributed record is read",
+    "  --force                             qualify every plugin again, recorded or not; no shipped record is taken",
     "  --no-wait                           a run in progress is not waited for: exit 0, and the holder runs once more at its end",
-    "  --no-distributed                    read no distributed record: every plugin not recorded is measured",
+    "  --no-distributed                    take no shipped record: every plugin not recorded is measured",
     "  --refresh-pins                      only bring every pin's files up to the ones plugin-hostd names, measuring nothing",
     "  --rejudge                           derive every record's verdicts, tiers and pin again from the figures it holds; measures nothing",
     "  --memory-only                       measure only the footprint of each recorded plugin at the Pi's cells and merge it; with --force, those already merged too",
@@ -281,26 +285,18 @@ export function resolveSyncSettings(
   const hostProfile = shippedHostProfile(profileId);
   if (hostProfile === undefined) return { ok: false, error: `host_profile ${profileId} is not a shipped host profile` };
   const once = (dirs: readonly string[]): string[] => [...new Set(dirs.map((d) => resolve(d)))];
-  const dataHome = env["XDG_DATA_HOME"] !== undefined && env["XDG_DATA_HOME"] !== "" ? env["XDG_DATA_HOME"] : join(home, ".local", "share");
-  const dataDirs = dirList(env["XDG_DATA_DIRS"] ?? "").length > 0 ? dirList(env["XDG_DATA_DIRS"]!) : ["/usr/local/share", "/usr/share"];
-  const distributedNamed = get("distributed_dir");
-  const distributedDirs =
-    distributedNamed !== undefined && distributedNamed !== ""
-      ? dirList(distributedNamed)
-      : args.system
-        ? [DISTRIBUTED_DIR_SYSTEM]
-        : [dataHome, ...dataDirs].map((d) => join(d, "omx", "qualification"));
   const classNamed = get("host_class");
   const hostClass = hostClassOf(classNamed, boardModel, machineArch);
-  if (hostClass !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(hostClass)) return { ok: false, error: `host_class ${hostClass} is not a directory name` };
+  if (hostClass === undefined) return { ok: false, error: "host_class is unset and this machine has none: name it in host_class (the store keys its records by it)" };
+  if (!/^[A-Za-z0-9][A-Za-z0-9._+-]*$/.test(hostClass)) return { ok: false, error: `host_class ${hostClass} is not a word of the store` };
   return {
     ok: true,
     warnings: searchPathWarnings(search.path, hostdConf),
     settings: {
+      system: args.system,
       lv2Dirs: once(search.path.lv2),
       clapDirs: once(search.path.clap),
       pinFile: place("pin_file", "/var/lib/omx/qualified.pins", join("omx", "qualified.pins")),
-      qualificationDir: place("qualification_dir", "/var/lib/omx/qualification", join("omx", "qualification")),
       descriptorDir: place("descriptor_dir", DESCRIPTOR_DIR_SYSTEM, DESCRIPTOR_DIR_STATE_SUBDIR),
       stateFile: place("state_file", "/var/lib/omx/qualify-sync.json", join("omx", "qualify-sync.json")),
       budgetS,
@@ -312,8 +308,7 @@ export function resolveSyncSettings(
       hostdPort,
       hostdFeedbackPort: feedbackPort === 0 && hostdPort !== 0 ? hostdPort + 1 : feedbackPort,
       settleS,
-      ...(hostClass === undefined ? {} : { hostClass }),
-      distributedDirs: once(distributedDirs),
+      hostClass,
       distributed: !args.noDistributed,
     },
   };
@@ -516,7 +511,7 @@ export function digestFiles(root: string, files: readonly string[], known: reado
 
 // --- the state --------------------------------------------------------------------------------------------------------
 
-export const SYNC_STATE_SCHEMA = "plugin-qualify.sync-state/1";
+export const SYNC_STATE_SCHEMA = "plugin-qualify.sync-state/2";
 
 /** How the quick qualification of one plugin ended. */
 export const SYNC_OUTCOMES = ["qualified", "refused", "crashed", "hung", "unmeasured"] as const;
@@ -554,16 +549,11 @@ export function machineReason(p: Pick<SyncPlugin, "outcome" | "code" | "detail">
  * pass ({@link latencyNeverTaken}) owes a measurement, and the sync measures the entry again although its bytes are the
  * ones it recorded. A record that cannot be read owes nothing here: the sync's other checks deal with it.
  */
-export function figureOwed(entry: Pick<SyncEntry, "plugins">): "latency" | undefined {
+export function figureOwed(entry: Pick<SyncEntry, "plugins">, store: QualificationStore): "latency" | undefined {
   for (const p of entry.plugins) {
     if (p.record === undefined) continue;
-    let r: QualificationRecord;
-    try {
-      r = JSON.parse(readFileSync(p.record, "utf8")) as QualificationRecord;
-    } catch {
-      continue;
-    }
-    if (r.schema === QUALIFICATION_RECORD_SCHEMA && latencyNeverTaken(r)) return "latency";
+    const r = store.record(p.record);
+    if (r !== undefined && r.schema === QUALIFICATION_RECORD_SCHEMA && latencyNeverTaken(r)) return "latency";
   }
   return undefined;
 }
@@ -582,8 +572,8 @@ export interface SyncPlugin {
   readonly descriptorProblem?: string;
   /** Its pin, when the run took a whole one. */
   readonly pin?: PinEntry;
-  /** The record written for it. */
-  readonly record?: string;
+  /** The shadow key of its record in the store. */
+  readonly record?: ShadowKey;
 }
 
 export interface SyncEntry {
@@ -594,7 +584,7 @@ export interface SyncEntry {
   readonly plugins: readonly SyncPlugin[];
   readonly qualifiedAt: string;
   readonly seconds: number;
-  /** The distributed set the plugins were taken from, when they were not measured here. */
+  /** The shipped set the plugins were taken from, when they were not measured here. */
   readonly distributed?: string;
 }
 
@@ -661,6 +651,8 @@ export function sameBinaryElsewhere(item: SyncItem, entry: SyncEntry | undefined
 
 export interface SyncContext {
   readonly settings: SyncSettings;
+  /** The qualification store of the run's scope: the only place a record is read or written. */
+  readonly store: QualificationStore;
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly log: (line: string) => void;
   /** The run of `plugin-hostd --pin-files`, a stand-in in tests. */
@@ -730,29 +722,9 @@ function outcomeOf(judgment: Judgment, host: string): { outcome: SyncOutcome; co
   const v = judgment.hosts.find((h) => h.verdict.host === host)?.verdict;
   if (v === undefined) return { outcome: "unmeasured", code: SYNC_CODE.notMeasured };
   const code = v.deciding;
-  if (!v.measured) return { outcome: code === "probe.crashed" ? "crashed" : code === "probe.timeout" ? "hung" : "unmeasured", ...(code === undefined ? {} : { code }) };
+  if (!v.measured) return { outcome: code === probeOutcome("probeCrashed") ? "crashed" : code === probeOutcome("probeTimeout") ? "hung" : "unmeasured", ...(code === undefined ? {} : { code }) };
   if (v.rating === "suitable" || v.rating === "conditional") return { outcome: "qualified", ...(code === undefined ? {} : { code }) };
   return { outcome: v.rating === "unsuitable" ? "refused" : "unmeasured", ...(code === undefined ? {} : { code }) };
-}
-
-const safe = descriptorNamePart;
-
-/** The record of a plugin no probe output exists for: what it is, the bytes it was, and why nothing was measured. */
-function writeUnmeasuredRecord(ctx: SyncContext, item: SyncItem, files: readonly FileDigest[], plugin: Omit<SyncPlugin, "record">): string {
-  const main = files.find((f) => f.path === item.files[item.format === "clap" ? 0 : 1]) ?? files[0];
-  const path = join(ctx.settings.qualificationDir, `${safe(basename(plugin.uri))}-${(main?.sha256 ?? "").slice(0, 12)}.unmeasured.json`);
-  const record = {
-    schema: "plugin-qualify.unmeasured-record/1",
-    plugin: { format: item.format, uri: plugin.uri },
-    binary: { root: item.root, files: files.map((f) => ({ path: f.path, sha256: f.sha256 })) },
-    outcome: plugin.outcome,
-    code: plugin.code,
-    ...(plugin.detail === undefined ? {} : { detail: plugin.detail }),
-    notMeasured: [{ dimension: "all", code: plugin.code ?? SYNC_CODE.notMeasured }, ...QUICK_NOT_MEASURED],
-    measuredAt: new Date().toISOString(),
-  };
-  writeFileWhole(path, `${JSON.stringify(record, null, 2)}\n`);
-  return path;
 }
 
 /** The directories the sync scanned, as the plugin-hostd a step starts reads them: with neither variable set it searches
@@ -770,10 +742,12 @@ export const isolatedEnv = (ctx: Pick<SyncContext, "env" | "settings">): Readonl
 });
 
 /** Each judged run of a pass as the plugins it qualified: the record written, the pin taken, the outcome. */
-function judgedPlugins(ctx: SyncContext, runs: readonly { bytes: Buffer; judgment: Judgment; stderr?: readonly Buffer[] }[], describeProblem?: string): SyncPlugin[] {
+function judgedPlugins(ctx: SyncContext, item: SyncItem, runs: readonly { bytes: Buffer; judgment: Judgment; stderr?: readonly Buffer[] }[], describeProblem?: string): SyncPlugin[] {
   const host = ctx.settings.hostProfile.id;
-  const entries = runs.map(({ bytes, judgment, stderr }) => {
-    const { recordPath, record } = writeQualification(ctx.settings.qualificationDir, bytes, judgment, QUICK_NOT_MEASURED, stderr);
+  const entries = runs.map(({ bytes, judgment }) => {
+    // the probe output is evidence the record names (its name, SHA-256 and size); no copy of it is kept beside the store
+    const record = buildQualificationRecord(judgment, { file: probeCopyFileName(judgment.output), sha256: sha256Hex(bytes), bytes: bytes.length }, QUICK_NOT_MEASURED);
+    const key: ShadowKey = { sha256: record.binary.sha256, format: record.plugin.format, uri: record.plugin.id, offer: judgment.output.offer.id, hostClass: ctx.settings.hostClass };
     const steps = baseSteps(record, describeProblem);
     let pin = withHostdFiles(ctx, judgmentPinEntries(judgment, host)[0]);
     let { outcome, code } = outcomeOf(judgment, host);
@@ -807,8 +781,11 @@ function judgedPlugins(ctx: SyncContext, runs: readonly { bytes: Buffer; judgmen
       steps.push(step);
       pin = pinAfterPool(pin, step);
     }
-    rewriteRecord(recordPath, { ...record, run: { id: judgment.output.run.id, steps } });
-    const plugin: SyncPlugin = { uri: pin?.uri ?? judgment.output.plugin.id, outcome, ...(code === undefined ? {} : { code }), ...(pin === undefined ? {} : { pin }), record: recordPath };
+    // the record's list is the files of the pin as plugin-hostd names them (the store spec's section 3.7), the probe's own
+    // when plugin-hostd could not name them
+    const files = pin?.integrity.files ?? record.binary.files;
+    ctx.store.put(key, storedForm({ ...record, binary: { ...record.binary, files }, run: { id: judgment.output.run.id, steps } }));
+    const plugin: SyncPlugin = { uri: pin?.uri ?? judgment.output.plugin.id, outcome, ...(code === undefined ? {} : { code }), ...(pin === undefined ? {} : { pin }), record: key };
     return { plugin, judgedHere: judgment.hosts.some((h) => h.verdict.host === host) };
   });
   // The pass also judges the console's other tier, which writes its own record; that run is no second plugin of this
@@ -901,7 +878,7 @@ function qualifyClap(ctx: SyncContext, item: SyncItem): SyncPlugin[] {
     const pass = runPass(ctx, { format: "clap", uri: `urn:clap:${p.id}`, bundle: item.root, binary: item.files[0]!, binaryPath: file }, ctx.env);
     for (const f of pass.failures) out.push({ uri, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: f.problem });
     const problem = descriptorFailed.get(p.id);
-    out.push(...judgedPlugins(ctx, pass.runs, problem).map((j) => (problem === undefined ? j : { ...j, descriptorProblem: problem })));
+    out.push(...judgedPlugins(ctx, item, pass.runs, problem).map((j) => (problem === undefined ? j : { ...j, descriptorProblem: problem })));
   }
   return out;
 }
@@ -910,7 +887,7 @@ function qualifyClap(ctx: SyncContext, item: SyncItem): SyncPlugin[] {
 function qualifyLv2(ctx: SyncContext, item: SyncItem): SyncPlugin[] {
   return lv2World(item.root, (world) => {
     const pass = runPass(ctx, { format: "lv2", uri: item.uri!, bundle: item.root }, { ...ctx.env, LV2_PATH: world });
-    return [...pass.failures.map((f): SyncPlugin => ({ uri: item.uri!, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: f.problem })), ...judgedPlugins(ctx, pass.runs)];
+    return [...pass.failures.map((f): SyncPlugin => ({ uri: item.uri!, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: f.problem })), ...judgedPlugins(ctx, item, pass.runs)];
   });
 }
 
@@ -924,7 +901,6 @@ export function qualifyItem(ctx: SyncContext, item: SyncItem, files: readonly Fi
     plugins = [{ uri: item.uri ?? item.key, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: (e as Error).message }];
   }
   if (plugins.length === 0) plugins = [{ uri: item.uri ?? item.key, outcome: "unmeasured", code: SYNC_CODE.notMeasured, detail: { code: TEXT_CODE.syncNoPluginListed } }];
-  plugins = plugins.map((p) => (p.record !== undefined ? p : { ...p, record: writeUnmeasuredRecord(ctx, item, files, p) }));
   // the pin's own files join the set, so a file the manifest reader missed still makes a change seen
   const pinned = plugins.flatMap((p) => p.pin?.integrity.files?.map((f) => f.path) ?? []);
   const all = digestFiles(item.root, [...item.files, ...pinned], files) ?? [...files];
@@ -944,21 +920,18 @@ export function isolatedPass(ctx: SyncContext, state: SyncState): { readonly sta
     entries[key] = {
       ...entry,
       plugins: entry.plugins.map((p) => {
-        if (p.record === undefined || !p.record.endsWith(".qualification.json")) return p;
-        const path = join(ctx.settings.qualificationDir, basename(p.record));
-        let record: QualificationRecord;
-        try {
-          record = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
-        } catch {
-          ctx.log(`${p.uri}: its record does not read; no isolated step`);
+        if (p.record === undefined) return p;
+        const record = ctx.store.record(p.record);
+        if (record === undefined) {
+          ctx.log(`${p.uri}: its record is not in the store; no isolated step`);
           return p;
         }
-        const done = completeIsolated(path, record, p.pin?.uri ?? record.plugin.id, isolatedCell(record, host), runner, isolatedEnv(ctx));
+        const done = completeIsolated(ctx.store, p.record, record, p.pin?.uri ?? record.plugin.id, isolatedCell(record, host), runner, isolatedEnv(ctx));
         if (done === undefined) {
           // a plugin the isolated step already decided but the state holds no pin for: the record keeps the bytes and the
           // step, and the pin follows them (hostd names the files, as at every other pin)
           if (p.pin !== undefined) return p;
-          const rebuilt = withHostdFiles(ctx, pinFromRecordWithPool(record));
+          const rebuilt = withHostdFiles(ctx, pinFromRecordWithPool(record, entry.root));
           if (rebuilt === undefined) return p;
           count.repinned++;
           ctx.log(`${p.uri}: pinned again from its record (isolated step ${rebuilt.verdict ?? "undecided"})`);
@@ -968,7 +941,7 @@ export function isolatedPass(ctx: SyncContext, state: SyncState): { readonly sta
         ctx.log(`${p.uri}: isolated step ${done.step.result}${done.step.code === undefined ? "" : ` (${done.step.code})`}`);
         // a plugin the state holds no pin for is pinned from the record the step now completes: the bytes it names and the word
         // the step earned (plugin-qualify#316: 38 plugins read hosting.memory.unmeasured and had none)
-        const pin = p.pin !== undefined ? pinAfterStep(p.pin, done.step) : withHostdFiles(ctx, pinFromRecordWithPool(done.record));
+        const pin = p.pin !== undefined ? pinAfterStep(p.pin, done.step) : withHostdFiles(ctx, pinFromRecordWithPool(done.record, entry.root));
         const { pin: _pin, code: _code, ...rest } = p;
         if (done.step.result === ISOLATED_RESULT.isolated) {
           count.isolated++;
@@ -997,16 +970,13 @@ export function poolPass(ctx: SyncContext, state: SyncState): { readonly state: 
     entries[key] = {
       ...entry,
       plugins: entry.plugins.map((p) => {
-        if (p.record === undefined || !p.record.endsWith(".qualification.json") || p.pin === undefined || p.pin.verdict === "refused") return p;
-        const path = join(ctx.settings.qualificationDir, basename(p.record));
-        let record: QualificationRecord;
-        try {
-          record = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
-        } catch {
-          ctx.log(`${p.uri}: its record does not read; no pool step`);
+        if (p.record === undefined || p.pin === undefined || p.pin.verdict === "refused") return p;
+        const record = ctx.store.record(p.record);
+        if (record === undefined) {
+          ctx.log(`${p.uri}: its record is not in the store; no pool step`);
           return p;
         }
-        const done = completePool(path, record, p.pin.uri, isolatedCell(record, host), runner, poolEnv({ ...ctx.env, ...hostdSearchEnv(ctx.settings) }, ctx.settings.budgetS));
+        const done = completePool(ctx.store, p.record, record, p.pin.uri, isolatedCell(record, host), runner, poolEnv({ ...ctx.env, ...hostdSearchEnv(ctx.settings) }, ctx.settings.budgetS));
         if (done === undefined) return p;
         ctx.log(`${p.uri}: pool step ${done.step.result}${done.step.code === undefined ? "" : ` (${done.step.code})`}`);
         if (done.step.result === POOL_RESULT.cores) count.cores++;
@@ -1020,84 +990,92 @@ export function poolPass(ctx: SyncContext, state: SyncState): { readonly state: 
   return { ...count, state: count.cores + count.off + count.notAsked + count.notRun === 0 ? state : { ...state, entries } };
 }
 
-// --- the distributed records ----------------------------------------------------------------------------------------
+// --- the stored records ----------------------------------------------------------------------------------------------
 
 /**
- * The cells a sync runs at, which a distributed set must hold to apply (#317): the grid's own cells when it names them
+ * The cells a sync runs at, which a stored record must hold to apply (#317): the grid's own cells when it names them
  * (`grid 48000/512`), else the cells the host profile judges cost and memory at.
  */
 export function syncCells(settings: Pick<SyncSettings, "grid" | "hostProfile">): GridCell[] {
   return settings.grid.kind === "cells" ? [...settings.grid.cells] : hostCells(settings.hostProfile);
 }
 
-/** The layer a run reads: none under `--force` or `--no-distributed`, or without a host class. */
-function distributedLayerOf(settings: SyncSettings, force: boolean, log: (line: string) => void): DistributedLayer {
-  if (force || !settings.distributed) return EMPTY_LAYER;
-  if (settings.hostClass === undefined) {
-    log("distributed: no host class (host_class unset, and the board names none); no distributed record is read");
-    return EMPTY_LAYER;
-  }
-  const layer = readDistributedLayer(settings.distributedDirs, settings.hostClass, log);
-  if (layer.records > 0) log(`distributed: ${String(layer.records)} records of ${layer.sets.join(", ")} for ${settings.hostClass}`);
-  return layer;
-}
-
 /**
- * The item's entry taken from the distributed records, or `undefined` when it is to be measured: no record finds it,
- * or the ones that do were not taken, each reason said. Its descriptors are written as a measured item's are: a
- * `.clap` is scanned for them (the scan lists the plugins and measures nothing), an LV2 plugin joins the run's
- * descriptor pass.
+ * The item's entry taken from the store's records, or `undefined` when it is to be measured: no record finds it, or the
+ * ones that do were not taken, each reason said. The match is the pin (`pin-match.ts`): the key and the exact set of the
+ * item's files. Of a key, the record taken is the one the store says answers the machine's cell (the first cell the
+ * sync runs at), whole: `QualificationStore.recordAt`, the store's claim. Two sets of the base may hold a key at one
+ * cell; which one answers is the store's rule (the reference tier, then the set measured later), read here and never
+ * decided here (#152). That record must hold every cell the sync runs at, as any record taken must (#317). Its
+ * descriptors are written as a measured item's are: a `.clap` is scanned for them (the scan lists the plugins and
+ * measures nothing), an LV2 plugin joins the run's descriptor pass.
  */
-function takeDistributed(ctx: SyncContext, layer: DistributedLayer, item: SyncItem, files: readonly FileDigest[]): SyncEntry | undefined {
-  if (layer.records === 0) return undefined;
+function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest[]): SyncEntry | undefined {
   const started = Date.now();
   const host = ctx.settings.hostProfile.id;
-  const match = matchDistributed(layer, item, host, (paths) => digestFiles(item.root, paths, files), syncCells(ctx.settings));
+  const results = ctx.store.results({ format: item.format, hostClass: ctx.settings.hostClass, ...(item.format === "clap" ? { binaryPath: item.files[0]! } : { uri: item.uri! }) });
+  if (results.length === 0) return undefined;
+  // the set compared is plugin-hostd's pin list for the item, as withHostdFiles takes it (the store spec's section 3.7), not the sync's own discovery
+  const named = hostdPinFiles(item.format === "clap" ? clapPinUri(join(item.root, item.files[0]!), `urn:clap:${results[0]!.uri}`) : item.uri!, ctx.settings.lv2Dirs, ctx.env, ...(ctx.pinFilesRun === undefined ? [] : [ctx.pinFilesRun]));
+  const match = matchStored(results, item, host, named.ok ? named.files : undefined, syncCells(ctx.settings));
   if (match.status === "none") return undefined;
   for (const line of match.lines) ctx.log(line);
   if (match.status === "ignored") return undefined;
-  for (const r of match.records) {
-    const missing = missingSteps(r.record);
-    if (missing.length > 0) {
-      ctx.log(`distributed: ${distributedUri(item, r)}: its record lacks the step${missing.length === 1 ? "" : "s"} ${missing.join(", ")}; measured here`);
-      return undefined;
-    }
-    if (latencyNeverTaken(r.record)) {
-      ctx.log(`distributed: ${distributedUri(item, r)}: its record never took the latency figure (a probe from before that pass); measured here`);
-      return undefined;
-    }
-  }
-  // The set was judged by the plugin-qualify that measured it. Its figures are carried across and judged again under
-  // today's rules, as an upgrade's are (`--rejudge`): a verdict of an older judge (RT-unsafe read as refused, before
-  // #196) is never taken as it stands. A record today's judge cannot decide for this host is measured here.
+  // The records were judged by the plugin-qualify that measured them. Their figures are carried across and judged again
+  // under today's rules from their rows, as an upgrade's are (`--rejudge`): a verdict of an older judge is never taken as
+  // it stands. A record today's judge cannot decide for this host is measured here.
   const by = rejudgeToolName();
   const at = new Date(started).toISOString();
-  const records = [];
-  for (const r of match.records) {
+  const cells = syncCells(ctx.settings);
+  const machineCell = cells[0]!;
+  const taken: { key: ShadowKey; whole: StoredRecord; record: QualificationRecord; result: (typeof results)[number] }[] = [];
+  for (const key of match.keys) {
+    const label = keyLabel(key);
+    const whole = ctx.store.recordAt(key, machineCell);
+    if (whole === undefined) {
+      ctx.log(`stored: ${label}: no record of it answers ${cellKey(machineCell)}; measured here`);
+      return undefined;
+    }
+    const held = new Set(recordCells(whole.record).map(cellKey));
+    if (!cells.every((c) => held.has(cellKey(c)))) {
+      ctx.log(`stored: ${label}: set ${whole.set ?? whole.layer} claims ${cellKey(machineCell)}, measured at ${[...held].join(", ")} only; measured here`);
+      return undefined;
+    }
+    const missing = missingSteps(whole.record);
+    if (missing.length > 0) {
+      ctx.log(`stored: ${label}: its record lacks the step${missing.length === 1 ? "" : "s"} ${missing.join(", ")}; measured here`);
+      return undefined;
+    }
+    if (latencyNeverTaken(whole.record)) {
+      ctx.log(`stored: ${label}: its record never took the latency figure (a probe from before that pass); measured here`);
+      return undefined;
+    }
     let record: QualificationRecord;
     try {
-      record = rejudgeRecord(r.record, readFileSync(join(r.path, "..", r.record.probe.file)), { host, by, at }).record;
+      record = rejudgeFromRows(whole, { host, by, at }).record;
     } catch (e) {
-      ctx.log(`distributed: ${distributedUri(item, r)}: ${(e as Error).message}; measured here`);
+      ctx.log(`stored: ${label}: ${(e as Error).message}; measured here`);
       return undefined;
     }
     const v = record.verdicts.find((x) => x.host === host);
     if (v !== undefined && outcomeOfVerdict(v) === "unmeasured") {
-      ctx.log(`distributed: ${distributedUri(item, r)}: judged again, ${v.deciding ?? "unknown"} for ${host}; measured here`);
+      ctx.log(`stored: ${label}: judged again, ${v.deciding ?? "unknown"} for ${host}; measured here`);
       return undefined;
     }
-    records.push({ ...r, record });
+    taken.push({ key, whole, record, result: results.find((r) => keyId(shadowKeyOf(r)) === keyId(key))! });
   }
-  let plugins: SyncPlugin[];
-  try {
-    plugins = applyDistributed(ctx.settings.qualificationDir, item, { ...match, records }, host);
-  } catch (e) {
-    ctx.log(`distributed: ${distributedUri(item, match.records[0]!)}: ${(e as Error).message}; measured here`);
-    return undefined;
+  const plugins: SyncPlugin[] = [];
+  for (const { key, whole, record, result } of taken) {
+    // a record already in this scope's layer stands; one of the base is carried into the layer, judged again
+    if (whole.layer === "base" || JSON.stringify(whole.record) !== JSON.stringify(record)) ctx.store.put(key, record);
+    const v = record.verdicts.find((x) => x.host === host);
+    if (v === undefined) continue; // the other tier's record: carried, and no plugin of the sweep
+    const pin = pinOfStored(item, { ...result, verdicts: [{ host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 }] }, host, v.reasons);
+    plugins.push({ uri: storedUri(item, result), outcome: outcomeOfVerdict(v), ...(v.deciding === undefined ? {} : { code: v.deciding }), ...(pin === undefined ? {} : { pin }), record: key });
   }
   if (item.format === "clap") scanClapDescriptors(ctx, item);
-  const all = digestFiles(item.root, [...item.files, ...match.files], files) ?? [...files];
-  return { format: item.format, root: item.root, files: all, plugins, qualifiedAt: new Date(started).toISOString(), seconds: (Date.now() - started) / 1000, distributed: match.set };
+  const all = digestFiles(item.root, item.files, files) ?? [...files];
+  return { format: item.format, root: item.root, files: all, plugins, qualifiedAt: new Date(started).toISOString(), seconds: (Date.now() - started) / 1000, distributed: taken.find((t) => typeof t.whole.set === "string")?.whole.set ?? "store" };
 }
 
 /** The descriptors of a `.clap` taken from the layer: the scanner lists its plugins, the descriptor writer writes them. */
@@ -1145,11 +1123,6 @@ export function removedPinUris(before: string, after: string): string[] {
   return [...pinLinesOf(before).keys()].filter((uri) => !now.has(uri));
 }
 
-/** `<id>@<version>-<binary sha first 12>`, the stem a qualification record, its probe copy, its children's stderr and its descriptor share. */
-export function recordStem(recordPath: string): string | undefined {
-  return /^(.*-[0-9a-f]{12})\.(?:(?:[^.]+\.(?:qualification|probe)|unmeasured)\.json|[^.]+\.stderr\.[0-9a-f]{12}\.log)$/.exec(basename(recordPath))?.[1];
-}
-
 /**
  * A stem's id and binary hash, its version segment dropped: what a record and its descriptor share even when their
  * version segments differ (a CLAP record is keyed `@unversioned` while its descriptor carries the plugin's declared
@@ -1161,45 +1134,34 @@ function idAndHash(stem: string): string | undefined {
 }
 
 /**
- * What a plugin the sync no longer finds, or finds as other bytes, leaves behind: its qualification record, the probe
- * output copied beside it and its descriptor. A stem the state before held and the state after does not hold is
- * stale; every record file of that stem is removed, and so is a descriptor of its id and binary hash whichever
- * version suffix it carries — unless that id and hash is still kept under another stem (two copies of one binary, or
- * a record and a descriptor the sync wrote at different version suffixes for the same plugin). A record of an id the
- * state after holds, made from other bytes than it holds, goes too, though no state ever named it (#198). A record another
- * plugin of the state still names (two copies of one binary) is kept, as is a descriptor the sync did not write.
- * Returns the files removed.
+ * What a plugin the sync no longer finds, or finds as other bytes, leaves behind: its record in the scope's user layer and
+ * its descriptor. A record is stale when the state before holds its key and the state after does not, or when its `uri`
+ * is a kept plugin's and its `sha256` is not one the state after keeps (the other bytes of a kept plugin, whether or not
+ * any state ever named it, #198). A stale record is removed by `delete`; a record another plugin of the state still names
+ * (two copies of one binary) is kept, and the base is never touched. A descriptor `<id>@<version>-<first 12 digits of the
+ * key>.json` is dropped by its id and those 12 digits, unless that id and hash is still kept. Returns the shadow keys
+ * removed and the descriptor files removed, to log.
  */
-export function pruneStale(settings: Pick<SyncSettings, "qualificationDir" | "descriptorDir">, before: SyncState, after: SyncState): string[] {
-  const stems = (state: SyncState): Set<string> =>
-    new Set(Object.values(state.entries).flatMap((e) => e.plugins.flatMap((p) => (p.record === undefined ? [] : [recordStem(p.record) ?? ""]))).filter((x) => x !== ""));
-  const kept = stems(after);
-  const stale = [...stems(before)].filter((stem) => !kept.has(stem));
-  const keptIdHash = new Set([...kept].map(idAndHash).filter((x): x is string => x !== undefined));
-  const staleIdHash = new Set(stale.map(idAndHash).filter((x): x is string => x !== undefined));
+export function pruneStale(settings: Pick<SyncSettings, "descriptorDir">, store: QualificationStore, before: SyncState, after: SyncState): string[] {
+  const keysOf = (state: SyncState): Map<string, ShadowKey> =>
+    new Map(Object.values(state.entries).flatMap((e) => e.plugins.flatMap((p) => (p.record === undefined ? [] : [[keyId(p.record), p.record] as const]))));
+  const kept = keysOf(after);
+  const stale = new Set([...keysOf(before).keys()].filter((id) => !kept.has(id)));
+  const keptUris = new Set([...kept.values()].map((k) => `${k.format}\0${k.uri}`));
+  const keptHashes = new Set([...kept.values()].map((k) => `${k.format}\0${k.uri}\0${k.sha256}`));
+  const idHash = (k: ShadowKey): string => `${safeName(k.uri)}\0${k.sha256.slice(0, 12)}`;
+  const keptIdHash = new Set([...kept.values()].map(idHash));
   const removed: string[] = [];
-  const drop = (dir: string, file: string): void => {
-    try {
-      unlinkSync(join(dir, file));
-      removed.push(join(dir, file));
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    }
-  };
-  let records: string[] = [];
-  try {
-    records = readdirSync(settings.qualificationDir);
-  } catch {
-    // no directory, no record
-  }
-  for (const stem of stale) for (const f of records) if (f.startsWith(`${stem}.`) && recordStem(f) === stem) drop(settings.qualificationDir, f);
-  // a record of an installed plugin's id made from other bytes, whether or not any state ever named it (the other
-  // tier's record, a lost state entry): the id is kept, the binary hash is not
-  const keptIds = new Set([...keptIdHash].map((k) => k.split("\0")[0]!));
-  for (const f of records) {
-    const s = recordStem(f);
-    const key = s === undefined ? undefined : idAndHash(s);
-    if (key !== undefined && keptIds.has(key.split("\0")[0]!) && !keptIdHash.has(key)) drop(settings.qualificationDir, f);
+  const dropped = new Set<string>();
+  for (const r of store.userRecords()) {
+    const key = shadowKeyOf(r);
+    const id = keyId(key);
+    if (kept.has(id)) continue;
+    const otherBytes = keptUris.has(`${key.format}\0${key.uri}`) && !keptHashes.has(`${key.format}\0${key.uri}\0${key.sha256}`);
+    if (!stale.has(id) && !otherBytes) continue;
+    store.delete(key);
+    dropped.add(idHash(key));
+    removed.push(keyLabel(key));
   }
   let descriptors: string[] = [];
   try {
@@ -1207,13 +1169,29 @@ export function pruneStale(settings: Pick<SyncSettings, "qualificationDir" | "de
   } catch {
     // no directory, no descriptor
   }
+  // a descriptor of a stale key's id and hash, though its version suffix is the plugin's own and not the record's
+  const staleIdHash = new Set([...stale].map((id) => idHash(keyOfId(id))).concat([...dropped]));
   for (const f of descriptors) {
     if (!f.endsWith(".json")) continue;
     const key = idAndHash(f.slice(0, -".json".length));
-    if (key !== undefined && staleIdHash.has(key) && !keptIdHash.has(key)) drop(settings.descriptorDir, f);
+    if (key !== undefined && staleIdHash.has(key) && !keptIdHash.has(key)) {
+      try {
+        unlinkSync(join(settings.descriptorDir, f));
+        removed.push(join(settings.descriptorDir, f));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+    }
   }
   return removed;
 }
+
+/** A key from its map form. */
+const keyOfId = (id: string): ShadowKey => {
+  const [sha256, format, uri, offer, hostClass] = id.split("\0");
+  return { sha256: sha256!, format: format!, uri: uri!, offer: offer!, hostClass: hostClass! };
+};
+const safeName = descriptorNamePart;
 
 /** What became of the pins sent to a daemon: its replies, or why none came. */
 export type SentPins =
@@ -1369,7 +1347,7 @@ export function descriptorAccessProblems(dir: string): string[] {
   return problems;
 }
 
-/** What the records say per plugin, not per record: a CLAP plugin has a record per offer (.default, the console's
+/** What the scope's own records say per plugin, not per record (`counts --layer user`): a CLAP plugin has a record per offer (.default, the console's
  * in-process tier, and .custom, omx-clap-host's isolated tier), and is offered when any of its records is. */
 export interface PluginCounts {
   readonly plugins: Readonly<Record<string, number>>;
@@ -1377,31 +1355,12 @@ export interface PluginCounts {
   readonly notOffered: Readonly<Record<string, number>>;
 }
 
-export function pluginCounts(qualificationDir: string): PluginCounts {
-  const offeredBy = new Map<string, boolean>();
-  let files: string[] = [];
-  try {
-    files = readdirSync(qualificationDir).filter((f) => f.endsWith(".qualification.json"));
-  } catch {
-    // no directory, no record
-  }
-  for (const f of files) {
-    let r: { plugin?: { format?: string; id?: string }; tiers?: { offeredOn?: readonly string[] } };
-    try {
-      r = JSON.parse(readFileSync(join(qualificationDir, f), "utf8"));
-    } catch {
-      continue;
-    }
-    if (!r.plugin?.format || !r.plugin.id) continue;
-    const key = `${r.plugin.format}\0${r.plugin.id}`;
-    offeredBy.set(key, (offeredBy.get(key) ?? false) || (r.tiers?.offeredOn?.length ?? 0) > 0);
-  }
+export function pluginCounts(store: QualificationStore): PluginCounts {
   const plugins: Record<string, number> = {}, offered: Record<string, number> = {}, notOffered: Record<string, number> = {};
-  for (const [key, isOffered] of offeredBy) {
-    const format = key.split("\0")[0]!;
-    plugins[format] = (plugins[format] ?? 0) + 1;
-    const into = isOffered ? offered : notOffered;
-    into[format] = (into[format] ?? 0) + 1;
+  for (const c of store.counts()) {
+    if (c.plugins > 0) plugins[c.format] = c.plugins;
+    if (c.offered > 0) offered[c.format] = c.offered;
+    if (c.not_offered > 0) notOffered[c.format] = c.not_offered;
   }
   return { plugins, offered, notOffered };
 }
@@ -1462,6 +1421,8 @@ export const pendingMarker = (stateFile: string): string => join(dirname(stateFi
 export interface SyncRunOptions {
   /** After a full run, write each recorded, pinned plugin into plugin-db's store (#73); `system` names the service's store. */
   readonly store?: { readonly system: boolean; readonly run?: PluginDbRun };
+  /** The qualification store of the run, a stand-in in tests; else the scope's own, through its commands. */
+  readonly qualificationStore?: QualificationStore;
   readonly force?: boolean;
   /** `--refresh-pins`: only refresh the pins' files from plugin-hostd and send the changed ones; measure nothing. */
   readonly refreshOnly?: boolean;
@@ -1571,7 +1532,9 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
   {
     const started = Date.now();
     const dirs = [...settings.clapDirs, ...settings.lv2Dirs];
-    const ctx: SyncContext = { settings, env, log, ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }), ...(options.isolatedRunner === undefined ? {} : { isolatedRunner: options.isolatedRunner }), ...(options.poolRunner === undefined ? {} : { poolRunner: options.poolRunner }) };
+    const ctx: SyncContext = { settings, env, log, store: options.qualificationStore ?? new QualificationStore(settings.system ? "system" : "user", { env }), ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }), ...(options.isolatedRunner === undefined ? {} : { isolatedRunner: options.isolatedRunner }), ...(options.poolRunner === undefined ? {} : { poolRunner: options.poolRunner }) };
+    // an absent base is an empty base layer (the store spec, section 6.1): said once a run, when the reader first says it
+    ctx.store.whenBaseAbsent((path) => log(`qualification store: base-absent: ${path}: the base layer is empty; the ${ctx.store.scope} layer's records alone are read`));
     // the pins first, before the quiet wait and any measurement: an upgrade of plugin-hostd that collects more files
     // than the pins on disk hold refuses those plugins until their pins name them (plugin-qualify#239)
     const fresh = refreshPins(ctx, readSyncState(settings.stateFile, log));
@@ -1610,7 +1573,6 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     }
     await waitQuiet(dirs, settings.settleS, log);
     const count = { qualified: 0, skipped: 0, refused: 0, crashed: 0, hung: 0, unmeasured: 0, distributed: 0 };
-    const layer = distributedLayerOf(settings, options.force === true, log);
     let before: string;
     try {
       before = readFileSync(settings.pinFile, "utf8");
@@ -1644,7 +1606,7 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
       for (const item of items) {
         const recorded = recordedAsIs(item, entries[item.key]);
         const retry = recorded.same ? entries[item.key]!.plugins.map(machineReason).find((r) => r !== undefined) : undefined;
-        const owed = recorded.same && options.force !== true && retry === undefined ? figureOwed(entries[item.key]!) : undefined;
+        const owed = recorded.same && options.force !== true && retry === undefined ? figureOwed(entries[item.key]!, ctx.store) : undefined;
         if (recorded.same && options.force !== true && retry === undefined && owed === undefined) {
           if (pass === 0) count.skipped += entries[item.key]!.plugins.length;
           continue;
@@ -1669,12 +1631,12 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
           log(`${item.key}: a file of it cannot be read; skipped this run`);
           continue;
         }
-        const taken = takeDistributed(ctx, layer, item, files);
+        const taken = options.force === true || !settings.distributed ? undefined : takeStored(ctx, item, files);
         if (taken !== undefined) {
           entries[item.key] = taken;
           if (item.format === "lv2") lv2Pinned.push(...taken.plugins.filter((p) => p.pin !== undefined).map((p) => p.uri));
           count.distributed += taken.plugins.length;
-          for (const p of taken.plugins) log(`distributed: ${p.uri}: applied (${taken.distributed!})`);
+          for (const p of taken.plugins) log(`stored: ${p.uri}: applied (${taken.distributed!})`);
           state = { schema: SYNC_STATE_SCHEMA, entries };
           writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
           writeFileWhole(settings.pinFile, syncPinsText(state));
@@ -1706,13 +1668,13 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     writeLv2Descriptors(ctx, lv2Pinned);
     for (const line of descriptorAccessProblems(settings.descriptorDir)) log(line);
     if (options.store !== undefined) {
-      const stored = storeJudgedLayers(state, { machineClass: settings.hostClass, system: options.store.system, lv2Path: settings.lv2Dirs.join(":"), stampFile: `${settings.stateFile}.stored`, env: ctx.env, ...(options.store.run === undefined ? {} : { run: options.store.run }) });
+      const stored = storeJudgedLayers(state, { machineClass: settings.hostClass, system: options.store.system, lv2Path: settings.lv2Dirs.join(":"), stampFile: `${settings.stateFile}.stored`, env: ctx.env, records: ctx.store, ...(options.store.run === undefined ? {} : { run: options.store.run }) });
       for (const line of stored.lines) log(line);
     }
     // the files of a plugin that is gone, or was replaced by other bytes: only when every directory could be read, so
     // an unreadable one is never taken for an uninstall
     if (unreadable) log("a plugin directory could not be read; no record or descriptor is removed this run");
-    else for (const f of pruneStale(settings, stateBefore, state)) log(`${f}: removed, its plugin is gone or changed`);
+    else for (const f of pruneStale(settings, ctx.store, stateBefore, state)) log(`${f}: removed, its plugin is gone or changed`);
     // a plugin that was pinned and is not any more is also forgotten by a running daemon
     const changed = [...changedPinLines(before, after), ...removedPinUris(before, after).map(pinClearLine)];
     const sent = await sendPins(settings.hostdPort, settings.hostdFeedbackPort, changed);

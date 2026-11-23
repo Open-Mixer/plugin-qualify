@@ -152,7 +152,7 @@ export { HOSTING_CODE };
 export type HostingCode = (typeof HOSTING_CODE)[keyof typeof HOSTING_CODE];
 
 /**
- * The refusals libomx-clap-core returns from `open`, `activate` and the timed open, each named by the KEY of the
+ * The refusals libomx-clap returns from `open`, `activate` and the timed open, each named by the KEY of the
  * `HOSTING_CODE` it answers with — never by the string, so no second spelling of a code exists. The console's
  * generator renders them into omx-clap-host's `clap_host_limits.h` as `CLAP_HOST_CODE_<NAME>`, the left column's
  * name in upper snake case. The facts the qualifier judges from a measurement (latency, thread violations, process
@@ -216,7 +216,8 @@ export interface CrashSignature {
   readonly attribution: CrashAttribution;
   /** The top plugin-owned stack frame, or a host frame that exonerates the plugin. */
   readonly topFrame: string;
-  readonly signal?: "SIGSEGV" | "SIGABRT" | "SIGBUS";
+  /** The title of the signal's word in the probe domain (`sigsegv`, `sigabrt`, `sigbus`); the word is the domain's. */
+  readonly signal?: string;
   /** What was found about this cluster. Provenance, so a row is never folklore. */
   readonly note: string;
 }
@@ -230,14 +231,14 @@ export const CRASH_SIGNATURES: readonly CrashSignature[] = [
     id: "pipewire-jack-close-double-free",
     attribution: "host",
     topFrame: "pw_memmap_free",
-    signal: "SIGSEGV",
+    signal: "sigsegv",
     note: "closing a PipeWire JACK client frees a memory map twice; the host crashes, not the plugin",
   },
   {
     id: "pipewire-jack-close-double-free-abort",
     attribution: "host",
     topFrame: "tcache_double_free_verify",
-    signal: "SIGABRT",
+    signal: "sigabrt",
     note: "the same double free in PipeWire's JACK client close, caught by glibc's tcache check as an abort",
   },
   {
@@ -256,7 +257,8 @@ export const CRASH_SIGNATURES: readonly CrashSignature[] = [
 
 /** A crash as observed, before attribution. */
 export interface ObservedCrash {
-  readonly signal?: "SIGSEGV" | "SIGABRT" | "SIGBUS";
+  /** The signal as the probe domain words it (PROBE_SIGNALS). */
+  readonly signal?: string;
   readonly topFrame?: string;
   /** The sanitizer's error class, when a sanitizer build caught it (interchange §3a). */
   readonly sanitizer?: string;
@@ -285,7 +287,7 @@ export function attributeCrash(
   if (crash.topFrame === undefined) return "unknown";
   for (const row of table) {
     if (row.topFrame !== crash.topFrame) continue;
-    if (row.signal !== undefined && crash.signal !== undefined && row.signal !== crash.signal) {
+    if (row.signal !== undefined && crash.signal !== undefined && probeSignal(row.signal) !== crash.signal) {
       continue;
     }
     return row.attribution;
@@ -327,6 +329,7 @@ export type PluginLv2Features = Omit<FeaturesMeasurement, "unmeasuredReason" | "
 export { DEFAULT_HOSTING_POLICY, type HostingPolicy } from "./qualify-declarations.js";
 import { DEFAULT_HOSTING_POLICY, type HostingPolicy } from "./qualify-declarations.js";
 import { costFieldsMissing, costPointKey } from "./cost-fields.js";
+import { probeSignal } from "./probe-domain.js";
 
 /** One declared rate's latency reading from the CLAP qualifier (CLAP spec §3, latency). */
 export interface ClapLatencyAtRate {

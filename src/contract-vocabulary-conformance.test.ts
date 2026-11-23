@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * omx-clap-core declares the hosting codes once (its two TypeScript modules); omx-contract
+ * omx-clap declares the hosting codes once (its two TypeScript modules); omx-contract
  * declares the measurement words once; plugin-qualify reads them. This file turns red on any
  * hosting.* code or measurement word plugin-qualify writes or reads that its owner lacks, and on
  * any word list here that is not the contract's.
@@ -15,7 +15,8 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 import { openQualificationDomainAt } from "./qualification-domain-node.js";
-import { clapCoreTsDirCandidates, isHostingTableName } from "../tools/clap-core-tsdir.mjs";
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
+import { clapTsDirCandidates, isHostingTableName } from "../tools/clap-tsdir.mjs";
 import { OUT as GENERATED_HOSTING_CODES, hostingCodesFileFrom } from "../tools/gen-hosting-codes.mjs";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import {
@@ -35,20 +36,20 @@ import {
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "src/contract-vocabulary-conformance.test.ts";
 
-/** omx-clap-core's two TypeScript modules, read independently of `tools/gen-hosting-codes.mjs`'s loader. */
-const CLAP_CORE_TS_MODULES = ["omx-clap-core-vocabulary.js", "omx-clap-core-hosting.js"] as const;
+/** omx-clap's two TypeScript modules, read independently of `tools/gen-hosting-codes.mjs`'s loader. */
+const CLAP_TS_MODULES = ["omx-clap-vocabulary.js", "omx-clap-hosting.js"] as const;
 
 function locateClapCoreTsDir(): string {
-  const dir = clapCoreTsDirCandidates().find((d) => CLAP_CORE_TS_MODULES.every((m) => existsSync(join(d, m))));
-  if (dir === undefined) throw new Error("omx-clap-core's TypeScript modules were not found for the conformance test");
+  const dir = clapTsDirCandidates().find((d) => CLAP_TS_MODULES.every((m) => existsSync(join(d, m))));
+  if (dir === undefined) throw new Error("omx-clap's TypeScript modules were not found for the conformance test");
   return dir;
 }
 
-/** Every code omx-clap-core declares, across both its modules' hosting tables. */
+/** Every code omx-clap declares, across both its modules' hosting tables. */
 async function loadContractCodes(): Promise<ReadonlySet<string>> {
   const dir = locateClapCoreTsDir();
   const codes = new Set<string>();
-  for (const name of CLAP_CORE_TS_MODULES) {
+  for (const name of CLAP_TS_MODULES) {
     const mod: Record<string, unknown> = await import(pathToFileURL(join(dir, name)).href);
     for (const [exportName, table] of Object.entries(mod)) {
       if (!isHostingTableName(exportName)) continue;
@@ -107,7 +108,7 @@ function undeclared(files: readonly string[], read: (rel: string) => string): st
 
 const readPkg = (rel: string): string => readFileSync(join(PKG, rel), "utf8");
 
-describe("every hosting.* code plugin-qualify names is omx-clap-core's", () => {
+describe("every hosting.* code plugin-qualify names is omx-clap's", () => {
   const files = trackedTextFiles();
 
   it("the scan reaches the sources, the tools, the native measurers and the docs — positive control", () => {
@@ -144,13 +145,13 @@ describe("every hosting.* code plugin-qualify names is omx-clap-core's", () => {
   });
 });
 
-describe("HOSTING_CODE is omx-clap-core's hosting tables, in full", () => {
+describe("HOSTING_CODE is omx-clap's hosting tables, in full", () => {
   it("every code in HOSTING_CODE is the contract's, and every contract code is in it", () => {
     const ours = new Set<string>(Object.values(HOSTING_CODE));
     expect([...ours].sort()).toEqual([...CONTRACT_CODES].sort());
   });
 
-  it("src/hosting-codes.generated.ts is byte-identical to the generator's output from omx-clap-core", async () => {
+  it("src/hosting-codes.generated.ts is byte-identical to the generator's output from omx-clap", async () => {
     const expected = await hostingCodesFileFrom(locateClapCoreTsDir());
     expect(readFileSync(GENERATED_HOSTING_CODES, "utf8"), "stale: run node tools/gen-hosting-codes.mjs --write").toBe(expected);
   });
@@ -162,7 +163,7 @@ describe("HOSTING_CODE is omx-clap-core's hosting tables, in full", () => {
 });
 
 /** The words of a contract item, in its order. */
-const domain = openQualificationDomainAt(join(PKG, "contract.d"));
+const domain = openQualificationDomainAt(INSTALLED_CONTRACT_DIR);
 const words = (name: string): readonly string[] => domain.words(name);
 const codes = (terms: readonly { readonly code: string }[]): string[] => terms.map((t) => t.code);
 
@@ -258,12 +259,6 @@ const WRITERS: readonly Writer[] = [
     words: captured(/\bmethod:\s*"([^"]+)"/g),
     vocabulary: [...words("QUALIFICATION_MEASUREMENT_LATENCY_METHODS"), ...words("QUALIFICATION_MEASUREMENT_COST_METHODS")],
   },
-  {
-    what: "scaling law benchmark.py fits",
-    files: (rel) => rel === "tools/benchmark.py",
-    words: pythonReturns("_fit_scaling"),
-    vocabulary: words("QUALIFICATION_MEASUREMENT_LATENCY_SCALING"),
-  },
 ];
 
 function writtenOutside(files: readonly string[], read: (rel: string) => string): string[] {
@@ -288,6 +283,13 @@ describe("every measurement word plugin-qualify writes is the contract's", () =>
 
   it("no writer writes a word the contract lacks", () => {
     expect(writtenOutside(files, readPkg)).toEqual([]);
+  });
+
+  it("benchmark.py types no scaling word: the law it fits returns the domain's words, read at call time", () => {
+    const text = readPkg("tools/benchmark.py");
+    expect(pythonReturns("_fit_scaling")(text)).toEqual([]);
+    expect(pythonReturns("classify_scaling")(text)).toEqual([]);
+    expect(text).toContain('"QUALIFICATION_MEASUREMENT_LATENCY_SCALING"');
   });
 
   it("an invented reason in the C measurer is seen — sabotage control", () => {

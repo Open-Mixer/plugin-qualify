@@ -3,7 +3,7 @@
 /**
  * The pool step: the one place that grants a plugin the CLAP thread pool. omx-clap-host sizes a pool of helper threads
  * from its worker's cpu set, and plugin-hostd starts a worker with it only for a plugin whose pin says `pool=cores`
- * (plugin-db's `PLUGIN_DB_PIN_POOLS`: "measured real-time safe and faster at the quantum"). That word is the plugin's
+ * (plugin-hostd-protocol's `pin` domain, `PIN_POOLS`: "measured real-time safe and faster at the quantum"). That word is the plugin's
  * qualification to give, so nothing writes it but this step.
  *
  * A plugin that does not offer `clap.thread-pool` is never asked: its record says `not-asked` and its pin has no pool
@@ -38,7 +38,7 @@ import { ADMIT_STEP_MS_ENV, CLAP_QUALIFY_TOOL_NAME, ISOLATED_SIGNAL_TOOL_ENV, IS
 import { ISOLATED_RESULT, RUN_STEP, baseSteps, pinFromRecord, runIdOf } from "./qualify-isolated.js";
 import { startPrivateJack, type JackStarter } from "./qualify-adapter-pass.js";
 import { locateNativeTool, toolsDir } from "./tool-paths.js";
-import { writeFileWhole } from "./whole-file.js";
+import type { QualificationStore, ShadowKey } from "./qualification-store.js";
 
 /** The name of the step in a record's run. It is not one of `RUN_STEP`: a record is complete without it (a plugin that does not ask for the pool, or a machine that cannot run the step, has none). */
 export const POOL_STEP = "pool";
@@ -299,21 +299,21 @@ export function withPoolStep(steps: readonly RunStep[], step: RunStep): RunStep[
  * The pin a record can give back to a plugin whose state lost it: what {@link pinFromRecord} gives, with the pool word
  * of the record's pool step.
  */
-export function pinFromRecordWithPool(record: QualificationRecord): PinEntry | undefined {
-  return pinAfterPool(pinFromRecord(record), poolStepOf(record.run));
+export function pinFromRecordWithPool(record: QualificationRecord, root: string): PinEntry | undefined {
+  return pinAfterPool(pinFromRecord(record, root), poolStepOf(record.run));
 }
 
 /**
  * The missing pool step of a record already judged: the run keeps its id and gains the step, and nothing else is
- * measured. `undefined` when it owes none, or has no run id to extend. Writes the record whole.
+ * measured. `undefined` when it owes none, or has no run id to extend. Puts the record whole.
  */
-export function completePool(path: string, record: QualificationRecord, uri: string, cell: GridCell, runner: PoolRunner, env: Readonly<Record<string, string | undefined>>): { readonly record: QualificationRecord; readonly step: RunStep } | undefined {
+export function completePool(store: QualificationStore, key: ShadowKey, record: QualificationRecord, uri: string, cell: GridCell, runner: PoolRunner, env: Readonly<Record<string, string | undefined>>): { readonly record: QualificationRecord; readonly step: RunStep } | undefined {
   if (!owesPool(record)) return undefined;
-  const id = runIdOf(record, join(path, ".."));
+  const id = runIdOf(record);
   if (id === undefined) return undefined;
   const step = judgePoolRun(runner(uri, cell, env));
   const run: RunBlock = { id, steps: withPoolStep(record.run?.steps ?? baseSteps(record), step) };
   const next = { ...record, run };
-  writeFileWhole(path, `${JSON.stringify(next, null, 2)}\n`);
+  store.put(key, next);
   return { record: next, step };
 }

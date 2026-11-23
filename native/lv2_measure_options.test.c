@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /*
  * lv2_measure_options.test.c — the feature options the LV2 measurer runs under (lv2-measure-options.h),
- * over omx-clap-core's provider. Built by `make -C native`; src/lv2-measure-native.test.ts runs it:
+ * over omx-clap's provider. Built by `make -C native`; src/lv2-measure-native.test.ts runs it:
  *
  *   make -C native && native/build/lv2_measure_options_test
  *

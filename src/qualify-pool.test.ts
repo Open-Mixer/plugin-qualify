@@ -6,6 +6,8 @@
  * live arms run the step on a private JACK server under a real plugin-hostd with omx-clap-host's pool, on fixtures that
  * ask for the pool and gain from it, gain nothing, have nothing to run in parallel, or never ask.
  */
+import { QualificationStore, type ShadowKey } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -295,18 +297,19 @@ describe("the step itself, on a private server, under a real plugin-hostd with o
 describe("the completion of a record already judged", () => {
   const scratch = mkdtempSync(join(tmpdir(), "qualify-pool-"));
   afterAll(() => rmSync(scratch, { recursive: true, force: true }));
-  const write = (r: QualificationRecord, name: string): string => {
-    const path = join(scratch, name);
-    writeFileSync(path, JSON.stringify(r));
-    return path;
+  const store = new QualificationStore("user", { run: fakeStore({ validate: false }).run });
+  const write = (r: QualificationRecord, offer: string): ShadowKey => {
+    const key: ShadowKey = { sha256: "0".repeat(64), format: r.plugin.format, uri: r.plugin.id, offer, hostClass: "x86-64" };
+    store.put(key, r);
+    return key;
   };
   const rec = (steps: RunStep[]): QualificationRecord => ({ ...record({ steps }), rejudged: { figures: { runId: "run-from-the-figures" } } }) as unknown as QualificationRecord;
 
   it("adds the step and keeps the run's id and its other steps; the rest of the record is untouched", () => {
     const before = rec([{ step: "probe", result: "probe.ok" }]);
-    const path = write(before, "keep.qualification.json");
-    const done = completePool(path, before, "clap:/p.clap#id", CELL, () => FASTER, {});
-    const after = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
+    const key = write(before, "keep");
+    const done = completePool(store, key, before, "clap:/p.clap#id", CELL, () => FASTER, {});
+    const after = store.record(key)!;
     expect(done?.step.result).toBe(POOL_RESULT.cores);
     expect(after.run?.id).toBe("r");
     expect(after.run?.steps).toEqual([{ step: "probe", result: "probe.ok" }, done?.step]);
@@ -320,12 +323,12 @@ describe("the completion of a record already judged", () => {
       return FASTER;
     };
     const decided = rec([{ step: POOL_STEP, result: POOL_RESULT.off }]);
-    expect(completePool(write(decided, "decided.qualification.json"), decided, "u", CELL, runner, {})).toBeUndefined();
+    expect(completePool(store, write(decided, "decided"), decided, "u", CELL, runner, {})).toBeUndefined();
     expect(ran).toBe(0);
     const notRun = rec([{ step: POOL_STEP, result: POOL_RESULT.notRun, code: POOL_CODE.noHost }]);
-    const path = write(notRun, "again.qualification.json");
-    expect(completePool(path, notRun, "u", CELL, runner, {})?.step.result).toBe(POOL_RESULT.cores);
-    expect((JSON.parse(readFileSync(path, "utf8")) as QualificationRecord).run?.steps.filter((s) => s.step === POOL_STEP)).toHaveLength(1);
+    const key = write(notRun, "again");
+    expect(completePool(store, key, notRun, "u", CELL, runner, {})?.step.result).toBe(POOL_RESULT.cores);
+    expect(store.record(key)!.run?.steps.filter((s) => s.step === POOL_STEP)).toHaveLength(1);
     expect(ran).toBe(1);
   });
 });

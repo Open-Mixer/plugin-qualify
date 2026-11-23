@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
-/** The two TypeScript modules omx-clap-core's `tsdir` carries. */
-export const CLAP_CORE_TS_MODULES: readonly string[];
-/** Where omx-clap-core's TypeScript modules are looked for, in order. */
-export function clapCoreTsDirCandidates(env?: Readonly<Record<string, string | undefined>>): readonly string[];
+/** The two TypeScript modules omx-clap's `tsdir` carries. */
+export const CLAP_TS_MODULES: readonly string[];
+/** Where omx-clap's TypeScript modules are looked for, in order. */
+export function clapTsDirCandidates(env?: Readonly<Record<string, string | undefined>>): readonly string[];
 /** The first candidate holding both modules, or `undefined`. */
-export function findClapCoreTsDir(env?: Readonly<Record<string, string | undefined>>): string | undefined;
-/** True for an export name that is one of omx-clap-core's hosting tables. */
+export function findClapTsDir(env?: Readonly<Record<string, string | undefined>>): string | undefined;
+/** True for an export name that is one of omx-clap's hosting tables. */
 export function isHostingTableName(name: string): boolean;
 /** One hosting table: key to its entry. */
 export type HostingEntries = Readonly<Record<string, { readonly code: string }>>;
