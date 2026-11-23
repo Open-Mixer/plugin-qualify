@@ -20,13 +20,20 @@
  *   hangs.clap      built with -DFIXTURE_HANGS, the gain whose process() never returns.
  *   rate-pinned.clap built with -DFIXTURE_RATE_PINNED, the gain that aborts when one instance is activated again at
  *                   another rate than its first: each rate is judged in a fresh instance, so it measures at every rate.
+ *   worker-allocates.clap built with -DFIXTURE_WORKER=1, the rt-safe gain with a thread of its own, started at init
+ *                   and joined at destroy, that allocates and frees every 100 us while it lives, as LSP's do: its
+ *                   process() is clean, its thread is not (D20, plugin-qualify#53).
+ *   worker-idle.clap built with -DFIXTURE_WORKER=2, the same thread that only waits.
  *
  * Nothing else differs, so a verdict that tells them apart is the interposer's count and nothing else.
  */
+#include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <clap/clap.h>
 
@@ -57,6 +64,12 @@
 #elif defined FIXTURE_PARAMS
 #define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.params-" FIXTURE_STR(FIXTURE_PARAMS)
 #define FIXTURE_NAME "gain with " FIXTURE_STR(FIXTURE_PARAMS) " parameters"
+#elif defined FIXTURE_WORKER && FIXTURE_WORKER == 1
+#define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.worker-allocates"
+#define FIXTURE_NAME "rt-safe gain with a thread that allocates"
+#elif defined FIXTURE_WORKER
+#define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.worker-idle"
+#define FIXTURE_NAME "rt-safe gain with a thread that waits"
 #elif defined FIXTURE_ALLOCATES
 #define FIXTURE_ID "org.freemixer.plugin-qualify.fixture.rt-unsafe"
 #define FIXTURE_NAME "rt-unsafe gain"
@@ -100,7 +113,29 @@ struct gain {
   /* FIXTURE_HOGS_MB MiB for every 48000 Hz of the rate it is activated at, touched, held until deactivate */
   char *hog;
 #endif
+#ifdef FIXTURE_WORKER
+  /* the plugin's own thread, from init to destroy */
+  pthread_t worker;
+  int started;
+  _Atomic int stop;
+#endif
 };
+
+#ifdef FIXTURE_WORKER
+static void *(*volatile worker_malloc)(size_t) = malloc;
+static void (*volatile worker_free)(void *) = free;
+static void *worker_main(void *arg) {
+  struct gain *g = arg;
+  const struct timespec tick = { 0, 100000 };
+  while (!atomic_load(&g->stop)) {
+#if FIXTURE_WORKER == 1
+    worker_free(worker_malloc(64));
+#endif
+    nanosleep(&tick, NULL);
+  }
+  return NULL;
+}
+#endif
 
 #ifdef FIXTURE_DELAY
 /* what omx-pitch's order-3 Lagrange read puts one frame ahead of a tap at 882.99999 frames */
@@ -112,9 +147,25 @@ static bool gain_init(const clap_plugin_t *p) {
 #ifdef FIXTURE_CRASHES_AT_LOAD
   raise(SIGSEGV);
 #endif
+#ifdef FIXTURE_WORKER
+  {
+    struct gain *g = p->plugin_data;
+    atomic_store(&g->stop, 0);
+    g->started = pthread_create(&g->worker, NULL, worker_main, g) == 0;
+  }
+#endif
   return true;
 }
-static void gain_destroy(const clap_plugin_t *p) { free(p->plugin_data); }
+static void gain_destroy(const clap_plugin_t *p) {
+#ifdef FIXTURE_WORKER
+  struct gain *g = p->plugin_data;
+  if (g->started) {
+    atomic_store(&g->stop, 1);
+    pthread_join(g->worker, NULL);
+  }
+#endif
+  free(p->plugin_data);
+}
 static bool gain_activate(const clap_plugin_t *p, double rate, uint32_t min, uint32_t max) {
   (void)p; (void)rate; (void)min; (void)max;
 #ifdef FIXTURE_RATE_PINNED

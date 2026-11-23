@@ -26,14 +26,14 @@ import {
   type ModHostRun,
   JALV_HOSTED_MS,
   admissionRating,
-  ADAPTER_CONTENT_UNOBSERVED_CODE,
+  adapterContentUnobservedCode,
 } from "./host-admission.js";
 import { lv2ContentParams } from "./lv2-loader.js";
 import { JALV_PROFILE, MOD_HOST_PROFILE, OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
 import { pinVerdictOf } from "./pins-file.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { qualifyTargets, type ProbeRun } from "./probe-runner.js";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { fixtureJson, readFixture, withoutMemoryBudget } from "./probe-output-fixtures.js";
 import { buildQualificationRecord, tiersOf } from "./qualification-record.js";
 
@@ -139,6 +139,28 @@ describe("the jalv run ends at its deadline (#187)", () => {
       expect(took).toBeLessThan(JALV_HOSTED_MS + 2000);
     } finally {
       rmSync(bin, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  // jalv 1.8.0 makes its state directory with mkdtemp("jalvXXXXXX") (src/jalv.c:872): relative, so in its working
+  // directory, and removed only at a clean exit. Killed at the deadline it never gets one, so a run started from a
+  // user's home left one jalvXXXXXX there per hosted plugin. jalv must start in the run's scratch directory instead.
+  it("a jalv killed at the deadline leaves no state directory where the caller stands", () => {
+    const bin = mkdtempSync(join(tmpdir(), "jalv-mkdtemp-"));
+    const caller = mkdtempSync(join(tmpdir(), "jalv-caller-home-"));
+    const before = process.cwd();
+    try {
+      // what jalv does first, then hosted until killed: a relative mkdtemp, removed only at a clean exit
+      writeFileSync(join(bin, "jalv"), `#!/bin/sh\nmktemp -d jalvXXXXXX >/dev/null || exit 9\ntrap '' TERM\nwhile :; do sleep 1; done\n`);
+      chmodSync(join(bin, "jalv"), 0o755);
+      process.chdir(caller);
+      const run = SPAWNED_ADMISSIONS.jalv("urn:x", { ...process.env, HOME: caller, PATH: `${bin}:${process.env["PATH"] ?? ""}` });
+      expect(run).toMatchObject({ installed: true, stillRunning: true });
+      expect(readdirSync(caller).filter((n) => n.startsWith("jalv"))).toEqual([]);
+    } finally {
+      process.chdir(before);
+      rmSync(bin, { recursive: true, force: true });
+      rmSync(caller, { recursive: true, force: true });
     }
   }, 15_000);
 });
@@ -448,7 +470,7 @@ net.createServer((c) => c.on("data", (d) => {
       expect(sent.filter((l) => l.startsWith("patch_set"))).toHaveLength(1);
       expect(run.sound?.content).toEqual({ params: ["urn:x#sample"], loaded: [], refused: ["urn:x#sample (resp -1)"] });
       const a = classifyProtocolRun(ADAPTER_HOST, run);
-      expect(a).toMatchObject({ measured: true, admitted: true, code: ADAPTER_CONTENT_UNOBSERVED_CODE, params: { peak: 0, notes: 30, content: "urn:x#sample", loaded: "", refused: "urn:x#sample (resp -1)" } });
+      expect(a).toMatchObject({ measured: true, admitted: true, code: adapterContentUnobservedCode(), params: { peak: 0, notes: 30, content: "urn:x#sample", loaded: "", refused: "urn:x#sample (resp -1)" } });
       const j = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: a } });
       const asIf = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: { host: ADAPTER_HOST, measured: true, admitted: true, params: {} } } });
       // the verdict is the one an admitted run gives; the reason says why the note test could not be observed

@@ -9,6 +9,7 @@
  * The directory carries its own run record, `sweep-run.json`: who measured, on what, when, and
  * which JSONL file is which pass. A figure without its conditions is not a measurement.
  */
+import "../dist/qualification-cli-start.js";
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 

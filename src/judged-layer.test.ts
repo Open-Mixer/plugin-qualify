@@ -17,6 +17,8 @@ import { judgeProbeOutput } from "./probe-judge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
 import { buildQualificationRecord, type QualificationRecord } from "./qualification-record.js";
+import { rendered } from "./text-rendered.support.js";
+import { textOf } from "./text-catalog.js";
 
 const PIN = { files: "a".repeat(64), layout: `omx-layout/1:${"b".repeat(64)}` };
 
@@ -30,7 +32,7 @@ function recordOf(patch: (d: Record<string, any>) => void = () => {}): Qualifica
 
 const layerOf = (rec: QualificationRecord, extra: Partial<Parameters<typeof judgedLayerOf>[1]> = {}) => judgedLayerOf(rec, { machineClass: "x86-64", pin: PIN, ...extra });
 const mustLayer = (x: ReturnType<typeof judgedLayerOf>): JudgedLayer => {
-  if (!("envelope" in x)) throw new Error(x.reason);
+  if (!("envelope" in x)) throw new Error(textOf(x.reason));
   return x;
 };
 
@@ -104,14 +106,14 @@ describe("a record's judged layer", () => {
   it("is not written when the verdict was not measured, and says why", () => {
     const rec = recordOf();
     const r = { ...rec, verdicts: rec.verdicts.map((v) => (v.host === "omx-clap-host" ? { ...v, measured: false, rating: "unknown", deciding: "probe.timeout" } : v)) };
-    expect(layerOf(r)).toEqual({ layer: null, reason: "omx-clap-host: not measured (probe.timeout)" });
+    expect(rendered(layerOf(r))).toEqual({ layer: null, reason: "omx-clap-host: not measured (probe.timeout)" });
     const gone = { ...rec, verdicts: rec.verdicts.filter((v) => v.host !== "omx-clap-host") };
-    expect((layerOf(gone) as { reason: string }).reason).toMatch(/no verdict under omx-clap-host/);
+    expect((rendered(layerOf(gone)) as unknown as { reason: string }).reason).toMatch(/no verdict under omx-clap-host/);
   });
 
   it("a record from before the rules were stated takes them from the plugin-qualify that judged its set, or has no layer", () => {
     const { rules: _r, latencyLineMs: _l, ...old } = recordOf();
-    expect((layerOf(old as QualificationRecord) as { reason: string }).reason).toMatch(/no rules/);
+    expect((rendered(layerOf(old as QualificationRecord)) as unknown as { reason: string }).reason).toMatch(/no rules/);
     const l = mustLayer(layerOf(old as QualificationRecord, { judgedBy: "0.19.1" }));
     expect(l.body.rules).toBe("plugin-qualify-rules/0.19");
     expect(l.body.latencyLineMs).toBe(LATENCY_LINE_MS);
@@ -119,7 +121,7 @@ describe("a record's judged layer", () => {
 
   it("a record with no plugin-hostd-probe version has no layer: the host version is never guessed", () => {
     const rec = { ...recordOf(), tool: { runner: "something-else 1.0" } };
-    expect((layerOf(rec) as { reason: string }).reason).toMatch(/plugin-hostd-probe/);
+    expect((rendered(layerOf(rec)) as unknown as { reason: string }).reason).toMatch(/plugin-hostd-probe/);
   });
 });
 
@@ -152,18 +154,21 @@ describe.skipIf(reader === undefined)("the round trip through plugin-db's reader
 });
 
 describe("plugin-qualify judged-layer", () => {
-  it("parses a record, the class word and the pin; refuses a pin that is no digest and a missing class", async () => {
+  it("parses a shadow key, the class word and the pin; refuses a pin that is no digest, a missing class and a file argument", async () => {
     const { parseJudgedLayerArgs } = await import("./judged-layer.js");
-    const ok = parseJudgedLayerArgs(["r.json", "--machine-class", "x86-64", "--files", PIN.files, "--layout", PIN.layout, "--body"]);
-    expect(ok).toEqual({ ok: true, args: { record: "r.json", machineClass: "x86-64", files: PIN.files, layout: PIN.layout, body: true } });
-    expect(parseJudgedLayerArgs(["r.json", "--files", PIN.files])).toEqual({ ok: false, error: "--machine-class is required" });
-    expect(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", "abc"]).ok).toBe(false);
-    expect(parseJudgedLayerArgs(["r.json", "--machine-class", "x", "--files", PIN.files, "--layout", "nope"]).ok).toBe(false);
-    expect(parseJudgedLayerArgs(["--machine-class", "x", "--files", PIN.files]).ok).toBe(false);
+    const key = ["--sha256", "a".repeat(64), "--format", "lv2", "--uri", "urn:x", "--offer", "default", "--host-class", "x86-64"];
+    const ok = parseJudgedLayerArgs([...key, "--layer", "user", "--machine-class", "x86-64", "--files", PIN.files, "--layout", PIN.layout, "--body"]);
+    expect(ok).toEqual({ ok: true, args: { key: { sha256: "a".repeat(64), format: "lv2", uri: "urn:x", offer: "default", hostClass: "x86-64" }, layer: "user", machineClass: "x86-64", files: PIN.files, layout: PIN.layout, body: true } });
+    expect(rendered(parseJudgedLayerArgs([...key, "--files", PIN.files]))).toEqual({ ok: false, error: "--machine-class is required" });
+    expect(rendered(parseJudgedLayerArgs([...key, "--machine-class", "x", "--files", "abc"])).ok).toBe(false);
+    expect(rendered(parseJudgedLayerArgs([...key, "--machine-class", "x", "--files", PIN.files, "--layout", "nope"])).ok).toBe(false);
+    expect(rendered(parseJudgedLayerArgs([...key.slice(2), "--machine-class", "x", "--files", PIN.files]))).toEqual({ ok: false, error: "--sha256 is needed" });
+    expect(rendered(parseJudgedLayerArgs([...key, "r.json", "--machine-class", "x", "--files", PIN.files]))).toEqual({ ok: false, error: "judged-layer takes a shadow key, not a file: r.json" });
+    expect(rendered(parseJudgedLayerArgs([...key, "--layer", "system", "--machine-class", "x", "--files", PIN.files]))).toEqual({ ok: false, error: "--layer must be user or base" });
   });
 
-  it("the built command prints the layer, the body for plugin-db put, and exits 1 with the reason for no layer", async () => {
-    const { mkdtempSync, writeFileSync } = await import("node:fs");
+  it("the built command reads the record of the shadow key from the store, prints the layer, the body for plugin-db put, and exits 1 with the reason for no layer", async () => {
+    const { chmodSync, mkdtempSync, writeFileSync } = await import("node:fs");
     const { tmpdir } = await import("node:os");
     const { spawnSync } = await import("node:child_process");
     const bin = new URL("../bin/plugin-qualify.mjs", import.meta.url).pathname;
@@ -171,17 +176,25 @@ describe("plugin-qualify judged-layer", () => {
     const dir = mkdtempSync(join(tmpdir(), "pq-judged-"));
     const rec = recordOf();
     const good = { ...rec, verdicts: rec.verdicts.map((v) => (v.host === "omx-clap-host" ? { ...v, rating: "suitable", measured: true } : v)) };
-    writeFileSync(join(dir, "good.json"), JSON.stringify(good));
-    const run = (...a: string[]) => spawnSync(process.execPath, [bin, "judged-layer", ...a], { encoding: "utf8" });
-    const out = run(join(dir, "good.json"), "--machine-class", "x86-64", "--files", PIN.files);
-    expect(out.status).toBe(0);
-    expect(JSON.parse(out.stdout)).toEqual(mustLayer(layerOf(good, { pin: { files: PIN.files, layout: null } })));
-    const body = run(join(dir, "good.json"), "--machine-class", "x86-64", "--files", PIN.files, "--body");
-    expect(JSON.parse(body.stdout).verdict).toBe("in-process");
     const bad = { ...rec, verdicts: rec.verdicts.map((v) => (v.host === "omx-clap-host" ? { ...v, measured: false, rating: "unknown", deciding: "probe.timeout" } : v)) };
-    writeFileSync(join(dir, "bad.json"), JSON.stringify(bad));
-    const none = run(join(dir, "bad.json"), "--machine-class", "x86-64", "--files", PIN.files);
+    const entry = (record: typeof rec, uri: string) => ({ layer: "user", sha256: record.binary.sha256, format: record.plugin.format, uri, offer: "default", host_class: "x86-64", record: { ...record, plugin: { ...record.plugin, id: uri } } });
+    writeFileSync(join(dir, "store.json"), JSON.stringify({ user: [entry(good, "urn:good"), entry(bad, "urn:bad")], base: [] }));
+    const stand = new URL("./store-stand-in.support.mjs", import.meta.url).pathname;
+    writeFileSync(join(dir, "reader"), `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(stand)} read "$@"\n`);
+    chmodSync(join(dir, "reader"), 0o755);
+    const env = { ...process.env, PLUGIN_QUALIFICATION_DB: join(dir, "reader"), STAND_IN_STORE: join(dir, "store.json") };
+    const keyOf = (uri: string, record: typeof rec) => ["--sha256", record.binary.sha256, "--format", record.plugin.format, "--uri", uri, "--offer", "default", "--host-class", "x86-64"];
+    const run = (...a: string[]) => spawnSync(process.execPath, [bin, "judged-layer", ...a], { encoding: "utf8", env });
+    const out = run(...keyOf("urn:good", good), "--machine-class", "x86-64", "--files", PIN.files);
+    expect(out.status, out.stderr).toBe(0);
+    expect(JSON.parse(out.stdout)).toEqual(mustLayer(layerOf({ ...good, plugin: { ...good.plugin, id: "urn:good" } }, { pin: { files: PIN.files, layout: null } })));
+    const body = run(...keyOf("urn:good", good), "--machine-class", "x86-64", "--files", PIN.files, "--body");
+    expect(JSON.parse(body.stdout).verdict).toBe("in-process");
+    const none = run(...keyOf("urn:bad", bad), "--machine-class", "x86-64", "--files", PIN.files);
     expect(none.status).toBe(1);
     expect(none.stderr).toMatch(/no judged layer: omx-clap-host: not measured \(probe\.timeout\)/);
+    const gone = run(...keyOf("urn:nobody", bad), "--machine-class", "x86-64", "--files", PIN.files);
+    expect(gone.status).toBe(2);
+    expect(gone.stderr).toContain("no record of that key");
   });
 });

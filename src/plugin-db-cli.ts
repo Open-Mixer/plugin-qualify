@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * plugin-db is the one writer's call into plugin-db's own store, as plugin-db's records documentation describes it:
- * `plugin-db pin <address> --files <sha256> [--layout <scheme>:<sha256>]` writes the pinned layer, `plugin-db put
- * <address> judged --writer plugin-qualify` writes the judged layer plugin-qualify is the one writer of, its body on
- * stdin. `--system` names the service's store (plugin-db's own default otherwise, for an interactive caller). Nothing
- * here computes a digest or a body; `plugin-db-pin.ts` and `judged-layer.ts` do.
+ * plugin-db is the one writer's call into plugin-db's own store, in plugin-db's grammar (`plugin-db --help`):
+ * `plugin-db [--system] pin <address> (--lv2-path <path> | --file <file.clap>) [--layout <scheme>:<sha256>]` writes
+ * the pinned layer, plugin-db finding the plugin's files and hashing them itself; `plugin-db [--system] put <address>
+ * judged --writer plugin-qualify` writes the judged layer plugin-qualify is the one writer of, its body on stdin.
+ * `--system` is plugin-db's store option and comes before the verb; it names the service's store (plugin-db's own
+ * default otherwise, for an interactive caller). Nothing here hashes a file or builds a body.
  */
 import { spawnSync } from "node:child_process";
 
 import type { JudgedBody } from "./judged-layer.js";
-import type { LayerPin } from "./judged-layer.js";
 
 /** The binary, else `plugin-db` on the PATH. */
 export const PLUGIN_DB_ENV = "PLUGIN_DB";
@@ -39,9 +39,13 @@ export interface PluginDbCallOptions {
 
 export type PluginDbCallResult = { readonly ok: true } | { readonly ok: false; readonly detail: string };
 
+/** plugin-db's store option, before the verb. */
 function systemFlag(args: readonly string[], opts: PluginDbCallOptions): string[] {
-  return opts.system ? [...args, "--system"] : [...args];
+  return opts.system ? ["--system", ...args] : [...args];
 }
+
+/** Where plugin-db finds a plugin's files: an LV2 search path (it picks the bundle), or the CLAP file. */
+export type PinWhere = { readonly lv2Path: string } | { readonly file: string };
 
 function refusal(r: PluginDbRunResult, verb: string): PluginDbCallResult {
   if (r.missing) return { ok: false, detail: `plugin-db is not installed: the store is plugin-db's to ${verb}` };
@@ -49,15 +53,17 @@ function refusal(r: PluginDbRunResult, verb: string): PluginDbCallResult {
   return { ok: false, detail: detail || `plugin-db ${verb} exited ${String(r.status)}` };
 }
 
-/** `plugin-db pin <address> --files <sha256> [--layout <scheme>:<sha256>]`: the files of a plugin's bytes, pinned. */
+/** `plugin-db pin <address> (--lv2-path <path> | --file <file.clap>) [--layout <scheme>:<sha256>]`: the plugin's bytes, pinned. */
 export function pluginDbPin(
   address: string,
-  pin: LayerPin,
+  where: PinWhere,
+  layout: string | null,
   opts: PluginDbCallOptions,
   env: Readonly<Record<string, string | undefined>> = process.env,
   run: PluginDbRun = SPAWNED_PLUGIN_DB,
 ): PluginDbCallResult {
-  const args = systemFlag(["pin", address, "--files", pin.files, ...(pin.layout === null ? [] : ["--layout", pin.layout])], opts);
+  const at = "file" in where ? ["--file", where.file] : ["--lv2-path", where.lv2Path];
+  const args = systemFlag(["pin", address, ...at, ...(layout === null ? [] : ["--layout", layout])], opts);
   const r = run(args, undefined, env);
   if (r.status !== 0 || r.missing) return refusal(r, "pin");
   return { ok: true };

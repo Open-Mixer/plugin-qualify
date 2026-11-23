@@ -41,7 +41,7 @@ from _declarations import (
     DESCRIPTOR_SCHEMA_INSTALLED,
 )
 
-SCHEMA_URL = "https://github.com/FreeMixer/omx-contract/raw/v3/schema/omx-contract.schema.json"
+SCHEMA_URL = "https://openmixer.org/schema/omx-contract/v3/omx-contract.schema.json"
 TOOLS = os.path.dirname(os.path.abspath(__file__))
 PKG = os.path.dirname(TOOLS)
 
@@ -81,6 +81,14 @@ def refused(code, **args):
     return DescriptorRefused(code, code_sentence(code, args), args)
 
 
+def refused_as(code, text_code, **args):
+    """A refusal by another owner's `code` (contract.file.invalid and the rest), its problem said by this package's
+    `text_code` with `args`: the refusal keeps its owner's code, the sentence is a code of schema/codes.json."""
+    e = DescriptorRefused(code, code_sentence(text_code, args), args)
+    e.text_code = text_code
+    return e
+
+
 def duplicate_symbol(symbols):
     """The first (sorted) symbol `symbols` holds twice, else None: two ports with one symbol cannot be addressed
     by it (EQ10Q's eq1qs..eq10qs name both output meters out_2_vu_ctl, plugin-qualify#27)."""
@@ -114,7 +122,7 @@ _SAFE = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
 def descriptor_file_name(plugin_id, version, sha256):
     """`<id>@<version>-<sha256 first 12>.json`, the base-name rule of the qualification record."""
     if not isinstance(sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", sha256):
-        raise DescriptorRefused(DESCRIPTOR_CODE_BINARY_UNHASHED, f"{plugin_id}: no SHA-256 of its binary")
+        raise refused_as(DESCRIPTOR_CODE_BINARY_UNHASHED, "qualify.descriptor.no-binary-hash", plugin=plugin_id)
     return f"{_safe(plugin_id)}@{_safe(version or 'unversioned')}-{sha256[:DESCRIPTOR_HASH_PREFIX]}.json"
 
 
@@ -126,7 +134,7 @@ def file_sha256(path):
             for chunk in iter(lambda: f.read(1 << 20), b""):
                 h.update(chunk)
     except OSError as e:
-        raise DescriptorRefused(DESCRIPTOR_CODE_BINARY_UNHASHED, f"{path}: {e.strerror}") from e
+        raise refused_as(DESCRIPTOR_CODE_BINARY_UNHASHED, "qualify.descriptor.binary-unreadable", path=path, error=e.strerror) from e
     return h.hexdigest()
 
 
@@ -147,30 +155,65 @@ def schema_candidates(env=None):
 
 
 SCHEMA_MAJOR = re.search(r"\d+", DESCRIPTOR_SCHEMA_FLOOR).group(0)
-UNITS_SHEET = os.path.join("formats", "lv2", "units.json")
+LV2_DOMAIN = os.path.join("lv2", "lv2.json")
+OPENMIXER_UNIT_PREFIX = "urn:openmixer:unit#"
+INSTALLED_CONTRACT_DIR = "/usr/share/omx-contract/contract.d"
 
 
-def contract_data_candidates(rel, env=None):
-    """Where one of omx-contract's data files is looked for: in the same omx-contract as each place the schema is,
-    its package's `data/` beside `schema/`, or the contract directory beside the installed schema."""
-    out = []
-    for schema in schema_candidates(env):
-        here = os.path.dirname(schema)
-        out.append(os.path.join(os.path.dirname(here), "data", rel))
-        out.append(os.path.join(here, "contract.d", SCHEMA_MAJOR, "omx-contract", rel))
-    return out
+def contract_dir_candidates(env=None):
+    """Where plugin-db's `lv2` domain is looked for, in order: the directories of OMX_CONTRACT_PATH (a ':' list, the test
+    entry), then the installed contract directory."""
+    env = os.environ if env is None else env
+    return [d for d in env.get("OMX_CONTRACT_PATH", "").split(":") if d] + [INSTALLED_CONTRACT_DIR]
 
 
 def unit_words(env=None):
-    """omx-contract's units sheet as LV2 unit URI -> the word it is spelled by; a unit the sheet gives no word has
-    none here. The sheet is the owner: there is no table of units in this package."""
-    found = [p for p in contract_data_candidates(UNITS_SHEET, env) if os.path.isfile(p)]
+    """plugin-db's `lv2` domain as LV2 unit URI -> the word of omx-contract's PARAM_UNITS it is: each word of LV2_UNIT_IDS
+    names its unit term of LV2_UNITS_TERMS (its `x-from`), whose uri is the unit as an LV2 file writes it; the urn:openmixer:unit#
+    spellings are LV2_OPENMIXER_UNIT_IDS' (by their lower-cased name, see `unit_word`). A unit the domain gives no word has none
+    here. The domain is the owner: there is no table of units in this package."""
+    paths = [os.path.join(d, LV2_DOMAIN) for d in contract_dir_candidates(env)]
+    found = [p for p in paths if os.path.isfile(p)]
     if not found:
-        raise DescriptorRefused(DESCRIPTOR_CODE_SCHEMA_MISSING,
-                                f"no omx-contract units sheet at {', '.join(contract_data_candidates(UNITS_SHEET, env))}")
-    with open(found[0], encoding="utf-8") as f:
-        terms = json.load(f)["LV2_UNITS_TERMS"]["terms"]
-    return {t["uri"]: t["word"] for t in terms.values() if t.get("kind") == "unit" and "word" in t}
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-units-sheet", places=", ".join(paths))
+    try:
+        with open(found[0], encoding="utf-8") as f:
+            schemas = json.load(f)["components"]["schemas"]
+        terms = {w["const"]: w["x-term"] for w in schemas["LV2_UNITS_TERMS"]["oneOf"]}
+        out = {}
+        for w in schemas["LV2_UNIT_IDS"]["oneOf"]:
+            for ref in w.get("x-from", []):
+                if ref["x-term"] not in terms:
+                    raise KeyError(f"LV2_UNIT_IDS {w['const']} names the term {ref['x-term']}, which LV2_UNITS_TERMS lacks")
+                out[terms[ref["x-term"]]["uri"]] = w["const"]
+        for w in schemas["LV2_OPENMIXER_UNIT_IDS"]["oneOf"]:
+            out[OPENMIXER_UNIT_PREFIX + w["title"]] = w["const"]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where=found[0], message=str(e)) from e
+    return out
+
+
+def unit_word(uri, words):
+    """The word of `uri` in `words` (unit_words): exact, else a urn:openmixer:unit# spelling by its lower-cased name; None for none."""
+    if uri in words:
+        return words[uri]
+    if uri.startswith(OPENMIXER_UNIT_PREFIX):
+        return words.get(OPENMIXER_UNIT_PREFIX + uri[len(OPENMIXER_UNIT_PREFIX):].lower())
+    return None
+
+
+def meaning_words(env=None):
+    """omx-contract's closed list of control meanings (the schema's `$defs.meaning`), in its order. The schema is the
+    owner: a meaning this package names is held to this list, and there is no list of meanings in this package."""
+    found = [p for p in schema_candidates(env) if os.path.isfile(p)]
+    if not found:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-schema", places=", ".join(schema_candidates(env)))
+    try:
+        with open(found[0], encoding="utf-8") as f:
+            return tuple(json.load(f)["$defs"]["meaning"]["enum"])
+    except (OSError, ValueError, KeyError) as e:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where="$defs/meaning",
+                         message=f"{found[0]} has no list of meanings ({type(e).__name__})") from e
 
 
 class SchemaValidator:
@@ -179,13 +222,13 @@ class SchemaValidator:
     def __init__(self, path=None, env=None):
         found = [path] if path else [p for p in schema_candidates(env) if os.path.isfile(p)]
         if not found or not os.path.isfile(found[0]):
-            raise DescriptorRefused(DESCRIPTOR_CODE_SCHEMA_MISSING,
-                                    f"no omx-contract schema at {', '.join(schema_candidates(env))}")
+            raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-schema",
+                             places=", ".join(schema_candidates(env)))
         self.path = found[0]
         try:
             import jsonschema
         except ImportError as e:
-            raise DescriptorRefused(DESCRIPTOR_CODE_SCHEMA_MISSING, "python3-jsonschema is not installed") from e
+            raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-jsonschema") from e
         with open(self.path, encoding="utf-8") as f:
             schema = json.load(f)
         cls = jsonschema.validators.validator_for(schema)
@@ -194,12 +237,12 @@ class SchemaValidator:
 
     def check(self, doc):
         if not isinstance(doc, dict) or doc.get("origin") != "scanned":
-            raise DescriptorRefused(DESCRIPTOR_CODE_SCHEMA, "a scanned descriptor carries origin scanned")
+            raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.origin-scanned")
         errors = sorted(self._validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
         if errors:
             e = errors[0]
             where = "/".join(str(p) for p in e.absolute_path) or "(the file)"
-            raise DescriptorRefused(DESCRIPTOR_CODE_SCHEMA, f"{where}: {e.message}")
+            raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where=where, message=e.message)
 
 
 DESCRIPTOR_DIR_MODE = 0o755
@@ -221,7 +264,7 @@ def write_descriptor(directory, doc, sha256, validator):
         os.chmod(pending, DESCRIPTOR_FILE_MODE)
         os.replace(pending, path)
     except OSError as e:
-        raise DescriptorRefused(DESCRIPTOR_CODE_DIR_UNWRITABLE, f"{directory}: {e.strerror}") from e
+        raise refused_as(DESCRIPTOR_CODE_DIR_UNWRITABLE, "qualify.descriptor.dir-unwritable", directory=directory, error=e.strerror) from e
     return path
 
 
@@ -405,7 +448,7 @@ def clap_descriptor(p, path):
 def clap_described(scan, err=sys.stderr):
     """Every plugin of a clap-qualify scan document as `(doc, sha256)`; a file that held none is reported."""
     if not isinstance(scan, dict) or not isinstance(scan.get("files"), list):
-        raise DescriptorRefused(DESCRIPTOR_CODE_SCHEMA, "not a CLAP scan document")
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.not-clap-scan")
     out = []
     for f in scan["files"]:
         if "plugins" not in f:

@@ -18,6 +18,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isMain } from '@openmixer/omx-contract/entry';
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(PKG, 'tools/_declarations.py');
@@ -105,4 +106,4 @@ function main() {
   process.exit(2);
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) main();
+if (isMain(import.meta.url)) main();

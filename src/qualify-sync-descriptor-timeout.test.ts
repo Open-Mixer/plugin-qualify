@@ -9,10 +9,19 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync 
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { parseSyncArgs, resolveSyncSettings, runSync, type SyncState } from "./qualify-sync.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
+import { QualificationStore } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
+
+/** The qualification store of the test: a stand-in that follows the commands' documented interface. */
+let fake = fakeStore();
+beforeEach(() => {
+  fake = fakeStore();
+});
+const store = (): QualificationStore => new QualificationStore("user", { run: fake.run });
 
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const scratch = mkdtempSync(join(tmpdir(), "qualify-sync-descriptor-timeout-"));
@@ -52,14 +61,15 @@ describe("the descriptor writer's time", () => {
       root,
       "probe-runner",
       `while [ "$1" != "--out" ]; do shift; done; o="$2"; shift 2; while [ "\${1#--}" != "$1" ]; do shift 2; done; f="$1"; id="$2"
-sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib64/clap/example-plate.clap|$f|" ${JSON.stringify(join(root, "probe.json"))} > "$o"`,
+s=$(sha256sum "$f" | cut -d" " -f1)
+sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib64/clap/example-plate.clap|$f|" -e "s|356902794a4eec2122989e072271ef995968131145db918d9a3084ce582f244b|$s|g" -e "s|\\"example-plate.clap\\"|\\"$(basename "$f")\\"|g" ${JSON.stringify(join(root, "probe.json"))} > "$o"`,
     );
     // plugin-hostd --pin-files clap:<path>#<id>: the file and its directory, as the daemon's CLAP collector names them
     const hostd = script(root, "plugin-hostd", `while [ "$1" != "--pin-files" ]; do shift; done; u="$2"; p="\${u#clap:}"; p="\${p%#*}"; echo "root $(dirname "$p")"; echo "file $(basename "$p")"`);
     const env = { ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}`, OMX_CLAP_QUALIFY: scanner, OMX_RT_INTERPOSE: interposer, OMX_PROBE_RUNNER: runner, PLUGIN_HOSTD: hostd } as Record<string, string>;
     const sp = splitPathFlags([
       "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "lv2"), "--lv2-extra", "",
-      "--pin-file", join(out, "qualified.pins"), "--qualification-dir", join(out, "qualification"),
+      "--pin-file", join(out, "qualified.pins"),
       "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
       "--budget-s", "1", "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed",
     ]);
@@ -68,7 +78,7 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
     const r = resolveSyncSettings(new Map(), args.args, env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const lines: string[] = [];
-    await runSync(r.settings, { env, log: (l) => lines.push(l) });
+    await runSync(r.settings, { qualificationStore: store(), env, log: (l) => lines.push(l) });
     const state = JSON.parse(readFileSync(join(out, "state.json"), "utf8")) as SyncState;
     const plugins = Object.values(state.entries).flatMap((e) => e.plugins);
     const slow = plugins.find((p) => p.uri.endsWith("#org.example.Slow"));

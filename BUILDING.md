@@ -21,12 +21,12 @@ declarations, regenerate it and commit both:
 node tools/gen-python-declarations.mjs --write
 ```
 
-`src/hosting-codes.generated.ts` is omx-clap-core's hosting tables (`HOSTING_<DIMENSION>_CODES` in
-the TypeScript modules under `pkg-config --variable=tsdir omx-clap-core`), flattened into the plain
+`src/hosting-codes.generated.ts` is omx-clap's hosting tables (`HOSTING_<DIMENSION>_CODES` in
+the TypeScript modules under `pkg-config --variable=tsdir omx-clap`), flattened into the plain
 data `HOSTING_CODE` is, so no public subpath a browser bundles reads a file or imports a `node:`
-module. `pnpm build` rewrites it whenever it finds omx-clap-core's modules (`OMX_CLAP_CORE_TSDIR`,
-else pkg-config, else the checkout `make -C native deps` fetches, else `/usr/share/omx-clap-core/ts`)
-and keeps the committed one where it finds none. After moving to a new omx-clap-core, regenerate it
+module. `pnpm build` rewrites it whenever it finds omx-clap's modules (`OMX_CLAP_TSDIR`,
+else pkg-config, else the checkout `make -C native deps` fetches, else `/usr/share/omx-clap/ts`)
+and keeps the committed one where it finds none. After moving to a new omx-clap, regenerate it
 and commit it:
 
 ```
@@ -45,9 +45,9 @@ The measurer's sample rates are omx-contract's `OMX_DECLARED_RATES`, and every t
 string literals through omx-contract's one writer, `<omxcontract/omx_json_write.h>`: the headers come
 from `pkg-config omx-contract` (`omx-contract-devel`, `libomx-contract-dev`, 3.9.1 or later), else
 `make deps` fetches them.
-Its host features are omx-clap-core's LV2 feature provider, the static `libomx-clap-lv2` and its
+Its host features are omx-clap's LV2 feature provider, the static `libomx-clap-lv2` and its
 header: `pkg-config omx-clap-lv2` (`omx-clap-lv2-devel`, `libomx-clap-lv2-dev`), else `make deps`
-fetches omx-clap-core at the packages' floor, builds the archive against the fetched CLAP headers and
+fetches omx-clap at the packages' floor, builds the archive against the fetched CLAP headers and
 installs it into `native/deps/omx-clap-lv2`.
 
 ```

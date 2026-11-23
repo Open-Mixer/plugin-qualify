@@ -1,0 +1,1149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openmixer.org/contract/qualify",
+  "info": {
+    "title": "plugin-qualify's own codes",
+    "version": "1.0.0",
+    "x-owner": "plugin-qualify",
+    "x-stability": "experimental"
+  },
+  "components": {
+    "schemas": {
+      "QUALIFY_CODES": {
+        "description": "plugin-qualify's own codes, each with its source sentence in English and the args it names (omx-contract's codes shape; translations are not here): the code its scan refuses a plugin by, and the verdict and reason sentences of its comparison and of its pin. Each language's sentences are in catalogs/<lang>.json, keyed by the code. tools/descriptors.py and src/text-catalog.ts render the English sentence from this file; no module repeats it. A code is never reworded.",
+        "x-since": "1.0.0",
+        "x-kind": "codes",
+        "oneOf": [
+          {
+            "const": "qualify.descriptor.duplicate-symbol",
+            "title": "descriptorDuplicateSymbol",
+            "x-code": 0,
+            "x-text": "Two ports of this plugin share the symbol {symbol}, so neither can be addressed by it; the plugin is not described.",
+            "x-args": [
+              "symbol"
+            ],
+            "x-name": "descriptorDuplicateSymbol"
+          },
+          {
+            "const": "qualify.compare.host-not-installed",
+            "title": "compareHostNotInstalled",
+            "description": "a comparison host is not installed, and the observation named no reason of its own",
+            "x-code": 1,
+            "x-text": "{program} is not installed",
+            "x-args": [
+              "program"
+            ],
+            "x-name": "compareHostNotInstalled"
+          },
+          {
+            "const": "qualify.compare.host-did-not-start",
+            "title": "compareHostDidNotStart",
+            "description": "a comparison host failed to start, and the observation named no reason of its own",
+            "x-code": 2,
+            "x-text": "{program} did not start",
+            "x-args": [
+              "program"
+            ],
+            "x-name": "compareHostDidNotStart"
+          },
+          {
+            "const": "qualify.compare.host-not-asked",
+            "title": "compareHostNotAsked",
+            "description": "a reference host a publishable comparison needs was left out of --hosts",
+            "x-code": 3,
+            "x-text": "not asked for with --hosts",
+            "x-args": [],
+            "x-name": "compareHostNotAsked"
+          },
+          {
+            "const": "qualify.compare.host-did-not-run",
+            "title": "compareHostDidNotRun",
+            "description": "a directory of comparison records holds no row, of any status, for this host",
+            "x-code": 4,
+            "x-text": "{program} did not run",
+            "x-args": [
+              "program"
+            ],
+            "x-name": "compareHostDidNotRun"
+          },
+          {
+            "const": "qualify.compare.format-not-taken",
+            "title": "compareFormatNotTaken",
+            "description": "a host was asked to run a plugin whose format it never takes",
+            "x-code": 5,
+            "x-text": "{program} takes no {format} plugin",
+            "x-args": [
+              "program",
+              "format"
+            ],
+            "x-name": "compareFormatNotTaken"
+          },
+          {
+            "const": "qualify.compare.rt-not-reported",
+            "title": "compareRtNotReported",
+            "description": "no process of the host reported to rt_watch.so at all",
+            "x-code": 6,
+            "x-text": "no process of the host reported (rt_watch.so was not loaded, or the host was gone)",
+            "x-args": [],
+            "x-name": "compareRtNotReported"
+          },
+          {
+            "const": "qualify.compare.rt-no-callback",
+            "title": "compareRtNoCallback",
+            "description": "a process of the host reported, but none set a JACK process callback rt_watch.so could wrap",
+            "x-code": 7,
+            "x-text": "no process of the host set a JACK process callback that rt_watch.so could wrap",
+            "x-args": [],
+            "x-name": "compareRtNoCallback"
+          },
+          {
+            "const": "qualify.compare.rt-no-warm-up",
+            "title": "compareRtNoWarmUp",
+            "description": "the process callback reported, but never ran a cycle past its warm-up window",
+            "x-code": 8,
+            "x-text": "the process callback never ran past its warm-up",
+            "x-args": [],
+            "x-name": "compareRtNoWarmUp"
+          },
+          {
+            "const": "qualify.compare.rt-trylocks-only",
+            "title": "compareRtTrylocksOnly",
+            "description": "the audio thread took no allocation, lock or syscall, but tried a lock that never waits",
+            "x-code": 9,
+            "x-text": "{trylocks} try-locks on the audio thread over {cycles} cycles; a try-lock never waits",
+            "x-args": [
+              "trylocks",
+              "cycles"
+            ],
+            "x-name": "compareRtTrylocksOnly"
+          },
+          {
+            "const": "qualify.compare.rt-unsafe",
+            "title": "compareRtUnsafe",
+            "description": "the audio thread took an allocation, a lock or a syscall over the armed cycles",
+            "x-code": 10,
+            "x-text": "on the audio thread over {cycles} cycles: {allocations} allocations, {locks} locks, {syscalls} system calls",
+            "x-args": [
+              "cycles",
+              "allocations",
+              "locks",
+              "syscalls"
+            ],
+            "x-name": "compareRtUnsafe"
+          },
+          {
+            "const": "qualify.compare.load-host-ended",
+            "title": "compareLoadHostEnded",
+            "description": "the host ended while a plugin was loading",
+            "x-code": 11,
+            "x-text": "the host ended ({died})",
+            "x-args": [
+              "died"
+            ],
+            "x-name": "compareLoadHostEnded"
+          },
+          {
+            "const": "qualify.compare.load-resp",
+            "title": "compareLoadResp",
+            "description": "the host answered a load with a reply code, not ok",
+            "x-code": 12,
+            "x-text": "resp {resp}",
+            "x-args": [
+              "resp"
+            ],
+            "x-name": "compareLoadResp"
+          },
+          {
+            "const": "qualify.compare.load-timeout",
+            "title": "compareLoadTimeout",
+            "description": "the host gave no answer to a load within the timeout",
+            "x-code": 13,
+            "x-text": "no answer in time",
+            "x-args": [],
+            "x-name": "compareLoadTimeout"
+          },
+          {
+            "const": "qualify.compare.not-loaded",
+            "title": "compareNotLoaded",
+            "description": "a check that needs the plugin loaded, when it did not",
+            "x-code": 14,
+            "x-text": "it did not load",
+            "x-args": [],
+            "x-name": "compareNotLoaded"
+          },
+          {
+            "const": "qualify.compare.no-port",
+            "title": "compareNoPort",
+            "description": "the plugin loaded, but no port of it appeared on the JACK graph",
+            "x-code": 15,
+            "x-text": "no port of the plugin appeared on the graph",
+            "x-args": [],
+            "x-name": "compareNoPort"
+          },
+          {
+            "const": "qualify.compare.not-running",
+            "title": "compareNotRunning",
+            "description": "a check that needs the plugin running (loaded with a port on the graph), when it was not",
+            "x-code": 16,
+            "x-text": "it is not running",
+            "x-args": [],
+            "x-name": "compareNotRunning"
+          },
+          {
+            "const": "qualify.compare.no-audio-output",
+            "title": "compareNoAudioOutput",
+            "description": "the output check on a plugin with no audio output port",
+            "x-code": 17,
+            "x-text": "the plugin has no audio output",
+            "x-args": [],
+            "x-name": "compareNoAudioOutput"
+          },
+          {
+            "const": "qualify.compare.output-not-finite",
+            "title": "compareOutputNotFinite",
+            "description": "the output held a NaN or infinite sample",
+            "x-code": 18,
+            "x-text": "the output is not finite ({count} NaN or infinite samples)",
+            "x-args": [
+              "count"
+            ],
+            "x-name": "compareOutputNotFinite"
+          },
+          {
+            "const": "qualify.compare.no-stimulus-silent",
+            "title": "compareNoStimulusSilent",
+            "description": "a plugin that takes no audio or MIDI input, so no stimulus is possible, and its output was silent regardless",
+            "x-code": 19,
+            "x-text": "no stimulus this plugin takes (no audio or MIDI input), and its output was silent",
+            "x-args": [],
+            "x-name": "compareNoStimulusSilent"
+          },
+          {
+            "const": "qualify.compare.silent-under-stimulus",
+            "title": "compareSilentUnderStimulus",
+            "description": "a plugin that takes a stimulus but gave no audible output under it",
+            "x-code": 20,
+            "x-text": "silent under {stimulus}",
+            "x-args": [
+              "stimulus"
+            ],
+            "x-name": "compareSilentUnderStimulus"
+          },
+          {
+            "const": "qualify.compare.cycles-not-run",
+            "title": "compareCyclesNotRun",
+            "description": "the load and unload cycles did not run, so the check is not-run rather than pass or fail",
+            "x-code": 21,
+            "x-text": "the cycles did not run",
+            "x-args": [],
+            "x-name": "compareCyclesNotRun"
+          },
+          {
+            "const": "qualify.compare.cycle-host-ended",
+            "title": "compareCycleHostEnded",
+            "description": "the host ended during one of the load and unload cycles",
+            "x-code": 22,
+            "x-text": "the host ended at cycle {cycle} ({died})",
+            "x-args": [
+              "cycle",
+              "died"
+            ],
+            "x-name": "compareCycleHostEnded"
+          },
+          {
+            "const": "qualify.compare.cycle-failed",
+            "title": "compareCycleFailed",
+            "description": "one load and unload cycle failed, with no named step",
+            "x-code": 23,
+            "x-text": "cycle {cycle} failed",
+            "x-args": [
+              "cycle"
+            ],
+            "x-name": "compareCycleFailed"
+          },
+          {
+            "const": "qualify.compare.cycle-failed-at",
+            "title": "compareCycleFailedAt",
+            "description": "one load and unload cycle failed at a named step",
+            "x-code": 24,
+            "x-text": "cycle {cycle} failed at {step}",
+            "x-args": [
+              "cycle",
+              "step"
+            ],
+            "x-name": "compareCycleFailedAt"
+          },
+          {
+            "const": "qualify.compare.soak-host-ended",
+            "title": "compareSoakHostEnded",
+            "description": "the host ended during the soak, with a named reason",
+            "x-code": 25,
+            "x-text": "the host ended during the soak ({died})",
+            "x-args": [
+              "died"
+            ],
+            "x-name": "compareSoakHostEnded"
+          },
+          {
+            "const": "qualify.compare.soak-ended",
+            "title": "compareSoakEnded",
+            "description": "the host ended during the soak, with no named reason",
+            "x-code": 26,
+            "x-text": "the host ended during the soak",
+            "x-args": [],
+            "x-name": "compareSoakEnded"
+          },
+          {
+            "const": "qualify.compare.latency-port-observable",
+            "title": "compareLatencyPortObservable",
+            "description": "a host (omx-clap-host, jalv) that sets a JACK latency callback itself",
+            "x-code": 27,
+            "x-text": "the host sets a JACK latency callback: the plugin's latency is on its output port's capture range",
+            "x-args": [],
+            "x-name": "compareLatencyPortObservable"
+          },
+          {
+            "const": "qualify.compare.latency-hostd-port-observable",
+            "title": "compareLatencyHostdPortObservable",
+            "description": "plugin-hostd: its worker (omx-clap-host) sets the JACK latency callback on its behalf",
+            "x-code": 28,
+            "x-text": "its worker (omx-clap-host) sets a JACK latency callback",
+            "x-args": [],
+            "x-name": "compareLatencyHostdPortObservable"
+          },
+          {
+            "const": "qualify.compare.latency-not-observable-mod-host",
+            "title": "compareLatencyNotObservableModHost",
+            "description": "mod-host sets no JACK latency callback, so this host's reported latency is never observable",
+            "x-code": 29,
+            "x-text": "mod-host sets no JACK latency callback, so a plugin's latency is not on its ports",
+            "x-args": [],
+            "x-name": "compareLatencyNotObservableModHost"
+          },
+          {
+            "const": "qualify.compare.latency-unreadable",
+            "title": "compareLatencyUnreadable",
+            "description": "a host whose latency is observable in principle, but the output port's latency could not be read this run",
+            "x-code": 30,
+            "x-text": "the output port's latency could not be read",
+            "x-args": [],
+            "x-name": "compareLatencyUnreadable"
+          },
+          {
+            "const": "qualify.compare.skipped-reason",
+            "title": "compareSkippedReason",
+            "description": "the summary table's row for a host it skipped, with that host's own reason already rendered",
+            "x-code": 31,
+            "x-text": "skipped: {reason}",
+            "x-args": [
+              "reason"
+            ],
+            "x-name": "compareSkippedReason"
+          },
+          {
+            "const": "qualify.compare.does-better-on",
+            "title": "compareDoesBetterOn",
+            "description": "the summary table's line naming how many plugins a host does better on, with the rendered beat list",
+            "x-code": 32,
+            "x-text": "{host} does better on {count}: {detail}",
+            "x-args": [
+              "host",
+              "count",
+              "detail"
+            ],
+            "x-name": "compareDoesBetterOn"
+          },
+          {
+            "const": "qualify.compare.beat-description",
+            "title": "compareBeatDescription",
+            "description": "one plugin of a does-better-on list, with the hosts it beat",
+            "x-code": 33,
+            "x-text": "{id} ({on} over {over})",
+            "x-args": [
+              "id",
+              "on",
+              "over"
+            ],
+            "x-name": "compareBeatDescription"
+          },
+          {
+            "const": "qualify.compare.not-publishable-with-missing",
+            "title": "compareNotPublishableWithMissing",
+            "description": "the summary table's closing line when --publish was asked for but a reference host is missing",
+            "x-code": 34,
+            "x-text": "not publishable: {missing}",
+            "x-args": [
+              "missing"
+            ],
+            "x-name": "compareNotPublishableWithMissing"
+          },
+          {
+            "const": "qualify.compare.not-publishable-no-flag",
+            "title": "compareNotPublishableNoFlag",
+            "description": "the summary table's closing line when --publish was never asked for",
+            "x-code": 35,
+            "x-text": "not publishable (no --publish)",
+            "x-args": [],
+            "x-name": "compareNotPublishableNoFlag"
+          },
+          {
+            "const": "qualify.pin.hostd-not-installed",
+            "title": "pinHostdNotInstalled",
+            "description": "plugin-hostd --pin-files could not run because plugin-hostd is not installed",
+            "x-code": 36,
+            "x-text": "plugin-hostd is not installed: the files of a pin are plugin-hostd's to name",
+            "x-args": [],
+            "x-name": "pinHostdNotInstalled"
+          },
+          {
+            "const": "qualify.pin.hostd-no-pin-files",
+            "title": "pinHostdNoPinFiles",
+            "description": "the installed plugin-hostd predates --pin-files (0.15.0)",
+            "x-code": 37,
+            "x-text": "this plugin-hostd has no --pin-files (plugin-hostd 0.15.0 or later names the files of a pin)",
+            "x-args": [],
+            "x-name": "pinHostdNoPinFiles"
+          },
+          {
+            "const": "qualify.pin.hostd-exited",
+            "title": "pinHostdExited",
+            "description": "plugin-hostd --pin-files exited with no stderr line to say why",
+            "x-code": 38,
+            "x-text": "plugin-hostd --pin-files exited {status}",
+            "x-args": [
+              "status"
+            ],
+            "x-name": "pinHostdExited"
+          },
+          {
+            "const": "qualify.pin.hostd-no-root-or-file",
+            "title": "pinHostdNoRootOrFile",
+            "description": "plugin-hostd --pin-files exited ok, but its output named no root or no file",
+            "x-code": 39,
+            "x-text": "plugin-hostd --pin-files printed no root or no file",
+            "x-args": [],
+            "x-name": "pinHostdNoRootOrFile"
+          },
+          {
+            "const": "qualify.pin.file-unreadable",
+            "title": "pinFileUnreadable",
+            "description": "a file plugin-hostd named for the pin could not be read (and so hashed) from the bundle",
+            "x-code": 40,
+            "x-text": "a file plugin-hostd names cannot be read: {error}",
+            "x-args": [
+              "error"
+            ],
+            "x-name": "pinFileUnreadable"
+          },
+          {
+            "const": "qualify.cli.unknown-option",
+            "title": "cliUnknownOption",
+            "x-code": 41,
+            "x-text": "unknown option {option}",
+            "x-args": [
+              "option"
+            ],
+            "x-name": "cliUnknownOption"
+          },
+          {
+            "const": "qualify.cli.unknown-argument",
+            "title": "cliUnknownArgument",
+            "x-code": 42,
+            "x-text": "unknown argument {argument}",
+            "x-args": [
+              "argument"
+            ],
+            "x-name": "cliUnknownArgument"
+          },
+          {
+            "const": "qualify.cli.needs-value",
+            "title": "cliNeedsValue",
+            "x-code": 43,
+            "x-text": "{option} needs a value",
+            "x-args": [
+              "option"
+            ],
+            "x-name": "cliNeedsValue"
+          },
+          {
+            "const": "qualify.cli.is-needed",
+            "title": "cliIsNeeded",
+            "x-code": 44,
+            "x-text": "{option} is needed",
+            "x-args": [
+              "option"
+            ],
+            "x-name": "cliIsNeeded"
+          },
+          {
+            "const": "qualify.cli.whole-above-zero",
+            "title": "cliWholeAboveZero",
+            "x-code": 45,
+            "x-text": "{option} takes a whole number above 0",
+            "x-args": [
+              "option"
+            ],
+            "x-name": "cliWholeAboveZero"
+          },
+          {
+            "const": "qualify.cli.format-one-of",
+            "title": "cliFormatOneOf",
+            "x-code": 46,
+            "x-text": "--format must be one of {formats}",
+            "x-args": [
+              "formats"
+            ],
+            "x-name": "cliFormatOneOf"
+          },
+          {
+            "const": "qualify.cli.format-text-or-json",
+            "title": "cliFormatTextOrJson",
+            "x-code": 47,
+            "x-text": "--format is text or json",
+            "x-args": [],
+            "x-name": "cliFormatTextOrJson"
+          },
+          {
+            "const": "qualify.cli.option-problem",
+            "title": "cliOptionProblem",
+            "x-code": 48,
+            "x-text": "{option}: {problem}",
+            "x-args": [
+              "option",
+              "problem"
+            ],
+            "x-name": "cliOptionProblem"
+          },
+          {
+            "const": "qualify.cli.all-takes-no-targets",
+            "title": "cliAllTakesNoTargets",
+            "x-code": 49,
+            "x-text": "--all takes no plugin targets",
+            "x-args": [],
+            "x-name": "cliAllTakesNoTargets"
+          },
+          {
+            "const": "qualify.cli.all-with-targets",
+            "title": "cliAllWithTargets",
+            "x-code": 50,
+            "x-text": "--all and named plugins do not go together",
+            "x-args": [],
+            "x-name": "cliAllWithTargets"
+          },
+          {
+            "const": "qualify.cli.name-target",
+            "title": "cliNameTarget",
+            "x-code": 51,
+            "x-text": "name a plugin (URI or .lv2 bundle) or pass --all",
+            "x-args": [],
+            "x-name": "cliNameTarget"
+          },
+          {
+            "const": "qualify.cli.rates-list",
+            "title": "cliRatesList",
+            "x-code": 52,
+            "x-text": "--rates must be positive integers, comma-separated",
+            "x-args": [],
+            "x-name": "cliRatesList"
+          },
+          {
+            "const": "qualify.cli.quanta-list",
+            "title": "cliQuantaList",
+            "x-code": 53,
+            "x-text": "--quanta must be positive integers, comma-separated",
+            "x-args": [],
+            "x-name": "cliQuantaList"
+          },
+          {
+            "const": "qualify.cli.two-grids",
+            "title": "cliTwoGrids",
+            "x-code": 54,
+            "x-text": "--grid-hosts and --grid name two grids; give one",
+            "x-args": [],
+            "x-name": "cliTwoGrids"
+          },
+          {
+            "const": "qualify.cli.cells-budget",
+            "title": "cliCellsBudget",
+            "x-code": 55,
+            "x-text": "--cells-per-plugin-budget must be a whole number, 0 or more",
+            "x-args": [],
+            "x-name": "cliCellsBudget"
+          },
+          {
+            "const": "qualify.cli.blocks",
+            "title": "cliBlocks",
+            "x-code": 56,
+            "x-text": "--blocks must be a whole number, 1 or more",
+            "x-args": [],
+            "x-name": "cliBlocks"
+          },
+          {
+            "const": "qualify.cli.pins-file",
+            "title": "cliPinsFile",
+            "x-code": 57,
+            "x-text": "--pins needs a file name",
+            "x-args": [],
+            "x-name": "cliPinsFile"
+          },
+          {
+            "const": "qualify.adjust.options-only",
+            "title": "adjustOptionsOnly",
+            "x-code": 58,
+            "x-text": "{argument}: adjust takes options only; the records are read from --qualification-dir",
+            "x-args": [
+              "argument"
+            ],
+            "x-name": "adjustOptionsOnly"
+          },
+          {
+            "const": "qualify.adjust.now-seconds",
+            "title": "adjustNowSeconds",
+            "x-code": 59,
+            "x-text": "--now must be UTC seconds, a whole number",
+            "x-args": [],
+            "x-name": "adjustNowSeconds"
+          },
+          {
+            "const": "qualify.adjust.name-history",
+            "title": "adjustNameHistory",
+            "x-code": 60,
+            "x-text": "name the history file with --history",
+            "x-args": [],
+            "x-name": "adjustNameHistory"
+          },
+          {
+            "const": "qualify.here.config-file",
+            "title": "hereConfigFile",
+            "x-code": 61,
+            "x-text": "--config takes a file",
+            "x-args": [],
+            "x-name": "hereConfigFile"
+          },
+          {
+            "const": "qualify.compare.hosts-list",
+            "title": "compareHostsList",
+            "x-code": 62,
+            "x-text": "--hosts takes a list of {hosts}",
+            "x-args": [
+              "hosts"
+            ],
+            "x-name": "compareHostsList"
+          },
+          {
+            "const": "qualify.compare.hosts-list-bad",
+            "title": "compareHostsListBad",
+            "x-code": 63,
+            "x-text": "--hosts takes a list of {hosts}; not a host: {bad}",
+            "x-args": [
+              "hosts",
+              "bad"
+            ],
+            "x-name": "compareHostsListBad"
+          },
+          {
+            "const": "qualify.compare.name-targets",
+            "title": "compareNameTargets",
+            "x-code": 64,
+            "x-text": "name the plugins (LV2 URIs, bundles or .clap files) or --all",
+            "x-args": [],
+            "x-name": "compareNameTargets"
+          },
+          {
+            "const": "qualify.compare.publish-needs",
+            "title": "comparePublishNeeds",
+            "x-code": 65,
+            "x-text": "--publish writes a summary for the records: it needs --out, --host-class and --set",
+            "x-args": [],
+            "x-name": "comparePublishNeeds"
+          },
+          {
+            "const": "qualify.compare.publish-hosts",
+            "title": "comparePublishHosts",
+            "x-code": 66,
+            "x-text": "--publish compares against {hosts}: --hosts must name them",
+            "x-args": [
+              "hosts"
+            ],
+            "x-name": "comparePublishHosts"
+          },
+          {
+            "const": "qualify.compare.one-directory",
+            "title": "compareOneDirectory",
+            "x-code": 67,
+            "x-text": "one directory",
+            "x-args": [],
+            "x-name": "compareOneDirectory"
+          },
+          {
+            "const": "qualify.compare.name-directory",
+            "title": "compareNameDirectory",
+            "x-code": 68,
+            "x-text": "name the directory of the comparison records",
+            "x-args": [],
+            "x-name": "compareNameDirectory"
+          },
+          {
+            "const": "qualify.compare.publish-needs-set",
+            "title": "comparePublishNeedsSet",
+            "x-code": 69,
+            "x-text": "--publish needs --host-class and --set",
+            "x-args": [],
+            "x-name": "comparePublishNeedsSet"
+          },
+          {
+            "const": "qualify.grid.part-unknown",
+            "title": "gridPartUnknown",
+            "x-code": 70,
+            "x-text": "the grid is hosts, full, or cells as <rate>/<quantum>, comma-separated; \"{part}\" is none of them",
+            "x-args": [
+              "part"
+            ],
+            "x-name": "gridPartUnknown"
+          },
+          {
+            "const": "qualify.memory.limit-unread",
+            "title": "memoryLimitUnread",
+            "x-code": 71,
+            "x-text": "the memory limit is off, or bytes as 2147483648, 2048M or 2G; \"{value}\" is neither",
+            "x-args": [
+              "value"
+            ],
+            "x-name": "memoryLimitUnread"
+          },
+          {
+            "const": "qualify.adapter.no-version",
+            "title": "adapterNoVersion",
+            "x-code": 72,
+            "x-text": "{tool} --version names no version, so a run could not say which host it was under",
+            "x-args": [
+              "tool"
+            ],
+            "x-name": "adapterNoVersion"
+          },
+          {
+            "const": "qualify.judge.name-probe-output",
+            "title": "judgeNameProbeOutput",
+            "x-code": 73,
+            "x-text": "name at least one probe output",
+            "x-args": [],
+            "x-name": "judgeNameProbeOutput"
+          },
+          {
+            "const": "qualify.judged.name-one-record",
+            "title": "judgedNameOneRecord",
+            "x-code": 74,
+            "x-text": "name one record",
+            "x-args": [],
+            "x-name": "judgedNameOneRecord"
+          },
+          {
+            "const": "qualify.judged.machine-class",
+            "title": "judgedMachineClass",
+            "x-code": 75,
+            "x-text": "--machine-class is required",
+            "x-args": [],
+            "x-name": "judgedMachineClass"
+          },
+          {
+            "const": "qualify.records.name-directory",
+            "title": "recordsNameDirectory",
+            "x-code": 76,
+            "x-text": "name a qualification directory or a run root",
+            "x-args": [],
+            "x-name": "recordsNameDirectory"
+          },
+          {
+            "const": "qualify.records.package-word",
+            "title": "recordsPackageWord",
+            "x-code": 77,
+            "x-text": "{what} {value}: a package name holds lowercase letters, digits, + - and . only",
+            "x-args": [
+              "what",
+              "value"
+            ],
+            "x-name": "recordsPackageWord"
+          },
+          {
+            "const": "qualify.records.cell-unread",
+            "title": "recordsCellUnread",
+            "x-code": 78,
+            "x-text": "--cell {cell} is not <rate>/<quantum>",
+            "x-args": [
+              "cell"
+            ],
+            "x-name": "recordsCellUnread"
+          },
+          {
+            "const": "qualify.records.cell-one-directory",
+            "title": "recordsCellOneDirectory",
+            "x-code": 79,
+            "x-text": "--cell names the cell of one directory; name one",
+            "x-args": [],
+            "x-name": "recordsCellOneDirectory"
+          },
+          {
+            "const": "qualify.records.version-unread",
+            "title": "recordsVersionUnread",
+            "x-code": 80,
+            "x-text": "--version {version} is not a Debian version",
+            "x-args": [
+              "version"
+            ],
+            "x-name": "recordsVersionUnread"
+          },
+          {
+            "const": "qualify.judged.schema-other",
+            "title": "judgedSchemaOther",
+            "x-code": 81,
+            "x-text": "record schema {schema} is not {expected}",
+            "x-args": [
+              "schema",
+              "expected"
+            ],
+            "x-name": "judgedSchemaOther"
+          },
+          {
+            "const": "qualify.judged.no-verdict",
+            "title": "judgedNoVerdict",
+            "x-code": 82,
+            "x-text": "no verdict under {host}",
+            "x-args": [
+              "host"
+            ],
+            "x-name": "judgedNoVerdict"
+          },
+          {
+            "const": "qualify.judged.no-verdict-format",
+            "title": "judgedNoVerdictFormat",
+            "x-code": 83,
+            "x-text": "no verdict under a host for {format}",
+            "x-args": [
+              "format"
+            ],
+            "x-name": "judgedNoVerdictFormat"
+          },
+          {
+            "const": "qualify.judged.not-measured",
+            "title": "judgedNotMeasured",
+            "x-code": 84,
+            "x-text": "{host}: not measured ({deciding})",
+            "x-args": [
+              "host",
+              "deciding"
+            ],
+            "x-name": "judgedNotMeasured"
+          },
+          {
+            "const": "qualify.judged.no-probe-version",
+            "title": "judgedNoProbeVersion",
+            "x-code": 85,
+            "x-text": "the record names no plugin-hostd-probe version",
+            "x-args": [],
+            "x-name": "judgedNoProbeVersion"
+          },
+          {
+            "const": "qualify.judged.no-rules",
+            "title": "judgedNoRules",
+            "x-code": 86,
+            "x-text": "the record states no rules, and no judgedBy was given",
+            "x-args": [],
+            "x-name": "judgedNoRules"
+          },
+          {
+            "const": "qualify.records.left-unmeasured",
+            "title": "recordsLeftUnmeasured",
+            "x-code": 87,
+            "x-text": "unmeasured, never applies",
+            "x-args": [],
+            "x-name": "recordsLeftUnmeasured"
+          },
+          {
+            "const": "qualify.records.left-unreadable",
+            "title": "recordsLeftUnreadable",
+            "x-code": 88,
+            "x-text": "does not read",
+            "x-args": [],
+            "x-name": "recordsLeftUnreadable"
+          },
+          {
+            "const": "qualify.records.left-not-record",
+            "title": "recordsLeftNotRecord",
+            "x-code": 89,
+            "x-text": "not a {schema} naming its probe output",
+            "x-args": [
+              "schema"
+            ],
+            "x-name": "recordsLeftNotRecord"
+          },
+          {
+            "const": "qualify.records.left-other-cell",
+            "title": "recordsLeftOtherCell",
+            "x-code": 90,
+            "x-text": "measured at {cells}, not at its set's {cell}",
+            "x-args": [
+              "cells",
+              "cell"
+            ],
+            "x-name": "recordsLeftOtherCell"
+          },
+          {
+            "const": "qualify.records.left-no-cell",
+            "title": "recordsLeftNoCell",
+            "x-code": 91,
+            "x-text": "measured at no cell, not at its set's {cell}",
+            "x-args": [
+              "cell"
+            ],
+            "x-name": "recordsLeftNoCell"
+          },
+          {
+            "const": "qualify.records.left-no-probe-output",
+            "title": "recordsLeftNoProbeOutput",
+            "x-code": 92,
+            "x-text": "its probe output {file} is not there",
+            "x-args": [
+              "file"
+            ],
+            "x-name": "recordsLeftNoProbeOutput"
+          },
+          {
+            "const": "qualify.records.left-probe-output-other",
+            "title": "recordsLeftProbeOutputOther",
+            "x-code": 93,
+            "x-text": "its probe output {file} is not the copy it names",
+            "x-args": [
+              "file"
+            ],
+            "x-name": "recordsLeftProbeOutputOther"
+          },
+          {
+            "const": "qualify.search-path.no-key",
+            "title": "searchPathNoKey",
+            "x-code": 94,
+            "x-text": "plugin-hostd --search-path printed no {key} with its source",
+            "x-args": [
+              "key"
+            ],
+            "x-name": "searchPathNoKey"
+          },
+          {
+            "const": "qualify.search-path.no-effective",
+            "title": "searchPathNoEffective",
+            "x-code": 95,
+            "x-text": "plugin-hostd --search-path printed no effective lv2 and clap lists",
+            "x-args": [],
+            "x-name": "searchPathNoEffective"
+          },
+          {
+            "const": "qualify.search-path.no-hostd",
+            "title": "searchPathNoHostd",
+            "x-code": 96,
+            "x-text": "plugin-hostd is not installed: the directories scanned are the ones plugin-hostd searches",
+            "x-args": [],
+            "x-name": "searchPathNoHostd"
+          },
+          {
+            "const": "qualify.search-path.unsupported",
+            "title": "searchPathUnsupported",
+            "x-code": 97,
+            "x-text": "this plugin-hostd has no --search-path (plugin-hostd 0.20.3 or later names the directories it searches)",
+            "x-args": [],
+            "x-name": "searchPathUnsupported"
+          },
+          {
+            "const": "qualify.search-path.exited",
+            "title": "searchPathExited",
+            "x-code": 98,
+            "x-text": "plugin-hostd --search-path exited {status}",
+            "x-args": [
+              "status"
+            ],
+            "x-name": "searchPathExited"
+          },
+          {
+            "const": "qualify.search-path.from-env",
+            "title": "searchPathFromEnv",
+            "x-code": 99,
+            "x-text": "{key} is plugin-hostd's environment ({variable}), not {where}: the running daemon may search other directories; write it in that file",
+            "x-args": [
+              "key",
+              "variable",
+              "where"
+            ],
+            "x-name": "searchPathFromEnv"
+          },
+          {
+            "const": "qualify.search-path.from-env-own-file",
+            "title": "searchPathFromEnvOwnFile",
+            "x-code": 100,
+            "x-text": "{key} is plugin-hostd's environment ({variable}), not plugin-hostd's own settings file: the running daemon may search other directories; write it there",
+            "x-args": [
+              "key",
+              "variable"
+            ],
+            "x-name": "searchPathFromEnvOwnFile"
+          },
+          {
+            "const": "qualify.search-path.from-default",
+            "title": "searchPathFromDefault",
+            "x-code": 101,
+            "x-text": "{key} is plugin-hostd's default, not {where}: the running daemon may search other directories; write it in that file",
+            "x-args": [
+              "key",
+              "where"
+            ],
+            "x-name": "searchPathFromDefault"
+          },
+          {
+            "const": "qualify.search-path.from-default-own-file",
+            "title": "searchPathFromDefaultOwnFile",
+            "x-code": 102,
+            "x-text": "{key} is plugin-hostd's default, not plugin-hostd's own settings file: the running daemon may search other directories; write it there",
+            "x-args": [
+              "key"
+            ],
+            "x-name": "searchPathFromDefaultOwnFile"
+          },
+          {
+            "const": "qualify.sync.no-plugin-listed",
+            "title": "syncNoPluginListed",
+            "x-code": 103,
+            "x-text": "no plugin was listed",
+            "x-args": [],
+            "x-name": "syncNoPluginListed"
+          },
+          {
+            "const": "qualify.sync.no-document",
+            "title": "syncNoDocument",
+            "x-code": 104,
+            "x-text": "the measurement wrote no document",
+            "x-args": [],
+            "x-name": "syncNoDocument"
+          },
+          {
+            "const": "qualify.descriptor.no-binary-hash",
+            "title": "descriptorNoBinaryHash",
+            "x-code": 105,
+            "x-text": "{plugin}: no SHA-256 of its binary",
+            "x-args": [
+              "plugin"
+            ],
+            "x-name": "descriptorNoBinaryHash"
+          },
+          {
+            "const": "qualify.descriptor.binary-unreadable",
+            "title": "descriptorBinaryUnreadable",
+            "x-code": 106,
+            "x-text": "{path}: {error}",
+            "x-args": [
+              "path",
+              "error"
+            ],
+            "x-name": "descriptorBinaryUnreadable"
+          },
+          {
+            "const": "qualify.descriptor.no-units-sheet",
+            "title": "descriptorNoUnitsSheet",
+            "x-code": 107,
+            "x-text": "no omx-contract units sheet at {places}",
+            "x-args": [
+              "places"
+            ],
+            "x-name": "descriptorNoUnitsSheet"
+          },
+          {
+            "const": "qualify.descriptor.no-schema",
+            "title": "descriptorNoSchema",
+            "x-code": 108,
+            "x-text": "no omx-contract schema at {places}",
+            "x-args": [
+              "places"
+            ],
+            "x-name": "descriptorNoSchema"
+          },
+          {
+            "const": "qualify.descriptor.no-jsonschema",
+            "title": "descriptorNoJsonschema",
+            "x-code": 109,
+            "x-text": "python3-jsonschema is not installed",
+            "x-args": [],
+            "x-name": "descriptorNoJsonschema"
+          },
+          {
+            "const": "qualify.descriptor.origin-scanned",
+            "title": "descriptorOriginScanned",
+            "x-code": 110,
+            "x-text": "a scanned descriptor carries origin scanned",
+            "x-args": [],
+            "x-name": "descriptorOriginScanned"
+          },
+          {
+            "const": "qualify.descriptor.schema-refused",
+            "title": "descriptorSchemaRefused",
+            "x-code": 111,
+            "x-text": "{where}: {message}",
+            "x-args": [
+              "where",
+              "message"
+            ],
+            "x-name": "descriptorSchemaRefused"
+          },
+          {
+            "const": "qualify.descriptor.dir-unwritable",
+            "title": "descriptorDirUnwritable",
+            "x-code": 112,
+            "x-text": "{directory}: {error}",
+            "x-args": [
+              "directory",
+              "error"
+            ],
+            "x-name": "descriptorDirUnwritable"
+          },
+          {
+            "const": "qualify.descriptor.not-clap-scan",
+            "title": "descriptorNotClapScan",
+            "x-code": 113,
+            "x-text": "not a CLAP scan document",
+            "x-args": [],
+            "x-name": "descriptorNotClapScan"
+          },
+          {
+            "const": "qualify.judged.files-pin",
+            "title": "judgedFilesPin",
+            "x-code": 114,
+            "x-text": "--files must be the 64 hex digits of the files pin",
+            "x-args": [],
+            "x-name": "judgedFilesPin"
+          },
+          {
+            "const": "qualify.judged.layout-form",
+            "title": "judgedLayoutForm",
+            "x-code": 115,
+            "x-text": "--layout must be <scheme>:<sha256>",
+            "x-args": [],
+            "x-name": "judgedLayoutForm"
+          },
+          {
+            "const": "qualify.judged.takes-shadow-key",
+            "title": "judgedTakesShadowKey",
+            "x-code": 116,
+            "x-text": "judged-layer takes a shadow key, not a file: {file}",
+            "x-args": [
+              "file"
+            ],
+            "x-name": "judgedTakesShadowKey"
+          },
+          {
+            "const": "qualify.judged.layer-one-of",
+            "title": "judgedLayerOneOf",
+            "x-code": 117,
+            "x-text": "--layer must be user or base",
+            "x-args": [],
+            "x-name": "judgedLayerOneOf"
+          }
+        ]
+      }
+    }
+  }
+}

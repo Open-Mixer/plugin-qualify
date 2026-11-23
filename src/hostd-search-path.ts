@@ -8,6 +8,7 @@
  */
 import { spawnSync } from "node:child_process";
 import { HOSTD_ENV } from "./hostd-pin-files.js";
+import { type ReasonText, TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** Where plugin-hostd took a list from: its settings file, its environment (`LV2_PATH`, `CLAP_PATH`) or its default. */
 export type SearchPathSource = "file" | "env" | "default";
@@ -42,7 +43,7 @@ const SOURCES: readonly string[] = ["file", "env", "default"];
 const dirList = (text: string): string[] => text.split(":").filter((d) => d !== "");
 
 /** The lines `plugin-hostd --search-path` prints, read: `<key> TAB <source> TAB <value>`; why not, when one is missing. */
-export function parseSearchPath(stdout: string): { ok: true; path: HostdSearchPath } | { ok: false; error: string } {
+export function parseSearchPath(stdout: string): { ok: true; path: HostdSearchPath } | { ok: false; error: ReasonText } {
   const rows = new Map<string, { source: string; value: string }>();
   for (const line of stdout.split("\n")) {
     const f = line.split("\t");
@@ -50,11 +51,11 @@ export function parseSearchPath(stdout: string): { ok: true; path: HostdSearchPa
   }
   for (const key of ["lv2_path", "lv2_extra", "clap_path"]) {
     const r = rows.get(key);
-    if (r === undefined || !SOURCES.includes(r.source)) return { ok: false, error: `plugin-hostd --search-path printed no ${key} with its source` };
+    if (r === undefined || !SOURCES.includes(r.source)) return { ok: false, error: { code: TEXT_CODE.searchPathNoKey, args: { key: key } } };
   }
   const lv2 = rows.get("lv2");
   const clap = rows.get("clap");
-  if (lv2?.source !== "effective" || clap?.source !== "effective") return { ok: false, error: "plugin-hostd --search-path printed no effective lv2 and clap lists" };
+  if (lv2?.source !== "effective" || clap?.source !== "effective") return { ok: false, error: { code: TEXT_CODE.searchPathNoEffective } };
   const src = (key: string) => rows.get(key)!.source as SearchPathSource;
   return { ok: true, path: { lv2: dirList(lv2.value), clap: dirList(clap.value), sources: { lv2_path: src("lv2_path"), lv2_extra: src("lv2_extra"), clap_path: src("clap_path") } } };
 }
@@ -64,22 +65,26 @@ export function hostdSearchPath(
   conf: string | undefined,
   env: Readonly<Record<string, string | undefined>> = process.env,
   run: SearchPathRun = SPAWNED_SEARCH_PATH,
-): { ok: true; path: HostdSearchPath } | { ok: false; error: string } {
+): { ok: true; path: HostdSearchPath } | { ok: false; error: ReasonText } {
   const r = run(conf, env);
-  if (r.missing) return { ok: false, error: "plugin-hostd is not installed: the directories scanned are the ones plugin-hostd searches" };
+  if (r.missing) return { ok: false, error: { code: TEXT_CODE.searchPathNoHostd } };
   if (r.status !== 0) {
-    const why = /unrecognized option|^Usage:/m.test(r.stdout + r.stderr)
-      ? "this plugin-hostd has no --search-path (plugin-hostd 0.20.3 or later names the directories it searches)"
-      : r.stderr.trim().split("\n").pop() || `plugin-hostd --search-path exited ${String(r.status)}`;
+    // plugin-hostd's own last line of stderr is its words, passed through; the rest are this package's
+    const why: ReasonText = /unrecognized option|^Usage:/m.test(r.stdout + r.stderr)
+      ? { code: TEXT_CODE.searchPathUnsupported }
+      : r.stderr.trim().split("\n").pop() || { code: TEXT_CODE.searchPathExited, args: { status: String(r.status) } };
     return { ok: false, error: why };
   }
   return parseSearchPath(r.stdout);
 }
 
 /** What the run says when a list is not the settings file's: the running daemon, started with another environment, may search other directories. */
-export function searchPathWarnings(path: HostdSearchPath, conf: string | undefined): string[] {
-  const where = conf ?? "plugin-hostd's own settings file";
+export function searchPathWarnings(path: HostdSearchPath, conf: string | undefined): TextRef[] {
   return (["lv2_path", "clap_path"] as const)
     .filter((k) => path.sources[k] !== "file")
-    .map((k) => `${k} is plugin-hostd's ${path.sources[k] === "env" ? `environment (${k === "lv2_path" ? "LV2_PATH" : "CLAP_PATH"})` : "default"}, not ${where}: the running daemon may search other directories; write ${k} in ${where}`);
+    .map((k): TextRef => {
+      const variable = k === "lv2_path" ? "LV2_PATH" : "CLAP_PATH";
+      if (path.sources[k] === "env") return conf === undefined ? { code: TEXT_CODE.searchPathFromEnvOwnFile, args: { key: k, variable: variable } } : { code: TEXT_CODE.searchPathFromEnv, args: { key: k, variable: variable, where: conf } };
+      return conf === undefined ? { code: TEXT_CODE.searchPathFromDefaultOwnFile, args: { key: k } } : { code: TEXT_CODE.searchPathFromDefault, args: { key: k, where: conf } };
+    });
 }

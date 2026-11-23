@@ -38,6 +38,7 @@
  * `@progress `. A supervising process (the OpenMixer console's Setup screen) parses those and
  * ignores everything else, so the human log stays readable.
  */
+import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { constants, hostname } from "node:os";
@@ -90,7 +91,7 @@ const HELP = `${TOOL_NAME} ${TOOL_VERSION} — measure LV2 plugin latency and CP
   --progress-json         Emit machine-readable progress on stderr, one '@progress {...}' per line.
   --help                  This text.
 
-The hosting pass's host features are omx-clap-core's LV2 feature provider; each of its options is
+The hosting pass's host features are omx-clap's LV2 feature provider; each of its options is
 a flag, passed to every run of lv2_measure and named in each plugin's record (featureOptions):
 
   --features LIST         Kinds offered: map,unmap,options,bounded,worker,default-state,log

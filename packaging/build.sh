@@ -31,6 +31,18 @@ tar -xzf "$work"/openmixer-plugin-qualify-*.tgz -C "$target" --strip-components=
 dep=$dest$libdir/node_modules/@openmixer/omx-contract
 mkdir -p "$dep"
 cp -rL node_modules/@openmixer/omx-contract/. "$dep"/
+# the other run-time dependency, ajv (the qualification domain's reader, dist/qualification-domain.js), copied the same
+# way: a dependency's directory in pnpm's store holds it and its own dependencies side by side, and Node resolves them
+# from the package's own node_modules, so nothing lands in a directory another package owns
+mods=$target/node_modules
+mkdir -p "$mods"
+cp -rL "$(dirname "$(readlink -f node_modules/ajv)")"/. "$mods"/
+# only what each package publishes: no dotfile (lint configs, version-control files), no spec, test or benchmark
+# directory, no lint or compiler configuration (lintian refuses them); the same list omx-contract's install prunes
+# bundled-prune begin
+find "$mods" -mindepth 2 -maxdepth 2 \( -name '.*' -o -name test -o -name spec -o -name benchmark \
+  -o -name 'eslint.config.*' -o -name 'tsconfig*.json' \) -exec rm -rf {} +
+# bundled-prune end
 # the package's one document is its README in the doc directory: no page rides along inside node_modules
 find "$target" "$dep" -name '*.md' -delete
 install -m 0644 packaging/plugin-qualify.1 packaging/plugin-qualify-sync.1 packaging/plugin-qualify-records-package.1 "$dest/usr/share/man/man1/"
