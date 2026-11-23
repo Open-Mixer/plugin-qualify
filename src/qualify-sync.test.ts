@@ -608,41 +608,73 @@ describe("the lock", () => {
     return r.settings;
   }
 
-  /** Runs recorded as they begin and end, on one clock. */
-  function traced(settings: SyncSettings, name: string, events: string[], options: { wait?: boolean } = {}): Promise<unknown> {
-    return runSync(settings, { ...options, qualificationStore: own(), log: (line) => line === "sync run begins" && events.push(`${name} begins`) }).then((r) => {
+  /**
+   * A run recorded as it begins and ends, on one clock. `begun` resolves when the run logs that it begins, which it
+   * does under the lock: a run started after it is known to find the lock held, whatever the host's load (#95).
+   */
+  function traced(settings: SyncSettings, name: string, events: string[], options: { wait?: boolean } = {}): { done: Promise<unknown>; begun: Promise<void> } {
+    let begin!: () => void;
+    const begun = new Promise<void>((r) => (begin = r));
+    const log = (line: string): void => {
+      if (line !== "sync run begins") return;
+      events.push(`${name} begins`);
+      begin();
+    };
+    const done = runSync(settings, { ...options, qualificationStore: own(), log }).then((r) => {
       events.push(`${name} ends`);
       return r;
     });
+    return { done, begun };
+  }
+
+  /**
+   * Keeps a run that waits for quiet (`settle_s`) in the lock until `release`: a file in its plugin directory grows
+   * faster than the run looks, so the directories are never quiet for as long as it asks. Not a clock: the run leaves
+   * the lock only after the test lets it.
+   */
+  function holdOpen(settings: SyncSettings): { release: () => void } {
+    const busy = join(settings.clapDirs[0]!, "busy");
+    const timer = setInterval(() => appendFileSync(busy, "."), 100);
+    appendFileSync(busy, ".");
+    return {
+      release: () => {
+        clearInterval(timer);
+        rmSync(busy, { force: true });
+      },
+    };
   }
 
   it("a second run waits for the first: they never measure at once", async () => {
     const settings = lockedSettings("1");
     const events: string[] = [];
+    const hold = holdOpen(settings);
     const a = traced(settings, "a", events);
-    await new Promise((r) => setTimeout(r, 300));
+    await a.begun;
     const b = traced(settings, "b", events);
-    await Promise.all([a, b]);
+    hold.release();
+    await Promise.all([a.done, b.done]);
     expect(events).toEqual(["a begins", "a ends", "b begins", "b ends"]);
-  }, 30_000);
+  });
 
   it("--no-wait returns at once, and the holder runs once more at its end", async () => {
     const settings = lockedSettings("1");
     const events: string[] = [];
+    const hold = holdOpen(settings);
     const a = traced(settings, "a", events);
-    await new Promise((r) => setTimeout(r, 300));
-    const b = await traced(settings, "b", events, { wait: false });
+    await a.begun;
+    const b = await traced(settings, "b", events, { wait: false }).done;
+    hold.release();
     expect(b).toBeUndefined();
     expect(events).toEqual(["a begins", "b ends"]);
-    await a;
+    await a.done;
     expect(events).toEqual(["a begins", "b ends", "a begins", "a ends"]);
     expect(existsSync(`${settings.stateFile}.again`)).toBe(false);
-  }, 30_000);
+  });
 
   it("a lone --no-wait run takes the lock and runs once, leaving no marker", async () => {
     const settings = lockedSettings("0");
     const events: string[] = [];
-    expect(await traced(settings, "a", events, { wait: false })).toBeDefined();
+    expect(await traced(settings, "a", events, { wait: false }).done).toBeDefined();
     expect(events).toEqual(["a begins", "a ends"]);
     expect(existsSync(`${settings.stateFile}.again`)).toBe(false);
   });
