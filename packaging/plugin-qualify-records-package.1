@@ -3,20 +3,20 @@
 plugin-qualify-records-package \- the Debian packages of a device's qualification records, one per rate and quantum
 .SH SYNOPSIS
 .B plugin-qualify-records-package
-.IR qualification-dir | run-root ...
+.IR records-dir | run-root ...
 [\fB\-\-cell\fR \fIrate\fB/\fIquantum\fR] \fB\-\-host\-class\fR \fIclass\fR \fB\-\-set\fR \fIset\fR \fB\-\-provenance\fR \fIjson\fR
 [\fB\-\-version\fR \fIversion\fR] [\fB\-\-out\fR \fIdir\fR] [\fB\-\-maintainer\fR \fIwho\fR]
 .SH DESCRIPTION
 A record set is per machine class, rate and quantum. Builds one
 \fBplugin-db-qualification-\fIclass\fB-\fIset\fB-\fIrate\fB-\fIquantum\fB_\fIversion\fB_all.deb\fR per cell, a package of plugin-db's
-qualification layer, from the qualification directories plugin-qualify-sync(1) left on a device: each directory is a
-cell, named by its base (\fIrun\fB/b48000-512/qualification\fR), and a run root stands for every
+qualification layer, from directories of record documents, each record with the probe output it judged, as a measuring
+run writes them (\fBplugin-qualify \-\-out\fR): each directory is a cell, named by its base
+(\fIrun\fB/b48000-512/qualification\fR), and a run root stands for every
 \fBb\fIrate\fB-\fIquantum\fB/qualification\fR under it. Each package installs every record of its cell, with the probe
 output it judged, under /usr/share/omx/qualification/\fIclass\fR/\fIset\fB-\fIrate\fB-\fIquantum\fR/ beside
 \fBprovenance.json\fR, which names the cell, and depends on the minor
-of the plugin-qualify that wrote it, up to the next minor. On another device of the class, plugin-qualify-sync takes a plugin from
-those records instead of measuring it, and only when every file of the installed plugin hashes as the measured one
-did.
+of the plugin-qualify that wrote it, up to the next minor. plugin-qualify-sync(1) reads no directory of records: it reads
+the qualification store, whose base is built from record documents.
 .PP
 A record whose probe output is missing, or is not the copy it names, is left out and named on standard error; so is
 an unmeasured record, which never applies, and a record whose grid does not hold its set's cell. Each line on standard

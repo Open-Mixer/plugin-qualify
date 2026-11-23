@@ -357,7 +357,9 @@ async function jalvHost() {
   const obs = { installed: true, started: true };
   const start = (k) => {
     const name = `cmp${String(process.pid)}_${String(k)}`;
-    const p = spawn("jalv", ["-i", "-x", "-n", name, spec], { stdio: ["ignore", "ignore", "pipe"], detached: true, env: hostEnv() });
+    // in the comparison's work directory, which the run removes: jalv makes its state directory with a relative
+    // mkdtemp("jalvXXXXXX") and removes it only at a clean exit, so a jalv the stop kills would leave it where it stood
+    const p = spawn("jalv", ["-i", "-x", "-n", name, spec], { stdio: ["ignore", "ignore", "pipe"], detached: true, cwd: WORK, env: hostEnv() });
     const st = { p, name, end: undefined, stderr: "" };
     p.stderr.on("data", (d) => (st.stderr = (st.stderr + d.toString()).slice(-4000)));
     p.on("exit", (code, signal) => (st.end = signal ?? `exit ${String(code)}`));

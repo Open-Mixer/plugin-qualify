@@ -13,11 +13,11 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { classifyProtocolRun, type AdmissionRuns, type ModHostRun } from "./host-admission.js";
-import { AdapterPassRefused, NO_PRIVATE_SERVER, adapterBlockOf, adapterFinished, hostVersions, parseVersion, type AdapterPassOptions, type PrivateJack } from "./qualify-adapter-pass.js";
+import { AdapterPassRefused, noPrivateServerCode, adapterBlockOf, adapterFinished, hostVersions, parseVersion, type AdapterPassOptions, type PrivateJack } from "./qualify-adapter-pass.js";
 import type { QualificationRecord } from "./qualification-record.js";
 import { OWED_CODE, owedFile } from "./qualify-rejudge.js";
 import { parseSyncArgs, runSync, summaryLine } from "./qualify-sync.js";
-import { CLAP_RT, LV2_CLEAN, LV2_CRASHED, LV2_RT, device, probeFile, readJson, recordFile, rejudge, removeDevices, row, stored, type Device } from "./qualify-rejudge.support.js";
+import { CLAP_RT, LV2_CLEAN, LV2_CRASHED, LV2_RT, device, readJson, rejudge, removeDevices, row, stored, type Device } from "./qualify-rejudge.support.js";
 
 const scratch = mkdtempSync(join(tmpdir(), "qualify-adapter-"));
 afterAll(() => {
@@ -45,8 +45,9 @@ function stand(seen: Seen[], answer: (uri: string, quantum: number) => ModHostRu
   return { runs, jack, jackdPresent: true, versions: (tool) => ({ status: 0, stdout: `${tool} version: ${tool.includes("omx-clap") ? VERSIONS["omx-clap-host"] : VERSIONS["plugin-hostd"]}\n` }), now: () => "2026-10-31T02:00:00.000Z", ...over };
 }
 
-const pass = (d: Device, options: AdapterPassOptions, force = false) => runSync(d.settings, { adapterOnly: true, force, env: {}, adapterPass: options, pinFilesRun: () => ({ status: 1, stdout: "", stderr: "" }) });
-const bytes = (d: Device, stem: string): Buffer => readFileSync(join(d.dir, recordFile(stem)));
+const pass = (d: Device, options: AdapterPassOptions, force = false) => runSync(d.settings, { qualificationStore: d.store, adapterOnly: true, force, env: {}, adapterPass: options, pinFilesRun: () => ({ status: 1, stdout: "", stderr: "" }) });
+/** The record as the store holds it, as text: what a pass must leave as it was. */
+const bytes = (d: Device, stem: string): Buffer => Buffer.from(`${JSON.stringify(d.record(stem), null, 2)}\n`);
 
 describe("--adapter-only: the run", () => {
   it("runs each cell of a Pi, each on its private server, under the budget, never the device's own", async () => {
@@ -66,7 +67,6 @@ describe("--adapter-only: the run", () => {
   it("writes the block with the hosts' versions and each cell, and leaves every other byte of the record", async () => {
     const d = device([LV2_CLEAN]);
     const was = bytes(d, LV2_CLEAN).toString();
-    const copy = readFileSync(join(d.dir, probeFile(LV2_CLEAN)));
     const summary = await pass(d, stand([]));
     const now = d.record(LV2_CLEAN);
     expect(now.adapter).toEqual({
@@ -85,7 +85,6 @@ describe("--adapter-only: the run", () => {
     });
     const { adapter: _adapter, ...rest } = now;
     expect(`${JSON.stringify(rest, null, 2)}\n`).toBe(was);
-    expect(readFileSync(join(d.dir, probeFile(LV2_CLEAN))).equals(copy)).toBe(true);
     expect(summary!.adapterOnly).toEqual({ measured: 1, already: 0, failed: 0 });
     expect(summaryLine(summary!)).toContain("adapter run 1, already 0, failed 0");
   });
@@ -155,10 +154,10 @@ describe("--adapter-only: a crash or a timeout is a recorded outcome", () => {
   });
 
   it("a cell no private server came up for is not measured either, and a refusal elsewhere still decides", () => {
-    const off = { host: "omx-clap-host" as const, measured: false, admitted: false, code: NO_PRIVATE_SERVER, params: {} };
+    const off = { host: "omx-clap-host" as const, measured: false, admitted: false, code: noPrivateServerCode(), params: {} };
     const no = { host: "omx-clap-host" as const, measured: true, admitted: false, code: "omx-clap-host.resp-512", params: {} };
     const cell = (quantum: number) => ({ rate: 48000, quantum });
-    expect(adapterBlockOf([{ cell: cell(128), run: off }, { cell: cell(256), run: { ...off, admitted: true, measured: true, code: undefined as never } }], VERSIONS, "t")).toMatchObject({ measured: false, code: NO_PRIVATE_SERVER });
+    expect(adapterBlockOf([{ cell: cell(128), run: off }, { cell: cell(256), run: { ...off, admitted: true, measured: true, code: undefined as never } }], VERSIONS, "t")).toMatchObject({ measured: false, code: noPrivateServerCode() });
     expect(adapterBlockOf([{ cell: cell(128), run: off }, { cell: cell(256), run: no }], VERSIONS, "t")).toMatchObject({ measured: true, admitted: false, code: "omx-clap-host.resp-512" });
   });
 });
@@ -237,7 +236,7 @@ describe("--adapter-only: it starts only when it can say what it runs under", ()
   it("no jackd: refused, naming why, and the device's server is not used instead", async () => {
     const d = device([LV2_CLEAN]);
     const seen: Seen[] = [];
-    await expect(pass(d, stand(seen, () => admitted, { jackdPresent: false }))).rejects.toThrow(NO_PRIVATE_SERVER);
+    await expect(pass(d, stand(seen, () => admitted, { jackdPresent: false }))).rejects.toThrow(noPrivateServerCode());
     expect(seen).toEqual([]);
   });
 

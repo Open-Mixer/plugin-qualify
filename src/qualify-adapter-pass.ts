@@ -17,7 +17,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
-import { ADAPTER_HOST, ADAPTER_SILENT_CODE, SPAWNED_ADMISSIONS, admitUnderAdapter, type AdmissionRuns, type HostAdmission } from "./host-admission.js";
+import { ADAPTER_HOST, SPAWNED_ADMISSIONS, adapterCode, adapterSilentCode, admitUnderAdapter, type AdmissionRuns, type HostAdmission } from "./host-admission.js";
 import { HOSTD_ENV } from "./hostd-pin-files.js";
 import { freeDeadJackSlots } from "./jack-registry.js";
 import { cellKey, type GridCell } from "./measurement-grid.js";
@@ -25,15 +25,15 @@ import { defaultAddressSpaceLimit } from "./direct-limit.js";
 import { QUALIFICATION_RECORD_SCHEMA, type AdapterBlock, type QualificationRecord } from "./qualification-record.js";
 import { ADMIT_ADDRESS_KB_ENV, ADMIT_STATE_DIR_ENV, ADMIT_STEP_MS_ENV, PI_CELLS } from "./qualify-declarations.js";
 import { digestFiles, type SyncContext, type SyncState } from "./qualify-sync.js";
-import { writeFileWhole } from "./whole-file.js";
+import { localeOf, textOf } from "./text-catalog.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
 
 /** The cells the pass runs at: the ones a Pi runs. */
 export const ADAPTER_PASS_CELLS: readonly GridCell[] = PI_CELLS;
 
 /** The code of a cell no private server could be had for: the run did not happen. */
-export const NO_PRIVATE_SERVER = `${ADAPTER_HOST}.no-private-server`;
+export const noPrivateServerCode = (): string => adapterCode(ADAPTER_HOST, "noPrivateServer");
 
-const RECORD_SUFFIX = ".qualification.json";
 const SERVER_WAIT_MS = 5000;
 const SERVER_SETTLE_MS = 300;
 // a TERM is waited for this long: jackd on a Pi can take seconds to end, and a jackd that is KILLed keeps its row in
@@ -59,11 +59,11 @@ export function toolVersion(tool: string, run: VersionRun = spawnVersion): strin
 }
 
 /** The versions of the hosts as installed now, or which of them could not say. */
-export function hostVersions(env: Readonly<Record<string, string | undefined>>, run: VersionRun = spawnVersion): { ok: true; versions: Readonly<Record<string, string>> } | { ok: false; error: string } {
+export function hostVersions(env: Readonly<Record<string, string | undefined>>, run: VersionRun = spawnVersion): { ok: true; versions: Readonly<Record<string, string>> } | { ok: false; error: TextRef } {
   const versions: Record<string, string> = {};
   for (const [name, tool] of [[ADAPTER_HOST, ADAPTER_HOST], ["plugin-hostd", env[HOSTD_ENV] ?? "plugin-hostd"]] as const) {
     const version = toolVersion(tool, run);
-    if (version === undefined) return { ok: false, error: `${tool} --version names no version, so a run could not say which host it was under` };
+    if (version === undefined) return { ok: false, error: { code: TEXT_CODE.adapterNoVersion, args: { tool: tool } } };
     versions[name] = version;
   }
   return { ok: true, versions };
@@ -206,7 +206,7 @@ export function adapterFinished(record: QualificationRecord, versions: Readonly<
   const a = record.adapter;
   if (a === undefined || !a.measured || a.versions === undefined || a.cells === undefined) return false;
   // silence under the one key the run once played says nothing of a plugin that maps others: it is run again
-  if (a.cells.some((c) => c.code === ADAPTER_SILENT_CODE && c.params["notes"] === undefined)) return false;
+  if (a.cells.some((c) => c.code === adapterSilentCode() && c.params["notes"] === undefined)) return false;
   const same = Object.keys(versions).length === Object.keys(a.versions).length && Object.entries(versions).every(([k, v]) => a.versions![k] === v);
   return same && cells.every((c) => a.cells!.some((x) => cellKey(x) === cellKey(c)));
 }
@@ -233,22 +233,13 @@ export interface AdapterPassResult {
 /** The pass could not start: nothing was run and nothing written. */
 export class AdapterPassRefused extends Error {}
 
-const readRecord = (path: string): QualificationRecord | undefined => {
-  try {
-    const r = JSON.parse(readFileSync(path, "utf8")) as QualificationRecord;
-    return r.schema === QUALIFICATION_RECORD_SCHEMA ? r : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
 /**
- * The run of each LV2 plugin of the state, whatever its probe ended with, at each cell. Each record is written whole as its plugin ends.
+ * The run of each LV2 plugin of the state, whatever its probe ended with, at each cell. Each record is put whole as its plugin ends.
  */
 export function adapterPass(ctx: SyncContext, state: SyncState, options: AdapterPassOptions = {}): AdapterPassResult {
   const read = hostVersions(ctx.env, options.versions);
-  if (!read.ok) throw new AdapterPassRefused(read.error);
-  if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${NO_PRIVATE_SERVER}, and the device's own JACK server is never used for this`);
+  if (!read.ok) throw new AdapterPassRefused(textOf(read.error, localeOf(ctx.env)));
+  if (!(options.jackdPresent ?? jackdInstalled(ctx.env))) throw new AdapterPassRefused(`no jackd on the path: ${noPrivateServerCode()}, and the device's own JACK server is never used for this`);
   const { versions } = read;
   const starter = options.jack ?? startPrivateJack;
   const runs = options.runs ?? SPAWNED_ADMISSIONS;
@@ -275,11 +266,10 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
         continue;
       }
       for (const plugin of entry.plugins) {
-        if (plugin.record === undefined || !plugin.record.endsWith(RECORD_SUFFIX)) continue;
-        const path = join(ctx.settings.qualificationDir, basename(plugin.record));
-        const record = readRecord(path);
+        if (plugin.record === undefined) continue;
+        const record = ctx.store.record(plugin.record);
         if (record === undefined) {
-          ctx.log(`${plugin.uri}: its record does not read; no adapter run`);
+          ctx.log(`${plugin.uri}: its record is not in the store; no adapter run`);
           count.failed++;
           continue;
         }
@@ -293,17 +283,17 @@ export function adapterPass(ctx: SyncContext, state: SyncState, options: Adapter
         const started = Date.now();
         const done = ADAPTER_PASS_CELLS.map((cell) => {
           const server = serverFor(cell);
-          if (server === undefined) return { cell, run: { host: ADAPTER_HOST, measured: false, admitted: false, code: NO_PRIVATE_SERVER, params: {} } as HostAdmission };
+          if (server === undefined) return { cell, run: { host: ADAPTER_HOST, measured: false, admitted: false, code: noPrivateServerCode(), params: {} } as HostAdmission };
           const stateDir = mkdtempSync(join(tmpdir(), "plugin-qualify-adapter-state-"));
           try {
             const env = { ...ctx.env, ...limit, [ADMIT_STATE_DIR_ENV]: stateDir, LV2_PATH: ctx.settings.lv2Dirs.join(":"), JACK_DEFAULT_SERVER: server.name, JACK_NO_START_SERVER: "1" };
-            return { cell, run: admitUnderAdapter(record.plugin.id, runs, env) ?? ({ host: ADAPTER_HOST, measured: false, admitted: false, code: `${ADAPTER_HOST}.admission-failed`, params: {} } as HostAdmission) };
+            return { cell, run: admitUnderAdapter(record.plugin.id, runs, env) ?? ({ host: ADAPTER_HOST, measured: false, admitted: false, code: adapterCode(ADAPTER_HOST, "admissionFailed"), params: {} } as HostAdmission) };
           } finally {
             rmSync(stateDir, { recursive: true, force: true });
           }
         });
         const block = adapterBlockOf(done, versions, now());
-        writeFileWhole(path, `${JSON.stringify(mergeAdapterRun(record, block), null, 2)}\n`);
+        ctx.store.put(plugin.record, mergeAdapterRun(record, block));
         if (block.measured) count.measured++;
         else count.failed++;
         ctx.log(`${plugin.uri}: adapter ${block.measured ? (block.admitted ? "admitted" : `refused (${block.code ?? ""})`) : `not run (${block.code ?? ""})`} in ${((Date.now() - started) / 1000).toFixed(1)} s`);

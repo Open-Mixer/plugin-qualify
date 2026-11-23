@@ -4,13 +4,13 @@
  * Every process that loads a plugin starts with the run's scratch HOME, never the caller's (Surge XT segfaulted or
  * stayed silent with none). The spawn sites are read from the sources, so a new one without it is red.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { runHome, withRunHome } from "./run-home.js";
+import { runCwd, runHome, withRunHome } from "./run-home.js";
 
 const SRC = dirname(fileURLToPath(import.meta.url));
 
@@ -33,5 +33,32 @@ describe("the run's HOME", () => {
       expect(loading.length, file).toBeGreaterThan(0);
       for (const c of loading) expect(c, `${file}: ${c.slice(0, 80)}`).toContain("withRunHome(");
     }
+  });
+});
+
+describe("the run's working directory", () => {
+  it("is a scratch directory of this run beside its HOME, so it goes with it", () => {
+    expect(runCwd().startsWith(tmpdir())).toBe(true);
+    expect(dirname(runCwd())).toBe(dirname(runHome()));
+    expect(existsSync(runCwd())).toBe(true);
+  });
+
+  // jalv makes its state directory with a relative mkdtemp("jalvXXXXXX") and removes it only at a clean exit: every
+  // jalv this package starts is killed at a deadline or on a hang, so each one starts in a directory the run removes
+  it("is where every jalv this package starts stands", () => {
+    const sites = [
+      ...PLUGIN_SPAWNS.map((f) => join(SRC, f)),
+      join(SRC, "..", "tools", "compare-host.mjs"),
+    ];
+    let seen = 0;
+    for (const file of sites) {
+      const src = readFileSync(file, "utf8");
+      for (const m of src.matchAll(/spawn(?:Sync)?\(\s*"jalv"[\s\S]*?\}\)/g)) {
+        if (m[0].includes('"-V"')) continue;
+        seen++;
+        expect(m[0], `${file}: ${m[0].slice(0, 80)}`).toMatch(/\bcwd: (runCwd\(\)|WORK)/);
+      }
+    }
+    expect(seen).toBe(2);
   });
 });

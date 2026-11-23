@@ -11,7 +11,8 @@
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { withRunHome } from "./run-home.js";
+import { qualificationDomain } from "./qualification-domain.js";
+import { runCwd, withRunHome } from "./run-home.js";
 import type { HostProfile } from "./host-profiles.js";
 import { ADMIT_STEP_MS_ENV } from "./qualify-declarations.js";
 
@@ -56,14 +57,53 @@ export interface HostAdmission {
 
 type ProtocolHost = "mod-host" | typeof ADAPTER_HOST;
 const admitted = (host: HostAdmission["host"]): HostAdmission => ({ host, measured: true, admitted: true, params: {} });
-const refused = (host: HostAdmission["host"], code: string, params: HostAdmission["params"] = {}): HostAdmission => ({
-  host,
-  measured: true,
-  admitted: false,
-  code: `${host}.${code}`,
-  params,
-});
-const notInstalled = (host: HostAdmission["host"]): HostAdmission => ({ host, measured: false, admitted: false, code: `${host}.not-installed`, params: {} });
+const refused = (host: HostAdmission["host"], code: string, params: HostAdmission["params"] = {}): HostAdmission => ({ host, measured: true, admitted: false, code, params });
+const notInstalled = (host: HostAdmission["host"]): HostAdmission => ({ host, measured: false, admitted: false, code: adapterCode(host, "notInstalled"), params: {} });
+
+/**
+ * The kinds of a code this module composes, by the title they have in QUALIFICATION_ADAPTER_CODE_KINDS of the qualification
+ * domain: the domain spells each as a word, and a code is `<host>.<word>`, with `-<parameter>` after it for a kind that takes one
+ * (`resp` and `exit` an integer, `signal` a probe signal word, composed as plugin-hostd gives it).
+ */
+const ADAPTER_KIND_TITLES = [
+  "resp",
+  "signal",
+  "diedOnAdd",
+  "died",
+  "noAnswer",
+  "noJackClient",
+  "notStarted",
+  "notInstalled",
+  "silentUnderNote",
+  "levelUnmeasured",
+  "silentNeedsContent",
+  "admissionFailed",
+  "unknownPortType",
+  "exit",
+  "noPrivateServer",
+] as const;
+export type AdapterKind = (typeof ADAPTER_KIND_TITLES)[number];
+const KINDS_ITEM = "QUALIFICATION_ADAPTER_CODE_KINDS";
+
+/** The kinds of the domain in use, read at the first use and kept; a domain short of one refuses, by the item and the kind. */
+let kindWords: { readonly domain: ReturnType<typeof qualificationDomain>; readonly words: ReadonlyMap<string, string> } | undefined;
+function kindWordOf(kind: AdapterKind): string {
+  const domain = qualificationDomain();
+  if (kindWords?.domain !== domain) {
+    const words = new Map(domain.entries(KINDS_ITEM).map((e) => [e.title, e.word]));
+    for (const t of ADAPTER_KIND_TITLES) if (!words.has(t)) throw new Error(`${KINDS_ITEM}: the document has no kind titled ${t}`);
+    kindWords = { domain, words };
+  }
+  return kindWords.words.get(kind) as string;
+}
+
+/** The word the domain spells a kind as, for a caller that tests a code's end. */
+export const adapterKindWord = (kind: AdapterKind): string => kindWordOf(kind);
+
+/** A code: `<host>.<kind>`, or `<host>.<kind>-<parameter>` for a kind that takes one. */
+export function adapterCode(host: string, kind: AdapterKind, parameter?: string | number): string {
+  return `${host}.${kindWordOf(kind)}${parameter === undefined ? "" : `-${String(parameter)}`}`;
+}
 
 /** One command mod-host was sent and what came of it: its `resp` number, or how the host died. */
 export interface ModHostStep {
@@ -105,16 +145,15 @@ export const SILENT_PEAK = 1e-6;
  * no sound reads as qualified; but a sampler with nothing loaded is silent too, so this reads `unknown`, not refused: the
  * plugin stays loadable and its pin has no verdict word (`host-admission.test.ts`).
  */
-export const ADAPTER_SILENT_CODE = `${ADAPTER_HOST}.silent-under-note`;
-export const ADAPTER_LEVEL_UNMEASURED_CODE = `${ADAPTER_HOST}.level-unmeasured`;
-const UNPROVEN_SOUND: readonly string[] = [ADAPTER_SILENT_CODE, ADAPTER_LEVEL_UNMEASURED_CODE];
+export const adapterSilentCode = (): string => adapterCode(ADAPTER_HOST, "silentUnderNote");
+export const adapterLevelUnmeasuredCode = (): string => adapterCode(ADAPTER_HOST, "levelUnmeasured");
 /**
  * An instrument that declares content it plays from and stayed silent under the notes even so: the content could not be
  * given (the host refused the sample) or the sample did not reach the keys played. Its silence says nothing of the plugin,
  * so the note test is not observable for it: the run admits it, and the record names this code and the content (#318).
  * No other host is asked instead.
  */
-export const ADAPTER_CONTENT_UNOBSERVED_CODE = `${ADAPTER_HOST}.silent-needs-content`;
+export const adapterContentUnobservedCode = (): string => adapterCode(ADAPTER_HOST, "silentNeedsContent");
 
 /** The run's content, as a reason's params carry it: the declared parameters, the ones loaded, the ones refused. */
 function contentParams(content: AdapterContent): Record<string, string> {
@@ -127,7 +166,7 @@ function contentParams(content: AdapterContent): Record<string, string> {
 
 /** The rating a run that did not admit the plugin gives its host's verdict. */
 export function admissionRating(admission: HostAdmission): "unsuitable" | "unknown" {
-  return !admission.measured || UNPROVEN_SOUND.includes(admission.code ?? "") ? "unknown" : "unsuitable";
+  return !admission.measured || [adapterSilentCode(), adapterLevelUnmeasuredCode()].includes(admission.code ?? "") ? "unknown" : "unsuitable";
 }
 
 /**
@@ -145,7 +184,7 @@ export const NO_JACK_SERVER = "no JACK server";
  * resp -201 as if it were the plugin's. `undefined` for any other run.
  */
 export function noJackServerProblem(admission: HostAdmission | undefined): string | undefined {
-  if (admission === undefined || admission.measured || !admission.code?.endsWith(".no-jack-client")) return undefined;
+  if (admission === undefined || admission.measured || !admission.code?.endsWith(`.${adapterKindWord("noJackClient")}`)) return undefined;
   return `${NO_JACK_SERVER}: ${admission.host} could not open a JACK client (resp ${String(admission.params["resp"] ?? "-201")}), so nothing is learned of any plugin; start the JACK server it is pointed at (JACK_DEFAULT_SERVER names it) and run again`;
 }
 
@@ -153,26 +192,26 @@ export function noJackServerProblem(admission: HostAdmission | undefined): strin
 export function classifyProtocolRun(host: ProtocolHost, run: ModHostRun): HostAdmission {
   if (!run.installed) return notInstalled(host);
   // the host never listened, so the plugin was never loaded: nothing was learned about it
-  if (run.started === false) return { host, measured: false, admitted: false, code: `${host}.not-started`, params: {} };
+  if (run.started === false) return { host, measured: false, admitted: false, code: adapterCode(host, "notStarted"), params: {} };
   for (const s of run.steps) {
     if (s.died !== undefined) {
-      if (s.died.startsWith("SIG")) return refused(host, `signal-${s.died}`, { step: s.cmd });
-      return s.cmd === "add" ? refused(host, "died-on-add", { how: s.died }) : refused(host, "died", { step: s.cmd, how: s.died });
+      if (s.died.startsWith("SIG")) return refused(host, adapterCode(host, "signal", s.died), { step: s.cmd });
+      return s.cmd === "add" ? refused(host, adapterCode(host, "diedOnAdd"), { how: s.died }) : refused(host, adapterCode(host, "died"), { step: s.cmd, how: s.died });
     }
-    if (s.resp === undefined) return refused(host, "no-answer", { step: s.cmd });
-    if (s.cmd === "add" && s.resp !== undefined && JACK_CLIENT_RESPS.includes(s.resp)) return { host, measured: false, admitted: false, code: `${host}.no-jack-client`, params: { resp: s.resp } };
+    if (s.resp === undefined) return refused(host, adapterCode(host, "noAnswer"), { step: s.cmd });
+    if (s.cmd === "add" && s.resp !== undefined && JACK_CLIENT_RESPS.includes(s.resp)) return { host, measured: false, admitted: false, code: adapterCode(host, "noJackClient"), params: { resp: s.resp } };
     // the host answers an error as a negative number (`resp -102`); the code carries its magnitude
-    if (s.resp < 0) return refused(host, `resp-${-s.resp}`, { step: s.cmd, resp: s.resp });
+    if (s.resp < 0) return refused(host, adapterCode(host, "resp", -s.resp), { step: s.cmd, resp: s.resp });
   }
-  if (run.steps.length === 0) return refused(host, "no-answer");
+  if (run.steps.length === 0) return refused(host, adapterCode(host, "noAnswer"));
   if (run.sound !== undefined) {
     const { peak, problem } = run.sound;
-    if (peak === undefined) return { host, measured: true, admitted: false, code: ADAPTER_LEVEL_UNMEASURED_CODE, params: { problem: problem ?? "no figure" } };
+    if (peak === undefined) return { host, measured: true, admitted: false, code: adapterLevelUnmeasuredCode(), params: { problem: problem ?? "no figure" } };
     const notes: Record<string, number> = run.sound.notes === undefined ? {} : { notes: run.sound.notes };
     const content = run.sound.content;
     if (!(peak > SILENT_PEAK)) {
-      if (content !== undefined && content.params.length > 0) return { host, measured: true, admitted: true, code: ADAPTER_CONTENT_UNOBSERVED_CODE, params: { peak, ...notes, ...contentParams(content) } };
-      return { host, measured: true, admitted: false, code: ADAPTER_SILENT_CODE, params: { peak, ...notes } };
+      if (content !== undefined && content.params.length > 0) return { host, measured: true, admitted: true, code: adapterContentUnobservedCode(), params: { peak, ...notes, ...contentParams(content) } };
+      return { host, measured: true, admitted: false, code: adapterSilentCode(), params: { peak, ...notes } };
     }
     // it sounded on the content it was given: the record says which
     if (content !== undefined && content.loaded.length > 0) return { ...admitted(host), params: { peak, ...notes, ...contentParams(content) } };
@@ -201,10 +240,10 @@ const UNKNOWN_PORT_TYPE = /Mandatory port "([^"]*)" has unknown type/;
 export function classifyJalvRun(run: JalvRun): HostAdmission {
   if (!run.installed) return notInstalled("jalv");
   if (run.stillRunning) return admitted("jalv");
-  if (run.signal !== null) return refused("jalv", `signal-${run.signal}`);
+  if (run.signal !== null) return refused("jalv", adapterCode("jalv", "signal", run.signal));
   const port = UNKNOWN_PORT_TYPE.exec(run.stderr)?.[1];
-  if (port !== undefined) return refused("jalv", "unknown-port-type", { port });
-  if (run.status !== 0 && run.status !== null) return refused("jalv", `exit-${run.status}`);
+  if (port !== undefined) return refused("jalv", adapterCode("jalv", "unknownPortType"), { port });
+  if (run.status !== 0 && run.status !== null) return refused("jalv", adapterCode("jalv", "exit", run.status));
   return admitted("jalv");
 }
 
@@ -249,8 +288,10 @@ export const SPAWNED_ADMISSIONS: AdmissionRuns = {
   jalv(uri, env) {
     // SIGKILL at the deadline: jalv hosting some plugins ignores SIGTERM, and one stuck in jack_client_open never reaches
     // the loop that reads the flag TERM sets, so a TERM left spawnSync waiting with it (#187). Alive at the deadline is
-    // all the verdict asks, so nothing is lost by not letting it exit cleanly.
-    const r = spawnSync("jalv", ["-n", "plugin-qualify", uri], { encoding: "utf8", timeout: JALV_HOSTED_MS, killSignal: "SIGKILL", input: "", env: withRunHome(env ?? process.env) });
+    // all the verdict asks, so nothing is lost by not letting it exit cleanly. Killed, jalv never removes the state
+    // directory it made with a relative mkdtemp("jalvXXXXXX"), so it starts in the run's scratch directory, which
+    // goes when the run ends: never in the caller's working directory, a user's home when the run started there.
+    const r = spawnSync("jalv", ["-n", "plugin-qualify", uri], { encoding: "utf8", timeout: JALV_HOSTED_MS, killSignal: "SIGKILL", input: "", cwd: runCwd(), env: withRunHome(env ?? process.env) });
     const code = (r.error as NodeJS.ErrnoException | undefined)?.code;
     if (code === "ENOENT") return { installed: false, stillRunning: false, status: null, signal: null, stderr: "" };
     return { installed: true, stillRunning: code === "ETIMEDOUT", status: r.status, signal: code === "ETIMEDOUT" ? null : r.signal, stderr: r.stderr ?? "" };
@@ -268,7 +309,7 @@ export function admitPlugin(
     return host === "mod-host" ? classifyModHostRun(runs.modHost(uri, env)) : classifyJalvRun(runs.jalv(uri, env));
   } catch (e) {
     // the run itself broke: nothing was learned about the plugin, so nothing is rated
-    return { host, measured: false, admitted: false, code: `${host}.admission-failed`, params: { problem: e instanceof Error ? e.message : String(e) } };
+    return { host, measured: false, admitted: false, code: adapterCode(host, "admissionFailed"), params: { problem: e instanceof Error ? e.message : String(e) } };
   }
 }
 
@@ -282,6 +323,6 @@ export function admitUnderAdapter(
   try {
     return classifyProtocolRun(ADAPTER_HOST, runs.adapter(uri, env));
   } catch (e) {
-    return { host: ADAPTER_HOST, measured: false, admitted: false, code: `${ADAPTER_HOST}.admission-failed`, params: { problem: e instanceof Error ? e.message : String(e) } };
+    return { host: ADAPTER_HOST, measured: false, admitted: false, code: adapterCode(ADAPTER_HOST, "admissionFailed"), params: { problem: e instanceof Error ? e.message : String(e) } };
   }
 }

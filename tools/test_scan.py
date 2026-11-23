@@ -8,6 +8,7 @@ import os
 import tempfile
 import types
 import unittest
+from unittest import mock
 
 import descriptors as desc
 import scan as s
@@ -147,8 +148,46 @@ class Annotate(unittest.TestCase):
         self.assertEqual([e["uri"] for e in catalog], ["urn:a", "urn:b"])
 
 
+class MeaningsFromTheContract(unittest.TestCase):
+    """The meanings a designation names are words of omx-contract's closed list (the schema's `$defs.meaning`)."""
+
+    GOLDEN = {
+        s.PARAM + "gain": "gain", s.PARAM + "threshold": "threshold", s.PARAM + "ratio": "ratio", s.PARAM + "attack": "attack",
+        s.PARAM + "release": "release", s.PARAM + "hold": "hold", s.PARAM + "decay": "decay", s.PARAM + "frequency": "frequency",
+        s.PARAM + "cutoffFrequency": "cutoffFrequency", s.PARAM + "resonance": "resonance", s.PARAM + "bypass": "bypass",
+        s.PARAM + "wetDryRatio": "wetDryRatio", s.PARAM + "delay": "delay", s.LV2 + "enabled": "enabled",
+    }
+
+    def setUp(self):
+        s._DESIGNATED_MEANINGS = None
+        self.addCleanup(setattr, s, "_DESIGNATED_MEANINGS", None)
+
+    def schema_without(self, root, word):
+        path = os.path.join(root, "omx-contract.schema.json")
+        listed = [m for m in desc.meaning_words() if m != word]
+        with open(path, "w") as f:
+            json.dump({"$defs": {"meaning": {"enum": listed}}}, f)
+        return {desc.DESCRIPTOR_SCHEMA_ENV: path}
+
+    def test_the_designations_name_the_golden_meanings(self):
+        self.assertEqual(s.designated_meanings(), self.GOLDEN)
+        self.assertTrue(set(self.GOLDEN.values()) <= set(desc.meaning_words()))
+
+    def test_a_meaning_the_contract_lacks_is_refused_by_name(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.schema_without(root, "wetDryRatio")
+            with self.assertRaises(desc.DescriptorRefused) as raised:
+                s.designated_meanings(env)
+            self.assertIn("wetDryRatio", raised.exception.problem)
+
+    def test_no_schema_is_a_refusal_not_a_table(self):
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaises(desc.DescriptorRefused):
+                desc.meaning_words({desc.DESCRIPTOR_SCHEMA_ENV: os.path.join(root, "absent.json")})
+
+
 class UnitsFromTheSheet(unittest.TestCase):
-    """A port's unit is spelled by omx-contract's units sheet, the owner of the words; no table of units is kept here."""
+    """A port's unit is spelled by plugin-db's lv2 domain (its LV2_UNIT_IDS), the owner of the words; no table of units is kept here."""
 
     class FakePort:
         def __init__(self, unit):
@@ -182,22 +221,67 @@ class UnitsFromTheSheet(unittest.TestCase):
         self.assertEqual(s.Scanner.descriptor_unit(self.scanner({uri: "fur"}), self.FakePort(uri)), "unknown")
         self.assertIsNone(s.Scanner.unit_symbol(self.scanner(), self.FakePort(None)))
 
-    def test_the_sheet_is_read_from_the_omx_contract_the_schema_is_found_in(self):
+    @staticmethod
+    def lv2_domain(units=(("cent", "cents"),), openmixer=(("dbfs", "dBFS"), ("hz", "Hz")), drop_term=None):
+        """A plugin-db `lv2` domain with the given unit words (term key -> PARAM_UNITS word), as the document lays it out."""
+        term = lambda key, kind: {"const": key, "title": key, "x-term": {"uri": s.UNITS + key, "kind": kind}}
+        refs = "https://openmixer.org/contract/lv2#/components/schemas/LV2_UNITS_TERMS"
+        schemas = {
+            "LV2_UNITS_TERMS": {"x-kind": "terms", "oneOf": [term("Unit", "class")] + [term(k, "unit") for k, _ in units if k != drop_term]},
+            "LV2_UNIT_IDS": {"x-kind": "words", "oneOf": [{"const": w, "title": k, "x-from": [{"$ref": refs, "x-term": k}]} for k, w in units]},
+            "LV2_OPENMIXER_UNIT_IDS": {"x-kind": "words", "oneOf": [{"const": w, "title": t} for t, w in openmixer]},
+        }
+        return {"info": {"x-owner": "plugin-db"}, "components": {"schemas": schemas}}
+
+    def env_with(self, root, doc):
+        os.makedirs(os.path.join(root, "lv2"))
+        with open(os.path.join(root, "lv2", "lv2.json"), "w") as f:
+            json.dump(doc, f)
+        return {"OMX_CONTRACT_PATH": root}
+
+    def test_the_words_are_read_from_plugin_dbs_lv2_domain(self):
         with tempfile.TemporaryDirectory() as root:
-            schema = os.path.join(root, "schema", "omx-contract.schema.json")
-            sheet = os.path.join(root, "data", desc.UNITS_SHEET)
-            os.makedirs(os.path.dirname(schema))
-            os.makedirs(os.path.dirname(sheet))
-            open(schema, "w").close()
-            env = {desc.DESCRIPTOR_SCHEMA_ENV: schema}
-            with self.assertRaises(desc.DescriptorRefused):
+            env = {"OMX_CONTRACT_PATH": root}
+            with mock.patch.object(desc, "INSTALLED_CONTRACT_DIR", os.path.join(root, "installed")), self.assertRaises(desc.DescriptorRefused):
                 desc.unit_words(env)
+            env = self.env_with(root, self.lv2_domain())
+            words = desc.unit_words(env)
+            self.assertEqual(words[s.UNITS + "cent"], "cents")
+            self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + "dBFS", words), "dBFS")
+            self.assertIsNone(desc.unit_word(s.UNITS + "coef", words))
+
+    def test_an_openmixer_spelling_is_read_by_its_lower_cased_name_as_the_domain_says(self):
+        """plugin-db's LV2_OPENMIXER_UNIT_IDS (F1, Q7): its title is the <name> in lower case, and "a reader lower-cases the
+        name after urn:openmixer:unit# and reads the word of that title". So #Hz and #hz both read Hz, and #dbfs reads dBFS; a
+        name no title holds is refused."""
+        with tempfile.TemporaryDirectory() as root:
+            words = desc.unit_words(self.env_with(root, self.lv2_domain()))
+            for spelled in ("Hz", "hz", "HZ"):
+                self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + spelled, words), "Hz", spelled)
+            for spelled in ("dBFS", "dbfs"):
+                self.assertEqual(desc.unit_word(s.OPENMIXER_UNITS + spelled, words), "dBFS", spelled)
+            self.assertIsNone(desc.unit_word(s.OPENMIXER_UNITS + "furlong", words))
+
+    def test_a_unit_whose_term_the_domain_lacks_refuses_by_name(self):
+        with tempfile.TemporaryDirectory() as root:
+            env = self.env_with(root, self.lv2_domain(drop_term="cent"))
+            with self.assertRaises(desc.DescriptorRefused) as raised:
+                desc.unit_words(env)
+            self.assertIn("cent", raised.exception.problem)
+
+    def test_omx_contracts_old_sheet_is_not_read(self):
+        """Putting the old read back (the LV2 units sheet beside omx-contract's schema, planted under data/formats) finds nothing."""
+        with tempfile.TemporaryDirectory() as root:
+            sheet = os.path.join(root, "data", "formats", "lv2", "units.json")
+            os.makedirs(os.path.dirname(sheet))
             with open(sheet, "w") as f:
-                json.dump({"LV2_UNITS_TERMS": {"terms": {
-                    "cent": {"uri": s.UNITS + "cent", "kind": "unit", "word": "cents"},
-                    "coef": {"uri": s.UNITS + "coef", "kind": "unit"},
-                    "Unit": {"uri": s.UNITS + "Unit", "kind": "class", "word": "no"}}}}, f)
-            self.assertEqual(desc.unit_words(env), {s.UNITS + "cent": "cents"})
+                json.dump({"LV2_UNITS_TERMS": {"terms": {"cent": {"uri": s.UNITS + "cent", "kind": "unit", "word": "cents"}}}}, f)
+            schema = os.path.join(root, "schema", "omx-contract.schema.json")
+            os.makedirs(os.path.dirname(schema))
+            open(schema, "w").close()
+            with mock.patch.object(desc, "INSTALLED_CONTRACT_DIR", os.path.join(root, "installed")), self.assertRaises(desc.DescriptorRefused):
+                desc.unit_words({desc.DESCRIPTOR_SCHEMA_ENV: schema, "OMX_CONTRACT_PATH": root})
+            self.assertFalse(hasattr(desc, "UNITS_SHEET"))
 
     def test_no_table_of_units_comes_back(self):
         """No module of tools/ maps LV2 unit URIs itself: the sheet is the one table, and a copy here is refused."""
@@ -216,7 +300,7 @@ class UnitsFromTheSheet(unittest.TestCase):
                     if unit_key:
                         found.append(f"{os.path.basename(path)}:{node.lineno}")
                         break
-        self.assertEqual(found, [], "a table of LV2 units; read omx-contract's units sheet (desc.unit_words) instead")
+        self.assertEqual(found, [], "a table of LV2 units; read plugin-db's lv2 domain (desc.unit_words) instead")
 
 
 if __name__ == "__main__":

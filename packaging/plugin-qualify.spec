@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.20.4
+Version:        0.21.0
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -17,20 +17,25 @@ BuildRequires: npm
 BuildRequires: gcc
 BuildRequires: make
 BuildRequires: pkgconfig
-BuildRequires: (pkgconfig(clap) >= 1.2.10 with pkgconfig(clap) < 2)
+BuildRequires: pkgconfig(clap) >= 1.2.10
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: (pkgconfig(plugin-db) >= 0.4.1 with pkgconfig(plugin-db) < 0.5)
-BuildRequires: (pkgconfig(plugin-hostd-protocol) >= 0.5.7 with pkgconfig(plugin-hostd-protocol) < 0.6)
-BuildRequires: (pkgconfig(omx-contract) >= 3.16.0 with pkgconfig(omx-contract) < 4)
-BuildRequires: (pkgconfig(omx-clap-lv2) >= 0.32.3 with pkgconfig(omx-clap-lv2) < 0.33)
-BuildRequires: (pkgconfig(omxdsp) >= 0.32.0 with pkgconfig(omxdsp) < 0.33)
-# describe's JSON reader and writer (native/plugin-json.c), moved from plugin-hostd with it (#31)
-BuildRequires: (pkgconfig(libcjson) >= 1.7.15 with pkgconfig(libcjson) < 2)
+BuildRequires: pkgconfig(plugin-db) >= 0.5.0
+BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.8.0
+BuildRequires: pkgconfig(omx-contract) >= 3.21.0
+BuildRequires: pkgconfig(omx-clap-lv2) >= 0.34.0
+BuildRequires: pkgconfig(omxdsp) >= 0.34.0
+# src/dsp-rates.generated.ts is rendered from omx-dsp's rates file (tools/gen-dsp-rates.mjs), which its contract package ships
+BuildRequires: omx-dsp-contract >= 0.34.0
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
 Requires: python3
+# the program reads the qualification domain at start-up: plugin-hostd's, shipped by its contract package (a floor only; the
+# package this one shipped the domain in is pruned from the channel, so no relation to it stands here)
+Requires: plugin-hostd-contract >= 0.21.0
+# the LV2 units' words are plugin-db's `lv2` domain (tools/descriptors.py unit_words), shipped by its contract package
+Requires: plugin-db-contract >= 0.5.0
 # the measurer and the LV2 host probe link lilv, and the descriptors read it through python3-lilv
 Requires: lilv-libs
 Requires: python3-lilv
@@ -39,19 +44,29 @@ Requires: python3-jsonschema
 # plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
 # 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
 # 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
-Requires: (plugin-hostd >= 0.20.5 with plugin-hostd < 0.21)
+# 0.21.0: plugin-hostd-probe describe, the one describe (this package keeps no copy)
+Requires: plugin-hostd >= 0.21.0
+# the probe domain (the words of a probe's outcomes and signals, contract.d/probe/ there) that the judging code reads at run
+# time (src/probe-domain.ts); it is plugin-hostd-protocol's, and 0.8.0 is the release it lands in; a floor only
+Requires: plugin-hostd-protocol-contract >= 0.8.0
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
 Suggests: mod-host
 # omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: (omx-clap-host >= 0.32.3 with omx-clap-host < 0.33)
+Requires: omx-clap-host >= 0.34.0
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
-# tools/clap-core-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
-# /usr/share/omx-clap-core/ts, in the runtime package omx-clap-core from 0.17.0 on; the host above brings the same version
+# tools/clap-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
+# /usr/share/omx-clap/ts, in the runtime package omx-clap-libs (omx-clap-core before 0.34.0); the host above brings the same version
 # 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: (omx-clap-core >= 0.32.3 with omx-clap-core < 0.33)
+Requires: omx-clap-libs >= 0.34.0
+# the qualification store: the sync reads it through plugin-qualification-db and writes its records through
+# plugin-qualification-db-write (which brings plugin-qualification-db-schema); the store spec's section 7. The floor is the
+# release whose reader reads an absent base as an empty base layer (the base-absent line on standard error), after the one
+# that first shipped the widened verbs (query --records, --layer, counts) and the writer.
+Requires: plugin-qualification-db >= 2026112001
+Requires: plugin-qualification-db-write >= 2026112001
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.
@@ -229,6 +244,51 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Sun Nov 22 2026 Pau Aliagas <linuxnow@gmail.com> - 0.21.0-1
+- Sorting pass: V5, V6, V8, V9, V18, V19, V24 and V25.
+
+* Fri Nov 20 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.7-1
+- the qualification domain 1.4.0 holds the words of the record store, the 14 kinds
+  of an adapter code, the memory-bound outcome and the adapter hosts; the adapter
+  codes and the memory-bound outcome are read from it (#113, #115, #136)
+- reasons and usage errors are codes, every language filled by the router (#145)
+- the qualification record holds the package its binary came from (#124)
+- the audio thread decides: plugin-qualify's own threads are conditional and
+  groupable (#119)
+- entry points decide "run, not imported" with omx-contract's isMain (#134)
+- packages are built for Fedora 45, RPM for x86_64 only (#121)
+- the release install job takes its cells and runners from check-matrix (#117, #131)
+- floors: omx-contract rises to 3.20.2 (#139); plugin-hostd rises to 0.20.8, the
+  published fix of 0.20.7's protocol ceiling; no ceilings
+
+* Wed Nov 18 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.6-1
+- the qualification domain ships in the new plugin-qualify-contract package and is
+  read at run time (#105, #109)
+- ajv now ships in the package; the installed program failed to start since #105 (#109)
+- dependencies state floors only, no upper bound (#109)
+- the sync fills plugin-db's store, in plugin-db's grammar (#73, #77)
+- schema addresses in the descriptor writers and their field fixtures name
+  https://openmixer.org/schema/omx-contract/v3/ (#108)
+
+* Sat Nov 14 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.5-1
+- built and run against the 3.18.0 pass's releases: omx-contract >= 3.18.0 and < 4;
+  omx-clap-host, omx-clap-core and omx-clap-lv2 >= 0.32.5 and < 0.33; plugin-hostd
+  >= 0.20.7 and < 0.21; plugin-hostd-protocol >= 0.5.9 and < 0.6; omx-dsp >= 0.32.1
+  and < 0.33; plugin-db >= 0.4.4 and < 0.5 (D30); make deps fetches those tags
+- here: the facts of this machine for a plugin-db query, --json by plugin-db's keys
+  (#56, #59)
+- lv2-measure sends an integer port integers and a toggled port 0 or 1; the LV2
+  fixture set is 28 with a stepped port (#29, #62)
+- ZamVerb: its integer room port is no longer swept as a float, so it no longer
+  reloads its impulse response for every value; 30 lifecycles at 192 kHz in
+  512-frame blocks take 55 s instead of 272 s, inside the wall clock (#62)
+- a pass that hits the memory bound or crashes ends on its own and later passes are
+  still measured; Surge XT no longer loses its document (#61)
+- the organisation's name is Open-Mixer, the project's OpenMixer (#63)
+- contract files keep the $schema the floor's reader reads
+- CI builds against the channel, never the staging channel, guarded (D25, #64, #65);
+  a release dispatch can catch a served version up (#58)
+
 * Fri Nov 13 2026 Pau Aliagas <linuxnow@gmail.com> - 0.20.4-1
 - built and run against the inner layers' latest releases: omx-clap-host, omx-clap-core
   and omx-clap-lv2 >= 0.32.3 and < 0.33 (0.20.3 stopped below 0.32 and could not be
@@ -473,8 +533,8 @@ the English source sentence.
 - The hosting codes are read from omx-clap-core's installed TypeScript
   module instead of omx-contract (the contract split moved
   data/hosting/*.json there): HOSTING_CODE is omx-clap-core's tables now,
-  found at pkg-config --variable=tsdir omx-clap-core, the fetched checkout,
-  or /usr/share/omx-clap-core/ts (OMX_CLAP_CORE_TSDIR overrides)
+  found at pkg-config --variable=tsdir omx-clap, the fetched checkout,
+  or /usr/share/omx-clap/ts (OMX_CLAP_CORE_TSDIR overrides)
 - Two writes stop, as omx-clap-core 0.13.0 did: a topology past the
   auxiliary limit is hosting.topology.too-many-ports instead of the retired
   extra-inputs-fed-silence, and a CLAP's feature list is no longer judged
@@ -624,14 +684,14 @@ the English source sentence.
 
 * Sun Oct 11 2026 Pau Aliagas <linuxnow@gmail.com> - 0.2.0-1
 - New hosting code `hosting.output.non-finite`: the refusal the
-  libomx-clap-core CLAP host gives a plugin whose output goes non-finite.
-- `CLAP_CORE_REFUSALS` lists the refusals libomx-clap-core returns from
+  libomx-clap CLAP host gives a plugin whose output goes non-finite.
+- `CLAP_CORE_REFUSALS` lists the refusals libomx-clap returns from
   open, activate and the timed open, each by the hosting code it answers
   with.
 - `ScalingNoteCode` types the words `latency.scalingNote` may carry, and a
   test keeps `benchmark.py`'s scaling notes equal to the declared list.
 - The CLAP host extensions list is documented as the mirror of the header
-  libomx-clap-core's host object offers.
+  libomx-clap's host object offers.
 
 * Thu Oct 08 2026 Pau Aliagas <linuxnow@gmail.com> - 0.1.1-1
 - plugin-qualify installs from the FreeMixer package channel: `dnf install
