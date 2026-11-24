@@ -69,7 +69,7 @@ describe("judgeFiles", () => {
 
   it("a refused file is named with its code and exits 2, and the files after it are still judged", () => {
     const bad = fixtureJson("success-msi");
-    bad.formatVersion = "2.0";
+    bad.formatVersion = "1.4";
     const { store } = opened();
     const r = judgeFiles([put("bad.json", JSON.stringify(bad)), join(scratch, "missing.json"), put("good.json", fixtureText("success-msi"))], { profiles: [OMX_CLAP_HOST_PROFILE], store, hostClass: "x86-64" });
     expect(r.failures.map((f) => f.problem.split(":")[0])).toEqual(["probe.format.major-unknown", "cannot read"]);

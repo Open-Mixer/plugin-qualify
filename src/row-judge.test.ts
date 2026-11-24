@@ -63,7 +63,7 @@ function enriched(doc: Record<string, any>, memoryUnmeasured = false): Record<st
   for (const p of out.grid ?? []) {
     if (p.outcome !== "probe.ok") continue;
     p.latency = { declaredFrames: 3, measuredFrames: 4, method: "impulse-onset" };
-    p.cost = { unit: "ns-per-sample", median: 41.2, percentile: { p: 95, value: 47.9 }, min: 39, max: 112, iqr: 3, blocks: 100, warmupBlocks: 8, warmupMedian: 50, timingFloorNsPerBlock: 180, voices: { held: 8, basis: "declared", capacity: 16 } };
+    p.cost = { unit: "nsPerSample", median: 41.2, percentile: { p: 95, value: 47.9 }, min: 39, max: 112, iqr: 3, blocks: 100, warmupBlocks: 8, warmupMedian: 50, timingFloorNsPerBlock: 180, voices: { held: 8, basis: "declared", capacity: 16 } };
     p.memory = memoryUnmeasured ? { unmeasuredReason: unmeasuredWordOf("probe.crashed"), unmeasuredDetail: "the run ended probe.crashed" } : { afterInstantiateKb: 20_000, afterActivateKb: 21_000, atRestKb: 20_500, secondInstanceKb: 20_900, notesHeldKb: 22_000, notesHeld: 8, basis: "declared" };
     p.memoryLimit = { bytes: 2_147_483_648, mechanism: "rlimit-as" };
     p.rtSafety = { interposer: true, swept: true, sweepApplicable: true, blocks: 512, allocations: 1, locks: 2, syscalls: 3, threadViolations: 0, processErrors: 0, events: ["alloc"], ownThreads: 1, otherThreads: { allocations: 2, locks: 3, syscalls: 4 } };

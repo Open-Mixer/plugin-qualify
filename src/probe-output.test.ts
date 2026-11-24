@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 import { describe, expect, it } from "vitest";
 
-import { PROBE_FORMAT_CODE, readProbeOutput } from "./probe-output.js";
-import { fixtureJson, readFixture } from "./probe-output-fixtures.js";
+import { PROBE_COST_UNIT, PROBE_FORMAT_CODE, readProbeOutput } from "./probe-output.js";
+import { fixtureJson, fixtureText, readFixture } from "./probe-output-fixtures.js";
 
 function refused(doc: unknown): { code: string; problem: string } {
   const r = readProbeOutput(JSON.stringify(doc));
@@ -44,13 +44,13 @@ describe("readProbeOutput: the three documents of plugin-hostd", () => {
 
 describe("readProbeOutput: the major", () => {
   it("refuses a major it does not know, before it reads anything else", () => {
-    const r = refused({ format: "plugin-hostd.probe-output", formatVersion: "2.0" });
+    const r = refused({ format: "plugin-hostd.probe-output", formatVersion: "3.0" });
     expect(r.code).toBe("probe.format.major-unknown");
     expect(PROBE_FORMAT_CODE.majorUnknown).toBe("probe.format.major-unknown");
   });
 
-  it("refuses major 2 of a full document, and major 0", () => {
-    for (const v of ["2.0", "3.4", "0.9"]) {
+  it("refuses major 1 of a full document (the format before the cost unit was nsPerSample), major 3 and major 0", () => {
+    for (const v of ["1.4", "1.0", "3.4", "0.9"]) {
       const doc = fixtureJson("success-msi");
       doc["formatVersion"] = v;
       expect(refused(doc).code).toBe("probe.format.major-unknown");
@@ -59,12 +59,12 @@ describe("readProbeOutput: the major", () => {
 
   it("reads a newer minor and ignores the fields it adds", () => {
     const doc = fixtureJson("success-msi");
-    doc["formatVersion"] = "1.7";
+    doc["formatVersion"] = "2.7";
     doc["newThing"] = { anything: 1 };
     doc["grid"][0]["cost"]["futureStatistic"] = 3;
     const r = readProbeOutput(JSON.stringify(doc));
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.output.formatVersion).toBe("1.7");
+    if (r.ok) expect(r.output.formatVersion).toBe("2.7");
   });
 
   it("refuses a version that is not major.minor", () => {
@@ -72,6 +72,25 @@ describe("readProbeOutput: the major", () => {
       const doc = fixtureJson("success-msi");
       doc["formatVersion"] = v;
       expect(refused(doc).code).toBe("probe.format.invalid");
+    }
+  });
+});
+
+describe("readProbeOutput: the cost unit is nsPerSample (format 2)", () => {
+  it("reads a cost in nsPerSample, omx-contract's RESOURCE_UNITS id", () => {
+    expect(PROBE_COST_UNIT).toBe("nsPerSample");
+    expect(fixtureJson("success-msi")["grid"][0]["cost"]["unit"]).toBe("nsPerSample");
+    expect(readProbeOutput(fixtureText("success-msi")).ok).toBe(true);
+  });
+
+  it("refuses a cost in the 1.x word ns-per-sample, in any other unit, and with none: no reader takes both spellings", () => {
+    for (const unit of ["ns-per-sample", "ns/sample", "nspersample", undefined]) {
+      const doc = fixtureJson("success-msi");
+      if (unit === undefined) delete doc["grid"][0]["cost"]["unit"];
+      else doc["grid"][0]["cost"]["unit"] = unit;
+      const r = refused(doc);
+      expect(r.code).toBe("probe.format.invalid");
+      expect(r.problem).toMatch(/cost unit is .*, not nsPerSample/);
     }
   });
 });

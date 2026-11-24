@@ -214,7 +214,7 @@ export function probeOutputOfLv2Line(line: Lv2MeasureLine): Record<string, any> 
   if (cost?.nsPerSampleMedian !== undefined) {
     steps.push({ step: "cost", rate, quantum, outcome: "probe.ok", elapsedMs: 1 });
     point["cost"] = {
-      unit: "ns-per-sample",
+      unit: "nsPerSample",
       median: cost.nsPerSampleMedian,
       percentile: { p: line["cost"].percentile, value: cost.nsPerSampleP95 },
       min: cost.nsPerSampleMin,

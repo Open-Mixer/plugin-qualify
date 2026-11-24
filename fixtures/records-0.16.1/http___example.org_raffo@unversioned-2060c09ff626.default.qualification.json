@@ -163,7 +163,7 @@
   "measuredAt": "2026-10-27T14:34:05+00:00",
   "probe": {
     "file": "http___example.org_raffo@unversioned-2060c09ff626.default.probe.json",
-    "sha256": "34332454a15df57c18deb02d9b2400a06994fae27ff2435df6e0255ad00d3d94",
+    "sha256": "f5314840fa81673723d8dbf565a8faa2b995c2bdc98dcd40f9322de3d47a0fa9",
     "bytes": 2629,
     "protocol": {
       "name": "plugin-hostd.probe-protocol",
