@@ -83,7 +83,7 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
 }
 
 describe("a plugin the machine left unmeasured (#192)", () => {
-  it("a run where every plugin is unmeasured by one machine reason says it once and carries it to the end", async () => {
+  it("a run where every plugin is unmeasured by one machine reason names each, says the reason once and carries it to the end", async () => {
     const m = stands(["a.one", "a.two"]);
     writeFileSync(m.deny, "");
     const sp = splitPathFlags(m.flags);
@@ -94,8 +94,13 @@ describe("a plugin the machine left unmeasured (#192)", () => {
     const lines: string[] = [];
     const summary = await runSync(r.settings, { qualificationStore: store(), env: m.env, log: (l) => lines.push(l) });
     expect(summary).toMatchObject({ unmeasured: 2, qualified: 0, machineFailure: "EACCES" });
-    expect(lines.filter((l) => /: unmeasured \(/.test(l))).toHaveLength(1);
-    expect(lines).toContain("2 plugins unmeasured by the machine (EACCES); the first is listed above");
+    // every plugin is named by its key, one line each (#154); the machine's words are said once, on the first
+    const named = lines.filter((l) => /: unmeasured \(/.test(l));
+    expect(named).toHaveLength(2);
+    for (const id of ["a.one", "a.two"]) expect(named.filter((l) => l.includes(`#${id}: unmeasured (`))).toHaveLength(1);
+    expect(lines.filter((l) => l.includes("cannot open /dev/shm/probe"))).toHaveLength(1);
+    expect(named[1]).toMatch(/: unmeasured \(qualify\.sync\.not-measured\): by the machine \(EACCES\), as above$/);
+    expect(lines).toContain("2 plugins unmeasured by the machine (EACCES); each is named above");
   });
 
   it("the next run measures them again although their files are unchanged", async () => {
