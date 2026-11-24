@@ -133,8 +133,8 @@
   "measuredAt": "2026-10-28T21:01:52+00:00",
   "probe": {
     "file": "in.lsp-plug.trigger_midi_mono@unversioned-d5235d2f5f53.custom.probe.json",
-    "sha256": "17986ad33bc5087175fcce9512761cc28fb66d18beb01598ee2e72b5c5302fa6",
-    "bytes": 3978,
+    "sha256": "e9cf12613a602470e93afcf1ae71e510a119ba91c206f861fb273d90b2fa17c8",
+    "bytes": 3976,
     "protocol": {
       "name": "plugin-hostd.probe-protocol",
       "version": 1

@@ -142,8 +142,8 @@ describe("the runner's exit decides whether there is a document", () => {
   });
 
   it("a document the reader refuses is reported with its code, never judged", () => {
-    const major2 = JSON.stringify({ ...fixtureJson("success-msi"), formatVersion: "2.0" });
-    const { run } = runner(() => major2);
+    const major1 = JSON.stringify({ ...fixtureJson("success-msi"), formatVersion: "1.4" });
+    const { run } = runner(() => major1);
     expect(() => probeTarget(CLAP, { ...options, run })).toThrow(/refused \(probe\.format\.major-unknown\)/);
     const mismatch = fixtureJson("success-msi");
     mismatch.machine.class.cstatesLimited = false;
