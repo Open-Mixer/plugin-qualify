@@ -149,8 +149,10 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    # qualifying starts private JACK servers, which map their segments in /dev/shm, more than a container's default 64 MB
     container:
       image: ${{ matrix.cell.image }}
+      options: --shm-size=1g
     defaults:
       run:
         shell: bash

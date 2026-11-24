@@ -116,7 +116,7 @@ jobs:
       # the store's reader and writer, and the contract packages whose domains the writer checks a record's words against
       - run: >-
           dnf install -y --setopt=install_weak_deps=False
-          'plugin-qualification-db >= 2026112001' 'plugin-qualification-db-write >= 2026112001'
+          'plugin-qualification-db >= 2026112401' 'plugin-qualification-db-write >= 2026112401'
           'plugin-hostd-contract >= 0.21.0' 'plugin-db-contract >= 0.5.0' omx-clap-contract 'omx-dsp-contract >= 0.34.0'
       # the installed contract directory, qualification domain included (plugin-hostd-contract's): a writable copy the store
       # contract tests use
