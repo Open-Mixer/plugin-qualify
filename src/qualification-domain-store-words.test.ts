@@ -103,6 +103,15 @@ describe("the record store's words are items of the qualification domain", () =>
     expect(paths.length).toBeGreaterThan(0);
     expect(paths.filter((w) => !wordsOf("QUALIFICATION_VERDICT_HOSTINGS").includes(w))).toEqual([]);
   });
+  it("QUALIFICATION_REASON_PARAM_WORDS holds every step the adapter can name, as it names it (#169)", () => {
+    // a mod-host-protocol run that stops on a command writes it as params.step (host-admission.ts, classifyProtocolRun)
+    const src = readFileSync(join(PKG, "src", "host-admission.ts"), "utf8");
+    const m = /readonly cmd: ([^;]+);/.exec(src);
+    expect(m, "ModHostStep.cmd is not declared in host-admission.ts").not.toBeNull();
+    const steps = [...(m?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((x) => x[1] as string);
+    expect(steps).toContain("add");
+    expect(steps.filter((w) => !wordsOf("QUALIFICATION_REASON_PARAM_WORDS").includes(w))).toEqual([]);
+  });
   it("the package words are items: deb and rpm, their distros and arches", () => {
     expect(wordsOf("QUALIFICATION_PACKAGE_FORMATS")).toEqual(["deb", "rpm"]);
     expect(wordsOf("QUALIFICATION_PACKAGE_DISTROS")).toEqual(["trixie", "fc44", "fc45"]);
