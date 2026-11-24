@@ -3,7 +3,7 @@
   "$id": "https://openmixer.org/contract/qualify",
   "info": {
     "title": "plugin-qualify's own codes",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "x-owner": "plugin-qualify",
     "x-stability": "experimental"
   },
@@ -1141,6 +1141,19 @@
             "x-text": "--layer must be user or base",
             "x-args": [],
             "x-name": "judgedLayerOneOf"
+          }
+        ]
+      },
+      "QUALIFY_RUN_CONDITIONS": {
+        "description": "How the machine was while a qualification was measured, when it was not quiet: the record's run condition. Absent is a quiet machine. plugin-qualify-sync --plugin --under-load (plugin-hostd's ask, while the engine plays) writes it; no figure so measured is read as a quiet one (omx-panel docs/descriptions-store.md, sections 7 and 14.10).",
+        "x-since": "1.1.0",
+        "x-kind": "words",
+        "oneOf": [
+          {
+            "const": "measured-under-load",
+            "title": "measuredUnderLoad",
+            "description": "the engine played while the plugin was measured: its verdicts stand, its cost and latency figures are not a quiet machine's",
+            "x-name": "measuredUnderLoad"
           }
         ]
       }
