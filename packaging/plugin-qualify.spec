@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.21.1
+Version:        0.21.2
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -247,6 +247,10 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Tue Nov 24 2026 Pau Aliagas <linuxnow@gmail.com> - 0.21.2-1
+- The npm publish job marks its container checkout safe for git, so the suite it
+  runs before publishing reads the tree (0.21.1 reached no npm registry).
+
 * Tue Nov 24 2026 Pau Aliagas <linuxnow@gmail.com> - 0.21.1-1
 - every shipped script is executable, so lintian passes the DEB (0.21.0's arm64
   DEB was refused on tools/gen-dsp-rates.mjs)

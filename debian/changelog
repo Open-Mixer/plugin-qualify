@@ -1,3 +1,11 @@
+plugin-qualify (0.21.2) unstable; urgency=medium
+
+  * The npm publish job marks its container checkout safe for git, so the
+    suite it runs before publishing reads the tree (0.21.1 reached no npm
+    registry).
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Tue, 24 Nov 2026 15:07:11 +0000
+
 plugin-qualify (0.21.1) unstable; urgency=medium
 
   * Every shipped script is executable, so lintian passes the DEB (0.21.0's
