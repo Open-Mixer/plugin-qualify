@@ -58,7 +58,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
@@ -110,7 +110,7 @@ jobs:
     container:
       image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
+      - run: dnf install -y --setopt=install_weak_deps=False git nodejs26 nodejs26-bin nodejs26-npm nodejs26-npm-bin pkgconf-pkg-config
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Add the OpenMixer channel
@@ -153,7 +153,7 @@ jobs:
     container:
       image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs gnupg2
+      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs26 nodejs26-bin gnupg2
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
