@@ -6,13 +6,13 @@
  * explicitly. Importing this module registers the installed reader.
  */
 import { openDomainAt } from "@openmixer/omx-contract/domain-reader";
-import { HISTORY_DOMAIN, HISTORY_DOMAIN_FLOOR, HistoryDomainError, registerInstalledHistoryReader, type HistoryWordSource } from "./history-domain.js";
+import { HISTORY_DOMAIN, HistoryDomainError, registerInstalledHistoryReader, type HistoryWordSource } from "./history-domain.js";
 import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 
 /** Opens the domain from `<dir>/plugin-hostd/history/history.json`: the explicit entry of a test. */
 export function openHistoryDomainAt(dirs: string | readonly string[]): HistoryWordSource {
   try {
-    return openDomainAt(dirs, HISTORY_DOMAIN, HISTORY_DOMAIN_FLOOR);
+    return openDomainAt(dirs, HISTORY_DOMAIN);
   } catch (e) {
     throw new HistoryDomainError(Array.isArray(dirs) ? dirs.join(":") : String(dirs), (e as Error).message);
   }

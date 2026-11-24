@@ -17,15 +17,12 @@ export const HISTORY_DOMAIN = "plugin-hostd/history";
 /** The item the keys are the words of. */
 export const HISTORY_KEYS_ITEM = "PLUGIN_HOSTD_HISTORY_KEYS";
 
-/** The lowest `info.version` of the domain this package works with. */
-export const HISTORY_DOMAIN_FLOOR = "1.0.0";
-
 /** What this package needs of an opened domain: the words of an item with their title, in the declared order. */
 export interface HistoryWordSource {
   words(item: string): readonly { readonly word: string; readonly title: string }[];
 }
 
-/** A history domain this package cannot use: absent, not valid, below the floor, or without the item or the word asked for. */
+/** A history domain this package cannot use: absent, not valid, or without the item or the word asked for. */
 export class HistoryDomainError extends Error {
   constructor(place: string, reason: string) {
     super(`domain "${HISTORY_DOMAIN}" at ${place}: ${reason}`);

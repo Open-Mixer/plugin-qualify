@@ -96,7 +96,6 @@ class ClapMapping(unittest.TestCase):
         entry = "controls.clap#clap_entry[org.freemixer.plugin-qualify.fixture.controls]"
         self.assertEqual(doc, {
             "$schema": d.SCHEMA_URL,
-            "requires": {"omx-contract-schema": ">= 3.4.0"},
             "origin": "scanned",
             "plugin": {"format": "clap", "id": "org.freemixer.plugin-qualify.fixture.controls", "name": "controls",
                        "vendor": "plugin-qualify", "version": "1", "doc": "plugin-qualify fixture",

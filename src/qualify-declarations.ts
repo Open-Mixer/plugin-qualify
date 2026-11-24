@@ -233,11 +233,10 @@ export const DESCRIPTOR_HASH_PREFIX = 12;
 /**
  * The one descriptor schema both scanners hold a file to: omx-contract's, named by `DESCRIPTOR_SCHEMA_ENV`
  * when set (a test, or a checkout pointing at another contract), else the omx-contract package this one
- * depends on, else `DESCRIPTOR_SCHEMA_INSTALLED`. A written descriptor requires `DESCRIPTOR_SCHEMA_FLOOR`.
+ * depends on, else `DESCRIPTOR_SCHEMA_INSTALLED`.
  */
 export const DESCRIPTOR_SCHEMA_ENV = "OMX_CONTRACT_SCHEMA";
 export const DESCRIPTOR_SCHEMA_INSTALLED = "/usr/share/omx-contract/omx-contract.schema.json";
-export const DESCRIPTOR_SCHEMA_FLOOR = ">= 3.4.0";
 
 /**
  * Two ids that `_safe` maps onto the same characters (`a b` and `a_b`) would otherwise name the
@@ -252,7 +251,6 @@ export const DESCRIPTOR_ID_HASH_PREFIX = 8;
  */
 export const DESCRIPTOR_CODE_SCHEMA = "contract.file.invalid";
 export const DESCRIPTOR_CODE_SCHEMA_MISSING = "qualify.descriptor.schema-missing";
-export const DESCRIPTOR_CODE_SCHEMA_FLOOR = "qualify.descriptor.schema-floor";
 export const DESCRIPTOR_CODE_BINARY_UNHASHED = "qualify.descriptor.binary-unhashed";
 export const DESCRIPTOR_CODE_DIR_UNWRITABLE = "qualify.descriptor.dir-unwritable";
 /** Two ports of one plugin carry the same symbol: neither can be addressed by it, so the plugin is not described. Args: `symbol`. */

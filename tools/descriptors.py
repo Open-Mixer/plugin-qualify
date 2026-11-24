@@ -37,7 +37,6 @@ from _declarations import (
     DESCRIPTOR_DIR_SYSTEM,
     DESCRIPTOR_HASH_PREFIX,
     DESCRIPTOR_SCHEMA_ENV,
-    DESCRIPTOR_SCHEMA_FLOOR,
     DESCRIPTOR_SCHEMA_INSTALLED,
 )
 
@@ -154,7 +153,6 @@ def schema_candidates(env=None):
     ]
 
 
-SCHEMA_MAJOR = re.search(r"\d+", DESCRIPTOR_SCHEMA_FLOOR).group(0)
 LV2_DOMAIN = os.path.join("lv2", "lv2.json")
 OPENMIXER_UNIT_PREFIX = "urn:openmixer:unit#"
 INSTALLED_CONTRACT_DIR = "/usr/share/omx-contract/contract.d"
@@ -287,7 +285,6 @@ def head(fmt, plugin):
     """The fields every scanned descriptor opens with."""
     return {
         "$schema": SCHEMA_URL,
-        "requires": {"omx-contract-schema": DESCRIPTOR_SCHEMA_FLOOR},
         "origin": "scanned",
         "plugin": {"format": fmt, **plugin},
     }
