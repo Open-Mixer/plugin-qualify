@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
+# The OpenMixer packages a CI job installs by hand that the packaging does not declare, each with why. No package build
+# runs a test here (the spec has no %check, debian/rules overrides dh_auto_test with nothing), so every job below is
+# CI-only. deps-render refuses an install line naming any other undeclared OpenMixer package, a row here with no reason,
+# a row the packaging declares and a row no install line names.
+# <package>                     <why>
+plugin-hostd-tests              the measuring tests drive the installed daemon's fake host (install-plugin-hostd)
+omx-clap-host-tests             the sync's test chains plugins in a real worker with its fixtures (install-scanners)
+omx-contract-devel              the container tests compile against omx-contract's C headers and its installer
+omx-contract-data               the container tests and the catalogs job read the language list and the standard words
+omx-clap-contract               the store's writer checks a record's words against every installed domain (container tests)
+plugin-qualification-records    the release's Debian install check syncs from the records package's store base
