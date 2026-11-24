@@ -1,3 +1,18 @@
+plugin-qualify (0.21.1) unstable; urgency=medium
+
+  * Every shipped script is executable, so lintian passes the DEB (0.21.0's
+    arm64 DEB was refused on tools/gen-dsp-rates.mjs).
+  * plugin-qualify-sync imports QualificationStore, which its stored-plugin
+    count constructs; the store's commands are handed the installed contract
+    directory.
+  * The release's Fedora install check names omx-clap-libs as the owner of the
+    hosting codes, and a rerun keeps a tarball already attached with the same
+    bytes.
+  * The suite of ci.yml and publish.yml runs in a fedora:45 container with the
+    channel, which serves plugin-hostd 0.21.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Tue, 24 Nov 2026 14:30:00 +0100
+
 plugin-qualify (0.21.0) unstable; urgency=medium
 
   * Sorting pass: V5, V6, V8, V9, V18, V19, V24 and V25.
