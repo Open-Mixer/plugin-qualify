@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import { parsePinLine } from "./pins-file.js";
-import { MEASURED_UNDER_LOAD, parseSyncArgs, readSyncState, resolveSyncSettings, runSync } from "./qualify-sync.js";
+import { fileSha256, MEASURED_UNDER_LOAD, parseSyncArgs, readSyncState, resolveSyncSettings, runSync } from "./qualify-sync.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 import { QualificationStore } from "./qualification-store.js";
 import { fakeStore } from "./store-fake.support.js";
@@ -47,7 +47,8 @@ function stands() {
   mkdirSync(join(root, "lv2"));
   const fileOf = (id: string): string => join(clap, `${id}.clap`);
   for (const id of [A, B]) writeFileSync(fileOf(id), `the bytes of ${id}`);
-  writeFileSync(join(root, "scan.json"), JSON.stringify({ scanner: "clap-qualify", version: "0.1.0", files: [A, B].map((id) => ({ path: fileOf(id), plugins: [plugin(id)] })) }));
+  // the scanner lists the one file it is given, as clap-qualify --json <file> does
+  for (const id of [A, B]) writeFileSync(join(root, `${id}.clap.scan.json`), JSON.stringify({ scanner: "clap-qualify", version: "0.1.0", files: [{ path: fileOf(id), sha256: fileSha256(fileOf(id)), plugins: [plugin(id)] }] }));
   writeFileSync(join(root, "probe.json"), PROBE);
   // every file the probe runner was asked to measure, one a line: "never a scan" is read here
   const measured = join(root, "measured.log");
@@ -57,7 +58,7 @@ function stands() {
     chmodSync(p, 0o755);
     return p;
   };
-  const scanner = script("clap-qualify", `cat ${JSON.stringify(join(root, "scan.json"))}`);
+  const scanner = script("clap-qualify", `cat ${JSON.stringify(root)}/"$(basename "$2")".scan.json`);
   const interposer = join(root, "rt_interpose.so");
   writeFileSync(interposer, "");
   const runner = script(

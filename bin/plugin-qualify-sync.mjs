@@ -53,7 +53,7 @@ log(
     `memory ${s.memory === undefined ? "unbounded" : `${String(s.memory.bytes)} bytes`}`,
 );
 try {
-  const summary = await runSync(s, { force: parsed.args.force, wait: !parsed.args.noWait, refreshOnly: parsed.args.refreshPins, rejudge: parsed.args.rejudge, memoryOnly: parsed.args.memoryOnly, adapterOnly: parsed.args.adapterOnly, isolatedOnly: parsed.args.isolatedOnly, poolOnly: parsed.args.poolOnly, store: { system: parsed.args.system }, log });
+  const summary = await runSync(s, { ...(parsed.args.plugin === undefined ? {} : { plugin: parsed.args.plugin, underLoad: parsed.args.underLoad }), force: parsed.args.force, wait: !parsed.args.noWait, refreshOnly: parsed.args.refreshPins, rejudge: parsed.args.rejudge, memoryOnly: parsed.args.memoryOnly, adapterOnly: parsed.args.adapterOnly, isolatedOnly: parsed.args.isolatedOnly, poolOnly: parsed.args.poolOnly, store: { system: parsed.args.system }, log });
   if (summary !== undefined) {
     process.stdout.write(`${summaryLine(summary)}\n`);
     // the records counted per plugin over its offers: a CLAP plugin has a record per offer
@@ -61,6 +61,8 @@ try {
     log(`pins in ${s.pinFile}${summary.sent ? `, ${String(summary.sent)} sent to plugin-hostd` : ""}`);
     // every plugin left unmeasured by one reason of the machine: the run failed, and the unit says so (#192)
     if (summary.machineFailure !== undefined) process.exit(1);
+    // --plugin with a target no plugin on the search path is: the ask could not run
+    if (summary.pluginAbsent !== undefined) process.exit(2);
   }
 } catch (e) {
   log(`the run stopped: ${e.message}`);
