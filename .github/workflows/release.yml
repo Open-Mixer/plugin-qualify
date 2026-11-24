@@ -323,9 +323,24 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+        # a rerun of the run finds its own tarball attached: the same bytes are kept and the job is green; a tarball of
+        # the same name with other bytes is never replaced (a published release does not change), it is red by name
         run: |
+          set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" pack/*.tgz --repo "$GITHUB_REPOSITORY"
+            for f in pack/*.tgz; do
+              name=$(basename "$f")
+              have=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq ".assets[] | select(.name == \"$name\") | .digest")
+              want="sha256:$(sha256sum "$f" | cut -d' ' -f1)"
+              if [ -z "$have" ]; then
+                gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY"
+              elif [ "$have" = "$want" ]; then
+                echo "::notice::$name is already attached to $TAG with the same bytes ($want)"
+              else
+                echo "::error::$name is attached to $TAG as $have, this run packed $want: a release asset is never replaced"
+                exit 1
+              fi
+            done
           else
             gh release create "$TAG" pack/*.tgz --title "$TAG" --generate-notes --repo "$GITHUB_REPOSITORY"
           fi
