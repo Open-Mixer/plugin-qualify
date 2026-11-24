@@ -21,6 +21,8 @@ import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
 import { buildQualificationRecord, type QualificationRecord } from "./qualification-record.js";
 import type { SyncPlugin, SyncState } from "./qualify-sync.js";
+import { QualificationStore, type ShadowKey } from "./qualification-store.js";
+import { fakeStore } from "./store-fake.support.js";
 
 const dir = mkdtempSync(join(tmpdir(), "pq-store-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -33,11 +35,14 @@ function recordOf(patch: (d: Record<string, any>) => void = () => {}): Qualifica
   return buildQualificationRecord(judgeProbeOutput(r.output, [OPENMIXER_CONSOLE_PROFILE, OMX_CLAP_HOST_PROFILE]), { file: "x.probe.json", sha256: "0".repeat(64), bytes: 1 });
 }
 
+const records = new QualificationStore("user", { run: fakeStore({ validate: false }).run });
 let n = 0;
-function written(record: QualificationRecord | Record<string, unknown>): string {
-  const path = join(dir, `r${String(n++)}.qualification.json`);
-  writeFileSync(path, JSON.stringify(record));
-  return path;
+/** The record put in the qualification store, under a key of its own; the store pass reads it from there. */
+function written(record: QualificationRecord | Record<string, unknown>): ShadowKey {
+  const r = record as QualificationRecord;
+  const key: ShadowKey = { sha256: r.binary?.sha256 ?? "0".repeat(64), format: r.plugin?.format ?? "lv2", uri: r.plugin?.id ?? "urn:x", offer: `o${String(n++)}`, hostClass: "x86-64" };
+  records.put(key, r);
+  return key;
 }
 
 const FILES = [
@@ -46,7 +51,7 @@ const FILES = [
 ];
 const LAYOUT = { scheme: "omx-layout/1", sha256: "c".repeat(64) };
 
-function plugin(record: string | undefined, withPin = true, uri = "urn:x"): SyncPlugin {
+function plugin(record: ShadowKey | undefined, withPin = true, uri = "urn:x"): SyncPlugin {
   return {
     uri,
     outcome: "qualified",
@@ -56,7 +61,7 @@ function plugin(record: string | undefined, withPin = true, uri = "urn:x"): Sync
 }
 
 function stateOf(...plugins: SyncPlugin[]): SyncState {
-  return { schema: "plugin-qualify.sync-state/1", entries: { "/x": { format: "lv2", root: "/x", files: [], plugins, qualifiedAt: "t", seconds: 0 } } } as unknown as SyncState;
+  return { schema: "plugin-qualify.sync-state/2", entries: { "/x": { format: "lv2", root: "/x", files: [], plugins, qualifiedAt: "t", seconds: 0 } } } as unknown as SyncState;
 }
 
 /** A plugin-db that answers 0 and remembers every call; `answer` makes one call fail. */
@@ -71,7 +76,7 @@ function fakeDb(answer: (args: readonly string[]) => { status: number; stderr?: 
 }
 
 const LV2_PATH = "/usr/lib/lv2:/zynthian/zynthian-plugins/lv2";
-const base = { machineClass: "rpi5", system: true, lv2Path: LV2_PATH, env: {} };
+const base = { machineClass: "rpi5", system: true, lv2Path: LV2_PATH, env: {}, records };
 
 describe("the sync's store pass", () => {
   it("a recorded plugin with a pin is pinned, then its judged layer put, in the service's store", () => {
@@ -213,7 +218,7 @@ describe.skipIf(!haveRealPluginDb)("against the plugin-db installed here, in a s
     const rec = recordOf();
     const uri = `clap:${join(clap, "x.clap")}#${rec.plugin.id}`;
     const env = { ...process.env, HOME: home, PLUGIN_DB_STORE: undefined };
-    const out = storeJudgedLayers(stateOf(plugin(written(rec), true, uri)), { machineClass: "x86-64", system: false, lv2Path: "", env });
+    const out = storeJudgedLayers(stateOf(plugin(written(rec), true, uri)), { machineClass: "x86-64", system: false, lv2Path: "", env, records });
     expect(out.lines.at(-1)).toMatch(/^plugin-db: 1 plugins stored in the store, 0 already there, 0 without a pin, 0 without a judged layer, 0 refused$/);
     const show = spawnSync("plugin-db", ["show", `${rec.plugin.format}:${rec.plugin.id}`], { encoding: "utf8", env });
     expect(show.status).toBe(0);

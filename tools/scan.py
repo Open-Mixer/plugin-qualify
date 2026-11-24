@@ -41,6 +41,7 @@ MAXIMUM = LV2 + "maximum"
 DEFAULT = LV2 + "default"
 PP = "http://lv2plug.in/ns/ext/port-props#"
 UNITS = "http://lv2plug.in/ns/extensions/units#"
+OPENMIXER_UNITS = "urn:openmixer:unit#"
 PATCH = "http://lv2plug.in/ns/ext/patch#"
 ATOM = "http://lv2plug.in/ns/ext/atom#"
 RDFS = "http://www.w3.org/2000/01/rdf-schema#"
@@ -63,7 +64,7 @@ REPORTS_LATENCY = LV2 + "reportsLatency"
 MINOR_VERSION = LV2 + "minorVersion"
 MICRO_VERSION = LV2 + "microVersion"
 
-# A port's unit is spelled as omx-contract's units sheet spells it (desc.unit_words), in the catalog and in the
+# A port's unit is spelled as plugin-db's lv2 domain spells it (desc.unit_words), in the catalog and in the
 # descriptor alike; a unit the sheet has no word for falls to the plugin's own units:symbol in the catalog, and
 # is `unknown` in the descriptor.
 _UNIT_WORDS = None
@@ -75,12 +76,26 @@ def unit_words():
         _UNIT_WORDS = desc.unit_words()
     return _UNIT_WORDS
 
-# lv2:designation -> the descriptor's meaning, where the meaning carries the LV2 term's name
-DESIGNATED_MEANINGS = {
-    **{PARAM + m: m for m in ("gain", "threshold", "ratio", "attack", "release", "hold", "decay", "frequency",
-                              "cutoffFrequency", "resonance", "bypass", "wetDryRatio", "delay")},
-    LV2 + "enabled": "enabled",
-}
+# lv2:designation -> the descriptor's meaning, where the meaning carries the LV2 term's name. The meaning is a word of
+# omx-contract's closed list (the schema's `$defs.meaning`, desc.meaning_words): the names here are held to that list at the
+# first use, and a name the list lacks is refused by name, so no meaning of this package is a word the contract does not have.
+_DESIGNATED_NAMES = ("gain", "threshold", "ratio", "attack", "release", "hold", "decay", "frequency", "cutoffFrequency",
+                     "resonance", "bypass", "wetDryRatio", "delay")
+_ENABLED_NAME = "enabled"
+_DESIGNATED_MEANINGS = None
+
+
+def designated_meanings(env=None):
+    """lv2:designation URI -> the contract's meaning word it names; each word checked against omx-contract's list."""
+    global _DESIGNATED_MEANINGS
+    if _DESIGNATED_MEANINGS is None:
+        listed = desc.meaning_words(env)
+        missing = [m for m in (*_DESIGNATED_NAMES, _ENABLED_NAME, "unknown") if m not in listed]
+        if missing:
+            raise desc.refused_as(desc.DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where="$defs/meaning",
+                                  message="omx-contract's list of meanings has no " + ", ".join(missing))
+        _DESIGNATED_MEANINGS = {**{PARAM + m: m for m in _DESIGNATED_NAMES}, LV2 + "enabled": _ENABLED_NAME}
+    return _DESIGNATED_MEANINGS
 
 # LV2 classes -> the descriptor's plugin features; a plugin of none of them is an audio effect
 CLASS_FEATURES = {
@@ -206,8 +221,9 @@ class Scanner:
         if un is None:
             return None
         uri = str(un)
-        if uri in unit_words():
-            return unit_words()[uri]
+        word = desc.unit_word(uri, unit_words())
+        if word is not None:
+            return word
         sym = first(self.w.find_nodes(un, self.u[UNITS + "symbol"], None))
         return str(sym) if sym is not None else None
 
@@ -367,8 +383,8 @@ class Scanner:
         if not des:
             return "unknown"
         for d in des:
-            if d in DESIGNATED_MEANINGS:
-                return DESIGNATED_MEANINGS[d]
+            if d in designated_meanings():
+                return designated_meanings()[d]
         return None
 
     def port_group(self, port):
@@ -381,7 +397,7 @@ class Scanner:
 
     def descriptor_unit(self, port):
         un = first(port.get_value(self.u[UNITS + "unit"]))
-        return unit_words().get(str(un), "unknown") if un is not None else "unknown"
+        return (desc.unit_word(str(un), unit_words()) or "unknown") if un is not None else "unknown"
 
     def descriptor_control(self, port, link, readonly=False):
         """An input (or, readonly, an output) control port as a descriptor control."""

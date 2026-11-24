@@ -30,6 +30,7 @@
  */
 
 import "../qualification-domain-node.js";
+import "../probe-domain-node.js";
 export * from "./format.js";
 export * from "./vocabulary.js";
 export * from "./provenance.js";

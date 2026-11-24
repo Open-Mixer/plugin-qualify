@@ -19,6 +19,7 @@
  */
 import { createHash } from "node:crypto";
 
+import { probeOutcome } from "./probe-domain.js";
 import { finiteNumber, isRecord, nonEmptyString, optional } from "./measurement/guards.js";
 import { readMemoryFootprint, readVoicesHeld, type MemoryFootprint, type VoicesHeld } from "./measurement/format.js";
 
@@ -33,9 +34,10 @@ export const PROBE_FORMAT_CODE = {
 } as const;
 export type ProbeFormatCode = (typeof PROBE_FORMAT_CODE)[keyof typeof PROBE_FORMAT_CODE];
 
-/** The outcome that means a step ran to its end. */
-export const PROBE_OK = "probe.ok";
-export const PROBE_NOT_ATTEMPTED = "probe.not-attempted";
+/** The outcome that means a step ran to its end: the probe domain's word titled `probeOk`. */
+export const probeOk = (): string => probeOutcome("probeOk");
+/** The outcome of a step the protocol did not ask for, or that does not apply: the word titled `probeNotAttempted`. */
+export const probeNotAttempted = (): string => probeOutcome("probeNotAttempted");
 
 /**
  * An exit-latency above this many microseconds makes an idle state deep. The runner writes the

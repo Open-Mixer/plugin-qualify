@@ -431,7 +431,7 @@ export interface SoakReading {
 
 /** Everything one run learned about one plugin SURVIVING. Readable when it has a lifecycle. */
 /**
- * The plugin calls the measurer made through omx-clap-core's guard: whether one returned with a callee-saved register
+ * The plugin calls the measurer made through omx-clap's guard: whether one returned with a callee-saved register
  * changed, and for the first, the registers, the plugin function and the run block; calls counts all that did. The
  * guard put them back, so the measurement is whole; a plugin that clobbered runs only in a worker of its own.
  */

@@ -15,7 +15,9 @@ import { judgeProbeOutput } from "./probe-judge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
 import { QUICK_NOT_MEASURED } from "./qualify-sync.js";
-import { writeQualification } from "./qualification-record.js";
+import { buildQualificationRecord, probeCopyFileName, writeQualification } from "./qualification-record.js";
+import type { StoredRecord } from "./qualification-store.js";
+import { storeExport } from "./store-export.support.js";
 
 export const FIXTURE_CLAP_ID = "org.example.plate";
 export const FIXTURE_HOST = "omx-clap-host";
@@ -65,4 +67,21 @@ export function writeFixtureSet(root: string, hostClass: string, set: string, cl
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "provenance.json"), `${JSON.stringify(fixtureProvenance(hostClass, set), null, 2)}\n`);
   return { dir, ...writeFixtureRecord(dir, clapPath, edit) };
+}
+
+/**
+ * The record of the `.clap` at `clapPath` as the store exports it (`StoredRecord`), the layer given: the real writer's, over
+ * plugin-hostd's success fixture, judged by the real judge for `omx-clap-host`, with its binary below the install root.
+ */
+export function storedFixture(clapPath: string, options: { edit?: (doc: Record<string, any>) => void; layer?: "user" | "base"; hostClass?: string } = {}): StoredRecord {
+  const digest = sha(readFileSync(clapPath));
+  const doc = fixtureJson("success-msi");
+  options.edit?.(doc);
+  doc["binary"] = { ...doc["binary"], path: basename(clapPath), sha256: digest, files: [{ path: basename(clapPath), sha256: digest }] };
+  const bytes = Buffer.from(`${JSON.stringify(doc, null, 2)}\n`);
+  const read = readProbeOutput(bytes.toString("utf8"));
+  if (!read.ok) throw new Error(`the fixture probe output does not read: ${read.code}: ${read.problem}`);
+  const judgment = judgeProbeOutput(read.output, [shippedHostProfile(FIXTURE_HOST)!]);
+  const record = buildQualificationRecord(judgment, { file: probeCopyFileName(read.output), sha256: sha(bytes), bytes: bytes.length }, QUICK_NOT_MEASURED);
+  return { ...storeExport(record, read.output, undefined, options.hostClass ?? "test-class"), layer: options.layer ?? "base" };
 }

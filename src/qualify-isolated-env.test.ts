@@ -28,6 +28,7 @@ describe("the isolated step's environment", () => {
     const settings = { ...d.settings, lv2Dirs: ["/usr/lib/lv2", "/zynthian/zynthian-plugins/lv2"], clapDirs: ["/usr/lib/clap"] };
     const seen: (Readonly<Record<string, string | undefined>> | undefined)[] = [];
     const done = await runSync(settings, {
+      qualificationStore: d.store,
       isolatedOnly: true,
       isolatedRunner: (_uri, _cell, env) => (seen.push(env), ALONE),
       env: { LV2_PATH: "/somewhere/else" },
