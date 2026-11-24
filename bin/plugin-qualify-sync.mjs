@@ -9,7 +9,7 @@
 import "../dist/qualification-cli-start.js";
 import { readFileSync } from "node:fs";
 
-import { SYNC_CONF, localeOf, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText, textOf } from "../dist/index.js";
+import { QualificationStore, SYNC_CONF, localeOf, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText, textOf } from "../dist/index.js";
 
 const log = (line) => process.stderr.write(`plugin-qualify-sync: ${line}\n`);
 
