@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { OMX_CLAP_HOST_PROFILE } from "./host-profiles.js";
-import { PROBE_OOM } from "./memory-bound.js";
+import { probeOom } from "./memory-bound.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput } from "./probe-output.js";
@@ -56,7 +56,7 @@ describe("a record's cells all carry latency", () => {
     const rec = recordOf((d) => {
       delete d.grid[0].latency;
       d.steps.find((s: any) => s.step === "latency" && s.rate === 48000).detail = "something the child said";
-      d.grid[1] = { rate: 96000, quantum: 128, outcome: PROBE_OOM, memoryLimit: { bytes: 1024, mechanism: "rlimit-data" } };
+      d.grid[1] = { rate: 96000, quantum: 128, outcome: probeOom(), memoryLimit: { bytes: 1024, mechanism: "rlimit-data" } };
     });
     expect(cell(rec, 48000, 128)?.latency).toEqual({ unmeasuredReason: "probe-error", code: HOSTING_CODE.latencyUnmeasured });
     expect(cell(rec, 96000, 128)?.latency).toEqual({ unmeasuredReason: "probe-error", code: HOSTING_CODE.latencyUnmeasured });

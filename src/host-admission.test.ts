@@ -26,7 +26,7 @@ import {
   type ModHostRun,
   JALV_HOSTED_MS,
   admissionRating,
-  ADAPTER_CONTENT_UNOBSERVED_CODE,
+  adapterContentUnobservedCode,
 } from "./host-admission.js";
 import { lv2ContentParams } from "./lv2-loader.js";
 import { JALV_PROFILE, MOD_HOST_PROFILE, OMX_CLAP_HOST_PROFILE, OPENMIXER_CONSOLE_PROFILE } from "./host-profiles.js";
@@ -470,7 +470,7 @@ net.createServer((c) => c.on("data", (d) => {
       expect(sent.filter((l) => l.startsWith("patch_set"))).toHaveLength(1);
       expect(run.sound?.content).toEqual({ params: ["urn:x#sample"], loaded: [], refused: ["urn:x#sample (resp -1)"] });
       const a = classifyProtocolRun(ADAPTER_HOST, run);
-      expect(a).toMatchObject({ measured: true, admitted: true, code: ADAPTER_CONTENT_UNOBSERVED_CODE, params: { peak: 0, notes: 30, content: "urn:x#sample", loaded: "", refused: "urn:x#sample (resp -1)" } });
+      expect(a).toMatchObject({ measured: true, admitted: true, code: adapterContentUnobservedCode(), params: { peak: 0, notes: 30, content: "urn:x#sample", loaded: "", refused: "urn:x#sample (resp -1)" } });
       const j = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: a } });
       const asIf = judgeProbeOutput(asLv2, [OMX_CLAP_HOST_PROFILE], { admissions: { [ADAPTER_HOST]: { host: ADAPTER_HOST, measured: true, admitted: true, params: {} } } });
       // the verdict is the one an admitted run gives; the reason says why the note test could not be observed

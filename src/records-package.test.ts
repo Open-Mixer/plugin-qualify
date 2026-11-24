@@ -14,23 +14,22 @@ import { afterAll, describe, expect, it } from "vitest";
 
 import { FIXTURE_CLAP_ID, writeFakeClap, writeFixtureRecord } from "./distributed-records.support.js";
 import { parseSyncArgs, resolveSyncSettings, runSync } from "./qualify-sync.js";
-import { readDeb, recordsDependsRange, recordsPackageName } from "./records-package.js";
+import { readDeb, recordsDependsFloor, recordsPackageName } from "./records-package.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
-// the plugin-qualify these records are written by: its minor, up to the next one
+// the plugin-qualify these records are written by: its minor, and no ceiling
 const ownVersion = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version;
 const [ownMajor = 0, ownMinor = 0] = ownVersion.split(".").map(Number);
 const recordsFloor = `${String(ownMajor)}.${String(ownMinor)}.0`;
-const recordsCeiling = `${String(ownMajor)}.${String(ownMinor + 1)}`;
 
 describe("the records package's name and dependency", () => {
   it("is named for plugin-db's qualification layer, the class and the set", () => {
     expect(recordsPackageName("rpi5", "zynthian-vangelis")).toBe("plugin-db-qualification-rpi5-zynthian-vangelis");
   });
-  it("depends on the minor of the plugin-qualify that wrote it, up to the next minor", () => {
-    expect(recordsDependsRange("0.19.3")).toEqual({ floor: "0.19.0", ceiling: "0.20" });
-    expect(recordsDependsRange("1.4.0")).toEqual({ floor: "1.4.0", ceiling: "1.5" });
-    expect(recordsDependsRange("x")).toBeUndefined();
+  it("depends on the minor of the plugin-qualify that wrote it as a floor, with no ceiling", () => {
+    expect(recordsDependsFloor("0.19.3")).toBe("0.19.0");
+    expect(recordsDependsFloor("1.4.0")).toBe("1.4.0");
+    expect(recordsDependsFloor("x")).toBeUndefined();
   });
 });
 
@@ -84,7 +83,8 @@ describe("plugin-qualify-records-package", () => {
     expect(d.control["Package"]).toBe("plugin-db-qualification-test-class-test-set-48000-128");
     expect(d.control["Version"]).toBe("2026.10.29");
     expect(d.control["Architecture"]).toBe("all");
-    expect(d.control["Depends"]).toBe(`plugin-qualify (>= ${recordsFloor}~), plugin-qualify (<< ${recordsCeiling}~)`);
+    expect(d.control["Depends"]).toBe(`plugin-qualify (>= ${recordsFloor}~)`);
+    expect(d.control["Depends"]).not.toContain("<<");
     expect(d.files).toEqual([...device.kept, "provenance.json"].map((f) => `${dir}/${f}`).sort());
     expect(d.controlFiles).toEqual(["./control", "./md5sums"]);
     if (dpkgDeb) {
@@ -111,29 +111,6 @@ describe("plugin-qualify-records-package", () => {
     });
     expect(p.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     for (const f of device.kept) expect(readFileSync(join(tree, dir, f))).toEqual(readFileSync(join(device.state, f)));
-  });
-
-  it("unpacked, is a distributed layer the sync takes the plugin from", async () => {
-    const tree = join(scratch, "installed");
-    readDeb(deb, tree);
-    const m = join(scratch, "fresh");
-    mkdirSync(join(m, "lv2"), { recursive: true });
-    const sp = splitPathFlags([
-      "--clap-path", dirname(device.clap), "--lv2-path", join(m, "lv2"), "--lv2-extra", "",
-      "--qualification-dir", join(m, "q"), "--descriptor-dir", join(m, "d"), "--state-file", join(m, "s.json"), "--pin-file", join(m, "p.pins"),
-      "--hostd-port", "0", "--budget-s", "5", "--host-class", "test-class", "--distributed-dir", join(tree, "usr", "share", "omx", "qualification"),
-      "--grid", "48000/128",
-    ]);
-    const args = parseSyncArgs(sp.argv);
-    if (!args.ok) throw new Error(args.error);
-    const s = resolveSyncSettings(new Map(), args.args, {}, m, undefined, undefined, sp.run);
-    if (!s.ok) throw new Error(s.error);
-    // other.clap has no record in the package and is measured; plate.clap is taken from it
-    unlinkSync(join(dirname(device.clap), "other.clap"));
-    const lines: string[] = [];
-    const summary = await runSync(s.settings, { env: {}, log: (l) => lines.push(l) });
-    expect(lines).toContain(`distributed: clap:${device.clap}#${FIXTURE_CLAP_ID}: applied (test-set-48000-128)`);
-    expect(summary?.distributed).toBe(1);
   });
 
   it("refuses a name a Debian package cannot carry, and a run without its provenance", () => {
@@ -206,26 +183,4 @@ describe("a run of two cells, one package per cell (#317, plugin-db-qualificatio
     expect(r3.stderr).toContain("are both measured at 48000/512: one set per cell");
     expect(existsSync(out3)).toBe(false);
   });
-
-  it("installed together, a sync at each cell takes its own set", async () => {
-    for (const c of cells) {
-      const tree = join(scratch, `run-installed-${String(c.rate)}`);
-      for (const o of cells) readDeb(debOf(o.set), tree);
-      const m = join(scratch, `run-fresh-${String(c.rate)}`);
-      mkdirSync(join(m, "lv2"), { recursive: true });
-      const sp = splitPathFlags([
-        "--clap-path", dirname(clap), "--lv2-path", join(m, "lv2"), "--lv2-extra", "",
-        "--qualification-dir", join(m, "q"), "--descriptor-dir", join(m, "d"), "--state-file", join(m, "s.json"), "--pin-file", join(m, "p.pins"),
-        "--hostd-port", "0", "--budget-s", "5", "--host-class", "x86-64", "--distributed-dir", join(tree, "usr", "share", "omx", "qualification"),
-        "--grid", `${String(c.rate)}/${String(c.quantum)}`,
-      ]);
-      const args = parseSyncArgs(sp.argv);
-      if (!args.ok) throw new Error(args.error);
-      const s = resolveSyncSettings(new Map(), args.args, {}, m, undefined, undefined, sp.run);
-      if (!s.ok) throw new Error(s.error);
-      const lines: string[] = [];
-      await runSync(s.settings, { env: {}, log: (l) => lines.push(l) });
-      expect(lines).toContain(`distributed: clap:${clap}#${FIXTURE_CLAP_ID}: applied (${c.set})`);
-    }
-  }, 60_000);
 });

@@ -6,9 +6,10 @@
  * settings file, runs one sync, prints its summary line and exits. The exit is 0 whenever the run went through,
  * whatever the plugins' verdicts: a refused plugin is a result, not a failure of the service.
  */
+import "../dist/qualification-cli-start.js";
 import { readFileSync } from "node:fs";
 
-import { SYNC_CONF, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText } from "../dist/index.js";
+import { SYNC_CONF, localeOf, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText, textOf } from "../dist/index.js";
 
 const log = (line) => process.stderr.write(`plugin-qualify-sync: ${line}\n`);
 
@@ -43,7 +44,7 @@ if (!resolved.ok) {
   log(resolved.error);
   process.exit(2);
 }
-for (const w of resolved.warnings) log(w);
+for (const w of resolved.warnings) log(textOf(w, localeOf(process.env)));
 const s = resolved.settings;
 const grid = s.grid.kind === "cells" ? s.grid.cells.map((c) => `${String(c.rate)}/${String(c.quantum)}`).join(",") : s.grid.kind;
 log(
@@ -52,11 +53,11 @@ log(
     `memory ${s.memory === undefined ? "unbounded" : `${String(s.memory.bytes)} bytes`}`,
 );
 try {
-  const summary = await runSync(s, { force: parsed.args.force, wait: !parsed.args.noWait, refreshOnly: parsed.args.refreshPins, rejudge: parsed.args.rejudge, memoryOnly: parsed.args.memoryOnly, adapterOnly: parsed.args.adapterOnly, isolatedOnly: parsed.args.isolatedOnly, poolOnly: parsed.args.poolOnly, log });
+  const summary = await runSync(s, { force: parsed.args.force, wait: !parsed.args.noWait, refreshOnly: parsed.args.refreshPins, rejudge: parsed.args.rejudge, memoryOnly: parsed.args.memoryOnly, adapterOnly: parsed.args.adapterOnly, isolatedOnly: parsed.args.isolatedOnly, poolOnly: parsed.args.poolOnly, store: { system: parsed.args.system }, log });
   if (summary !== undefined) {
     process.stdout.write(`${summaryLine(summary)}\n`);
     // the records counted per plugin over its offers: a CLAP plugin has a record per offer
-    process.stdout.write(`${pluginCountsLine(pluginCounts(s.qualificationDir))}\n`);
+    process.stdout.write(`${pluginCountsLine(pluginCounts(new QualificationStore(s.system ? "system" : "user")))}\n`);
     log(`pins in ${s.pinFile}${summary.sent ? `, ${String(summary.sent)} sent to plugin-hostd` : ""}`);
     // every plugin left unmeasured by one reason of the machine: the run failed, and the unit says so (#192)
     if (summary.machineFailure !== undefined) process.exit(1);

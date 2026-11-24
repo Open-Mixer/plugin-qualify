@@ -2,7 +2,7 @@
 /* Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com> */
 /* A pool of helper threads for a host's clap.thread-pool, so that the interposer counts what a plugin's tasks do on a
  * thread that is not the audio thread (clap-qualify --pool, the pool step of src/qualify-pool.ts). The shape is
- * omx-clap-core's (docs/thread-pool.md): a request is one 64-bit word, a generation, the task count and the next index,
+ * omx-clap's (docs/thread-pool.md): a request is one 64-bit word, a generation, the task count and the next index,
  * taken with a compare-and-swap by the helpers and by the calling thread, which takes tasks too and returns when every
  * one has ended. After the helpers are made nothing here allocates, locks or makes a call the interposer counts: a
  * helper that waits spins and yields. The threads are created with the creator's attributes, so they inherit its

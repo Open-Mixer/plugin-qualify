@@ -29,6 +29,8 @@
  * view into a host's own descriptors belong in that host, on purpose.
  */
 
+import "../qualification-domain-node.js";
+import "../probe-domain-node.js";
 export * from "./format.js";
 export * from "./vocabulary.js";
 export * from "./provenance.js";

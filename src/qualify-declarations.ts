@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
-import { ORACLE_FLOOR_RATES, RT_HARD_TARGET } from "@openmixer/omx-contract";
+import { ORACLE_FLOOR_RATES, RT_HARD_TARGET } from "./dsp-rates.generated.js";
 
 /**
  * EVERY NUMBER plugin-qualify uses, declared once. The CLI's defaults and `--help`, the rating, and the Python tools (through the generated
@@ -35,7 +35,7 @@ export const MEASURE_BASE_RATE = 48000;
  */
 export const OPERATIONAL_RATE_FLOOR = 48000;
 
-/** The rates a run measures when `--rates` is not given — recorded in `run.rates`: omx-contract's ORACLE_FLOOR_RATES. */
+/** The rates a run measures when `--rates` is not given — recorded in `run.rates`: omx-dsp's ORACLE_FLOOR_RATES. */
 export const QUALIFY_RATES: readonly number[] = ORACLE_FLOOR_RATES;
 
 /** The quanta (frames) a run rates cost at when `--quanta` is not given: the contract's hard-target quantum, the reference, 512 and the long quantum. */

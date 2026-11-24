@@ -4,6 +4,7 @@
 // One isolated step (plugin-qualify#249): a plugin-hostd of its own on the JACK server the environment names, the plugin
 // added alone, worker_list read, a sine through it for a window, and worker_list read again. Prints one JSON line for
 // src/qualify-isolated.ts to judge. A host that never listened says started: false: nothing was learned about the plugin.
+import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";

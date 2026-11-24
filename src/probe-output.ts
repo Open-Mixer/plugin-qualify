@@ -19,6 +19,7 @@
  */
 import { createHash } from "node:crypto";
 
+import { probeOutcome } from "./probe-domain.js";
 import { finiteNumber, isRecord, nonEmptyString, optional } from "./measurement/guards.js";
 import { readMemoryFootprint, readVoicesHeld, type MemoryFootprint, type VoicesHeld } from "./measurement/format.js";
 
@@ -33,9 +34,10 @@ export const PROBE_FORMAT_CODE = {
 } as const;
 export type ProbeFormatCode = (typeof PROBE_FORMAT_CODE)[keyof typeof PROBE_FORMAT_CODE];
 
-/** The outcome that means a step ran to its end. */
-export const PROBE_OK = "probe.ok";
-export const PROBE_NOT_ATTEMPTED = "probe.not-attempted";
+/** The outcome that means a step ran to its end: the probe domain's word titled `probeOk`. */
+export const probeOk = (): string => probeOutcome("probeOk");
+/** The outcome of a step the protocol did not ask for, or that does not apply: the word titled `probeNotAttempted`. */
+export const probeNotAttempted = (): string => probeOutcome("probeNotAttempted");
 
 /**
  * An exit-latency above this many microseconds makes an idle state deep. The runner writes the
@@ -84,6 +86,9 @@ export interface ProbeRtSafety {
   readonly threadViolations?: number;
   readonly processErrors?: number;
   readonly events?: readonly string[];
+  /** D20: the threads the plugin started, and what other threads did while the audio thread was armed (a figure). */
+  readonly ownThreads?: number;
+  readonly otherThreads?: { readonly allocations: number; readonly locks: number; readonly syscalls: number };
 }
 
 export interface ProbeNoteSweep {
@@ -301,7 +306,15 @@ function readRtSafety(v: unknown, where: string): ProbeRtSafety {
     ...optional("threadViolations", optCount(o, "threadViolations", where)),
     ...optional("processErrors", optCount(o, "processErrors", where)),
     ...optional("events", events),
+    ...optional("ownThreads", optCount(o, "ownThreads", where)),
+    ...optional("otherThreads", o["otherThreads"] === undefined ? undefined : readOtherThreads(o["otherThreads"], `${where} otherThreads`)),
   };
+}
+
+function readOtherThreads(v: unknown, where: string): { allocations: number; locks: number; syscalls: number } {
+  const o = record(v, where);
+  const n = (k: string): number => optCount(o, k, where) ?? invalid(`${where} has no ${k}`);
+  return { allocations: n("allocations"), locks: n("locks"), syscalls: n("syscalls") };
 }
 
 function readNoteSweep(v: unknown, where: string): ProbeNoteSweep {

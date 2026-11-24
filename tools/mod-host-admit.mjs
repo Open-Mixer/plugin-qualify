@@ -4,6 +4,7 @@
 // One mod-host admission: a fresh `mod-host -n` on its own port, then `add` and `remove` of one plugin on its
 // socket. Prints one JSON line, {installed, steps:[{cmd, resp | died}]}, for src/host-admission.ts to classify. The host
 // is always killed at the end, so the next plugin gets a fresh one.
+import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";

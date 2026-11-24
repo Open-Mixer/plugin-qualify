@@ -12,7 +12,10 @@
 import { totalmem } from "node:os";
 
 import type { ProbeOutput } from "./probe-output.js";
+import { qualificationDomain } from "./qualification-domain.js";
 import { MEMORY_BOUND_EXIT_STATUS, MEMORY_LIMIT_RAM_FRACTION } from "./qualify-declarations.js";
+import { TEXT_CODE, type TextRef } from "./text-codes.js";
+import { probeOutcome, probeSignal } from "./probe-domain.js";
 
 /** How the bound is applied: the runner's data limit on the child. */
 export const MEMORY_BOUND_MECHANISM = "rlimit-data";
@@ -20,14 +23,30 @@ export const MEMORY_BOUND_MECHANISM = "rlimit-data";
 /** How the bound was applied when the runner set it as its cgroup's `memory.max`, which its document says. */
 export const MEMORY_CGROUP_MECHANISM = "cgroup-memory-max";
 
-/** The outcome of a run, and of each of its cells, that outgrew the bound. */
-export const PROBE_OOM = "probe.oom";
+const OUTCOMES_ITEM = "QUALIFICATION_MEMORY_BOUND_OUTCOMES";
 
-/** The runner's own outcome for a child the kernel killed at its cgroup's `memory.max`. */
-export const PROBE_MEMORY_LIMIT = "probe.memory-limit";
+/** The outcome word of the domain in use, read at the first use and kept; a domain with no such word refuses, by the item. */
+let held: { readonly domain: ReturnType<typeof qualificationDomain>; readonly word: string } | undefined;
+
+/**
+ * The outcome of a run, and of each of its cells, that outgrew the bound plugin-qualify put on it: the one word of
+ * QUALIFICATION_MEMORY_BOUND_OUTCOMES of the qualification domain.
+ */
+export function probeOom(): string {
+  const domain = qualificationDomain();
+  if (held?.domain !== domain) {
+    const words = domain.words(OUTCOMES_ITEM);
+    if (words.length !== 1) throw new Error(`${OUTCOMES_ITEM}: the document holds ${words.length} words, and plugin-qualify writes one`);
+    held = { domain, word: words[0] as string };
+  }
+  return held.word;
+}
+
+/** The runner's own outcome for a child the kernel killed at its cgroup's `memory.max`: the probe domain's word titled `probeMemoryLimit`. */
+export const probeMemoryLimit = (): string => probeOutcome("probeMemoryLimit");
 
 /** Whether an outcome says a run outgrew its memory limit, by either bound. */
-export const isOutOfMemory = (outcome: string): boolean => outcome === PROBE_OOM || outcome === PROBE_MEMORY_LIMIT;
+export const isOutOfMemory = (outcome: string): boolean => outcome === probeOom() || outcome === probeMemoryLimit();
 
 export interface MemoryBound {
   readonly bytes: number;
@@ -37,12 +56,12 @@ export interface MemoryBound {
 const UNITS: Readonly<Record<string, number>> = { "": 1, K: 2 ** 10, M: 2 ** 20, G: 2 ** 30, T: 2 ** 40 };
 
 /** `off`, a number of bytes, or one with a K, M, G or T suffix (powers of two: K is 2 ** 10 bytes). */
-export function parseMemoryLimit(text: string): { ok: true; bytes: number | "off" } | { ok: false; error: string } {
+export function parseMemoryLimit(text: string): { ok: true; bytes: number | "off" } | { ok: false; error: TextRef } {
   const t = text.trim();
   if (t === "off") return { ok: true, bytes: "off" };
   const m = /^(\d+)([KMGT]?)(?:i?B)?$/i.exec(t);
   const bytes = m === null ? NaN : Number(m[1]) * UNITS[m[2]!.toUpperCase()]!;
-  if (!Number.isSafeInteger(bytes) || bytes <= 0) return { ok: false, error: `the memory limit is off, or bytes as 2147483648, 2048M or 2G; "${t}" is neither` };
+  if (!Number.isSafeInteger(bytes) || bytes <= 0) return { ok: false, error: { code: TEXT_CODE.memoryLimitUnread, args: { value: t } } };
   return { ok: true, bytes };
 }
 
@@ -59,7 +78,7 @@ export function memoryBoundOf(setting: number | "off" | undefined, ramBytes?: nu
 
 /** Whether a run under `bound` ended out of memory: the interposer's exit status, or a SIGKILL that was no deadline's. */
 export function outOfMemory(output: ProbeOutput, bound: MemoryBound | undefined): boolean {
-  if (output.run.outcome === PROBE_MEMORY_LIMIT || output.steps.some((s) => s.outcome === PROBE_MEMORY_LIMIT)) return true;
+  if (output.run.outcome === probeMemoryLimit() || output.steps.some((s) => s.outcome === probeMemoryLimit())) return true;
   if (bound === undefined) return false;
-  return output.steps.some((s) => s.exitStatus === MEMORY_BOUND_EXIT_STATUS || (s.signal === "SIGKILL" && s.outcome === "probe.crashed"));
+  return output.steps.some((s) => s.exitStatus === MEMORY_BOUND_EXIT_STATUS || (s.signal === probeSignal("sigkill") && s.outcome === probeOutcome("probeCrashed")));
 }
