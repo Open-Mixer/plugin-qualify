@@ -18,6 +18,7 @@
  */
 import { spawnSync } from "node:child_process";
 
+import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 import type { QualificationRecord } from "./qualification-record.js";
 
 /** The writer command, else `plugin-qualification-db-write` on the PATH; for tests and packagers. */
@@ -40,9 +41,16 @@ export type StoreRun = (tool: StoreTool, args: readonly string[], input?: string
 
 const COMMAND = { write: "plugin-qualification-db-write", read: "plugin-qualification-db" } as const;
 
+/**
+ * The commands check a record's words against a contract directory, OMX_CONTRACT_PATH else the contractdir of
+ * libomx-domain.pc, which only the -devel package ships: unnamed, an installed writer has none and refuses every put. So
+ * they are handed the installed contract directory, the one place a production program reads, unless OMX_CONTRACT_PATH
+ * names one (a test, a developer).
+ */
 export const SPAWNED_STORE: StoreRun = (tool, args, input, env = process.env) => {
   const named = env[tool === "write" ? STORE_WRITE_ENV : STORE_READ_ENV];
-  const r = spawnSync(named !== undefined && named !== "" ? named : COMMAND[tool], args, { encoding: "utf8", timeout: 120_000, maxBuffer: 1 << 30, env: { ...env }, ...(input === undefined ? {} : { input }) });
+  const contract = env.OMX_CONTRACT_PATH !== undefined && env.OMX_CONTRACT_PATH !== "" ? {} : { OMX_CONTRACT_PATH: INSTALLED_CONTRACT_DIR };
+  const r = spawnSync(named !== undefined && named !== "" ? named : COMMAND[tool], args, { encoding: "utf8", timeout: 120_000, maxBuffer: 1 << 30, env: { ...env, ...contract }, ...(input === undefined ? {} : { input }) });
   const missing = (r.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT";
   return { status: r.status, stdout: r.stdout ?? "", stderr: r.stderr ?? "", ...(missing ? { missing } : {}) };
 };
