@@ -20,7 +20,10 @@ describe("no version ceiling on a dependency", () => {
     for (const l of lines) expect(l, l).not.toMatch(/ with |<=? ?[0-9]|=< /);
   });
   it("debian/control's Build-Depends and Depends state floors only", () => {
-    expect(read("debian/control")).not.toMatch(/\(<<|\(<=|\(< /);
+    // a field runs to the next line that starts a field; Breaks and Replaces name what a release dropped, below it
+    const fields = read("debian/control").split(/\n(?=[A-Z][\w-]*:)/).filter((f) => /^(Build-)?Depends:/.test(f));
+    expect(fields.length).toBeGreaterThan(1);
+    for (const f of fields) expect(f).not.toMatch(/\(<<|\(<=|\(< /);
   });
   it("the records package generator writes a floor-only Depends (a source check: its deb arm needs the full dependency tree)", () => {
     const src = read("src/records-package.ts");

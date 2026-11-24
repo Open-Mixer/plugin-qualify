@@ -26,6 +26,10 @@ Depends: ${misc:Depends}, ${shlibs:Depends}, nodejs (>= 18), python3, python3-js
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
 Suggests: mod-host
+# 0.21.0 stopped building the -contract package that shipped the qualification domain before (now plugin-hostd-contract's):
+# an upgrade removes it, its files taken over
+Breaks: plugin-qualify-contract (<< 0.21.0~)
+Replaces: plugin-qualify-contract (<< 0.21.0~)
 Description: find out whether an audio plugin is safe to run live
  A plugin that glitches on stage is worse than one you never installed.
  plugin-qualify takes an LV2 or CLAP plugin and tells you whether it can be

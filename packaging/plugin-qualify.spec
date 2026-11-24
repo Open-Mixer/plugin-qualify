@@ -31,9 +31,11 @@ BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
 Requires: python3
-# the program reads the qualification domain at start-up: plugin-hostd's, shipped by its contract package (a floor only; the
-# package this one shipped the domain in is pruned from the channel, so no relation to it stands here)
+# the program reads the qualification domain at start-up: plugin-hostd's, shipped by its contract package (a floor only)
 Requires: plugin-hostd-contract >= 0.21.0
+# 0.21.0 stopped building the -contract subpackage that shipped the domain before; a host that has it upgrades only when
+# this release declares it gone, else its files conflict with plugin-hostd-contract's
+Obsoletes: plugin-qualify-contract < 0.21.0
 # the LV2 units' words are plugin-db's `lv2` domain (tools/descriptors.py unit_words), shipped by its contract package
 Requires: plugin-db-contract >= 0.5.0
 # the measurer and the LV2 host probe link lilv, and the descriptors read it through python3-lilv

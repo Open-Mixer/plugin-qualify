@@ -69,7 +69,13 @@ describe("the domain is plugin-hostd's: no copy here, packaging names its packag
     const spec = read("packaging/plugin-qualify.spec").split("%changelog")[0]!;
     const control = read("debian/control");
     const rules = read("debian/rules");
-    for (const [name, text] of [["spec", spec], ["control", control], ["rules", rules], ["release.yml", read(".github/workflows/release.yml")]] as const) {
+    // the old package is named once, where the release that dropped it declares it gone: Obsoletes in the spec, Breaks and
+    // Replaces in debian/control, each below 0.21.0, the release that stopped building it (a host holding it upgrades)
+    const declared = [`Obsoletes: ${OLD_PACKAGE} < 0.21.0`, `Breaks: ${OLD_PACKAGE} (<< 0.21.0~)`, `Replaces: ${OLD_PACKAGE} (<< 0.21.0~)`];
+    expect(spec.split("\n").filter((l) => l.includes(OLD_PACKAGE) && !l.startsWith("#"))).toEqual([declared[0]]);
+    expect(control.split("\n").filter((l) => l.includes(OLD_PACKAGE) && !l.startsWith("#"))).toEqual([declared[1], declared[2]]);
+    const undeclared = (text: string) => text.split("\n").filter((l) => !declared.includes(l) && !l.startsWith("#")).join("\n");
+    for (const [name, text] of [["spec", undeclared(spec)], ["control", undeclared(control)], ["rules", rules], ["release.yml", read(".github/workflows/release.yml")]] as const) {
       expect(text, name).not.toContain(OLD_PACKAGE);
       expect(text, name).not.toMatch(/contract\.d\/qualification/);
     }
@@ -77,8 +83,8 @@ describe("the domain is plugin-hostd's: no copy here, packaging names its packag
     expect(control).toMatch(/plugin-hostd-contract \(>= \d+\.\d+\.\d+~\)/);
     expect(spec).not.toMatch(/^%package contract$/m);
     for (const rel of ["Breaks", "Replaces", "Conflicts", "Provides", "Obsoletes"]) {
-      expect(spec, rel).not.toMatch(new RegExp(`^${rel}:.*qualify`, "m"));
-      expect(control, rel).not.toMatch(new RegExp(`^${rel}:.*qualify`, "m"));
+      expect(undeclared(spec), rel).not.toMatch(new RegExp(`^${rel}:.*qualify`, "m"));
+      expect(undeclared(control), rel).not.toMatch(new RegExp(`^${rel}:.*qualify`, "m"));
     }
   });
 });
