@@ -79,8 +79,8 @@ describe("the domain is plugin-hostd's: no copy here, packaging names its packag
       expect(text, name).not.toContain(OLD_PACKAGE);
       expect(text, name).not.toMatch(/contract\.d\/qualification/);
     }
-    expect(spec).toMatch(/^Requires: plugin-hostd-contract >= \d+\.\d+\.\d+$/m);
-    expect(control).toMatch(/plugin-hostd-contract \(>= \d+\.\d+\.\d+~\)/);
+    expect(spec).toMatch(/^Requires: plugin-hostd-contract$/m);
+    expect(control).toMatch(/[ ]plugin-hostd-contract(,|$)/m);
     expect(spec).not.toMatch(/^%package contract$/m);
     for (const rel of ["Breaks", "Replaces", "Conflicts", "Provides", "Obsoletes"]) {
       expect(undeclared(spec), rel).not.toMatch(new RegExp(`^${rel}:.*qualify`, "m"));

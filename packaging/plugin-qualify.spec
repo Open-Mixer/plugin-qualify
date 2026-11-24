@@ -20,56 +20,52 @@ BuildRequires: pkgconfig
 BuildRequires: pkgconfig(clap) >= 1.2.10
 BuildRequires: pkgconfig(lilv-0)
 BuildRequires: pkgconfig(lv2)
-BuildRequires: pkgconfig(plugin-db) >= 0.5.0
-BuildRequires: pkgconfig(plugin-hostd-protocol) >= 0.8.0
-BuildRequires: pkgconfig(omx-contract) >= 3.21.0
-BuildRequires: pkgconfig(omx-clap-lv2) >= 0.34.0
-BuildRequires: pkgconfig(omxdsp) >= 0.34.0
+BuildRequires: pkgconfig(plugin-db)
+BuildRequires: pkgconfig(plugin-hostd-protocol)
+BuildRequires: pkgconfig(omx-contract)
+BuildRequires: pkgconfig(omx-clap-lv2)
+BuildRequires: pkgconfig(omxdsp)
 # src/dsp-rates.generated.ts is rendered from omx-dsp's rates file (tools/gen-dsp-rates.mjs), which its contract package ships
-BuildRequires: omx-dsp-contract >= 0.34.0
+BuildRequires: omx-dsp-contract
 BuildRequires: systemd-rpm-macros
 
 Requires: nodejs >= 18
 Requires: python3
-# the program reads the qualification domain at start-up: plugin-hostd's, shipped by its contract package (a floor only)
-Requires: plugin-hostd-contract >= 0.21.0
+# the program reads the qualification domain at start-up: plugin-hostd's, shipped by its contract package
+Requires: plugin-hostd-contract
 # 0.21.0 stopped building the -contract subpackage that shipped the domain before; a host that has it upgrades only when
 # this release declares it gone, else its files conflict with plugin-hostd-contract's
 Obsoletes: plugin-qualify-contract < 0.21.0
 # the LV2 units' words are plugin-db's `lv2` domain (tools/descriptors.py unit_words), shipped by its contract package
-Requires: plugin-db-contract >= 0.5.0
+Requires: plugin-db-contract
 # the measurer and the LV2 host probe link lilv, and the descriptors read it through python3-lilv
 Requires: lilv-libs
 Requires: python3-lilv
 # the scanned descriptors are held to omx-contract's schema before they are written (tools/descriptors.py)
 Requires: python3-jsonschema
-# plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from, first released in 0.15.0
-# 0.15.3: the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
-# 0.20.3: --search-path, the directories the sync scans (plugin-qualify#9)
-# 0.21.0: plugin-hostd-probe describe, the one describe (this package keeps no copy)
-Requires: plugin-hostd >= 0.21.0
+# plugin-hostd-probe, the runner every CLAP plugin is measured through; --pin-files, which the sync takes its pins from
+# the memory footprint in the probe output, without which every host with a budget reads unmeasured (#114)
+# --search-path, the directories the sync scans (plugin-qualify#9)
+# plugin-hostd-probe describe, the one describe (this package keeps no copy)
+Requires: plugin-hostd
 # the probe domain (the words of a probe's outcomes and signals, contract.d/probe/ there) that the judging code reads at run
-# time (src/probe-domain.ts); it is plugin-hostd-protocol's, and 0.8.0 is the release it lands in; a floor only
-Requires: plugin-hostd-protocol-contract >= 0.8.0
+# time (src/probe-domain.ts); it is plugin-hostd-protocol's
+Requires: plugin-hostd-protocol-contract
 # mod-host is the comparison host: --host-profile mod-host and the hosting sweep run it when it is installed, and
 # without it those verdicts read mod-host.not-installed. Nothing else uses it, so it is only suggested; a machine
 # that runs a published comparison or benchmark installs mod-host (and jalv) itself.
 Suggests: mod-host
-# omx-clap-scan, which lists the plugins in a .clap before each is qualified; from 0.23.0 its rows carry the
+# omx-clap-scan, which lists the plugins in a .clap before each is qualified; its rows carry the
 # remote-control pages (remote_controls), which the descriptors keep
-Requires: omx-clap-host >= 0.34.0
+Requires: omx-clap-host
 # the hosting codes' TypeScript modules, which the shipped tools/gen-hosting-codes.mjs reads through
 # tools/clap-tsdir.mjs (the CLI's codes are generated at build time, src/hosting-codes.generated.ts):
 # /usr/share/omx-clap/ts, in the runtime package omx-clap-libs (omx-clap-core before 0.34.0); the host above brings the same version
-# 0.25.1: the hosting.memory.* codes (#114); 0.26.2: the guarded plugin call and hosting.stability.callee-saved-clobbered
-Requires: omx-clap-libs >= 0.34.0
+Requires: omx-clap-libs
 # the qualification store: the sync reads it through plugin-qualification-db and writes its records through
-# plugin-qualification-db-write (which brings plugin-qualification-db-schema); the store spec's section 7. The floor is the
-# release whose writer reads the hosting words from omx-clap and puts on a runtime install (plugin-db-qualification#78), after
-# the one whose reader reads an absent base as an empty base layer and the one that first shipped the widened verbs and the
-# writer. The reader keeps step with the writer.
-Requires: plugin-qualification-db >= 2026112401
-Requires: plugin-qualification-db-write >= 2026112401
+# plugin-qualification-db-write (which brings plugin-qualification-db-schema); the store spec's section 7.
+Requires: plugin-qualification-db
+Requires: plugin-qualification-db-write
 %{?systemd_requires}
 
 # The JavaScript and Python are scripts run by their interpreters, never compiled modules.

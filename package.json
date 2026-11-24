@@ -106,7 +106,7 @@
     "provenance": true
   },
   "dependencies": {
-    "@openmixer/omx-contract": ">=3.20.2",
+    "@openmixer/omx-contract": "*",
     "ajv": "8.20.0",
     "json-schema-to-ts": "3.1.1"
   }

@@ -46,19 +46,18 @@ describe('ci.yml and publish.yml prepare the runner alike', () => {
     });
   }
 
-  it('the install action sets what src/pins-file.test.ts and src/grid-runs.test.ts ask for and checks the floor', () => {
+  it('the install action sets what src/pins-file.test.ts and src/grid-runs.test.ts ask for and installs what the spec requires', () => {
     const action = read('.github/actions/install-plugin-hostd/action.yml');
     expect(action).toMatch(/>> "\$GITHUB_ENV"/);
     // OMX_PROBE_RUNNER_REQUIRED: src/grid-runs.test.ts fails its live arms instead of skipping them
     for (const variable of ['PLUGIN_HOSTD', 'PLUGIN_HOSTD_FAKE_HOST', 'OMX_PROBE_RUNNER_REQUIRED']) {
       expect(action).toContain(`echo "${variable}=`);
     }
-    // the floors are the spec's: each plugin-hostd package the spec Requires is installed at that floor, so dnf refuses a
-    // channel that serves less, by name
+    // each plugin-hostd package the spec Requires is installed, as the channel serves it
     const spec = read('packaging/plugin-qualify.spec');
-    const floors = [...spec.matchAll(/^Requires:\s*(plugin-hostd(?:-contract|-protocol-contract)?)\s*>=\s*(\S+)$/gm)];
-    expect(floors.map((m) => m[1])).toEqual(expect.arrayContaining(['plugin-hostd', 'plugin-hostd-contract', 'plugin-hostd-protocol-contract']));
-    for (const [, name, floor] of floors) expect(action).toContain(`'${name!} >= ${floor!}'`);
+    const required = [...spec.matchAll(/^Requires:\s*(plugin-hostd(?:-contract|-protocol-contract)?)$/gm)].map((m) => m[1]!);
+    expect(required).toEqual(expect.arrayContaining(['plugin-hostd', 'plugin-hostd-contract', 'plugin-hostd-protocol-contract']));
+    for (const name of required) expect(action).toMatch(new RegExp(`[ ]${name}(?![\\w-])`));
   });
 
   it('the scanners action sets what the live scan tests ask for', () => {

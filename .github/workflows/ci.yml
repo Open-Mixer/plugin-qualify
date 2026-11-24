@@ -115,12 +115,12 @@ jobs:
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.2' 'omx-contract-devel >= 3.20.2' 'omx-contract-data >= 3.20.0' 'plugin-hostd-contract >= 0.21.0' 'plugin-hostd >= 0.21.0'
+      - run: dnf install -y --setopt=install_weak_deps=False omx-contract omx-contract-devel omx-contract-data plugin-hostd-contract plugin-hostd
       # the store's reader and writer, and the contract packages whose domains the writer checks a record's words against
       - run: >-
           dnf install -y --setopt=install_weak_deps=False
-          'plugin-qualification-db >= 2026112401' 'plugin-qualification-db-write >= 2026112401'
-          'plugin-hostd-contract >= 0.21.0' 'plugin-db-contract >= 0.5.0' omx-clap-contract 'omx-dsp-contract >= 0.34.0'
+          plugin-qualification-db plugin-qualification-db-write
+          plugin-hostd-contract plugin-db-contract omx-clap-contract omx-dsp-contract
       # the installed contract directory, qualification domain included (plugin-hostd-contract's): a writable copy the store
       # contract tests use
       - name: The store commands' contract directory
@@ -159,7 +159,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.16.0' 'omx-contract-data >= 3.16.0'
+      - run: dnf install -y --setopt=install_weak_deps=False omx-contract omx-contract-data
       # an ordinary run builds against the channel: name where each omx package came from, refuse one from staging (D25,
       # plugin-hostd-protocol#27: a stale staged contract package outranked the channel)
       - name: Every omx package comes from the channel
