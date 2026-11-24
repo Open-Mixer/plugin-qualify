@@ -1,0 +1,608 @@
+{
+  "qualify.descriptor.duplicate-symbol": {
+    "args": [
+      "symbol"
+    ],
+    "en": "Two ports of this plugin share the symbol {symbol}, so neither can be addressed by it; the plugin is not described."
+  },
+  "qualify.compare.host-not-installed": {
+    "args": [
+      "program"
+    ],
+    "en": "{program} is not installed"
+  },
+  "qualify.compare.host-did-not-start": {
+    "args": [
+      "program"
+    ],
+    "en": "{program} did not start"
+  },
+  "qualify.compare.host-not-asked": {
+    "args": [],
+    "en": "not asked for with --hosts"
+  },
+  "qualify.compare.host-did-not-run": {
+    "args": [
+      "program"
+    ],
+    "en": "{program} did not run"
+  },
+  "qualify.compare.format-not-taken": {
+    "args": [
+      "program",
+      "format"
+    ],
+    "en": "{program} takes no {format} plugin"
+  },
+  "qualify.compare.rt-not-reported": {
+    "args": [],
+    "en": "no process of the host reported (rt_watch.so was not loaded, or the host was gone)"
+  },
+  "qualify.compare.rt-no-callback": {
+    "args": [],
+    "en": "no process of the host set a JACK process callback that rt_watch.so could wrap"
+  },
+  "qualify.compare.rt-no-warm-up": {
+    "args": [],
+    "en": "the process callback never ran past its warm-up"
+  },
+  "qualify.compare.rt-trylocks-only": {
+    "args": [
+      "trylocks",
+      "cycles"
+    ],
+    "en": "{trylocks} try-locks on the audio thread over {cycles} cycles; a try-lock never waits"
+  },
+  "qualify.compare.rt-unsafe": {
+    "args": [
+      "cycles",
+      "allocations",
+      "locks",
+      "syscalls"
+    ],
+    "en": "on the audio thread over {cycles} cycles: {allocations} allocations, {locks} locks, {syscalls} system calls"
+  },
+  "qualify.compare.load-host-ended": {
+    "args": [
+      "died"
+    ],
+    "en": "the host ended ({died})"
+  },
+  "qualify.compare.load-resp": {
+    "args": [
+      "resp"
+    ],
+    "en": "resp {resp}"
+  },
+  "qualify.compare.load-timeout": {
+    "args": [],
+    "en": "no answer in time"
+  },
+  "qualify.compare.not-loaded": {
+    "args": [],
+    "en": "it did not load"
+  },
+  "qualify.compare.no-port": {
+    "args": [],
+    "en": "no port of the plugin appeared on the graph"
+  },
+  "qualify.compare.not-running": {
+    "args": [],
+    "en": "it is not running"
+  },
+  "qualify.compare.no-audio-output": {
+    "args": [],
+    "en": "the plugin has no audio output"
+  },
+  "qualify.compare.output-not-finite": {
+    "args": [
+      "count"
+    ],
+    "en": "the output is not finite ({count} NaN or infinite samples)"
+  },
+  "qualify.compare.no-stimulus-silent": {
+    "args": [],
+    "en": "no stimulus this plugin takes (no audio or MIDI input), and its output was silent"
+  },
+  "qualify.compare.silent-under-stimulus": {
+    "args": [
+      "stimulus"
+    ],
+    "en": "silent under {stimulus}"
+  },
+  "qualify.compare.cycles-not-run": {
+    "args": [],
+    "en": "the cycles did not run"
+  },
+  "qualify.compare.cycle-host-ended": {
+    "args": [
+      "cycle",
+      "died"
+    ],
+    "en": "the host ended at cycle {cycle} ({died})"
+  },
+  "qualify.compare.cycle-failed": {
+    "args": [
+      "cycle"
+    ],
+    "en": "cycle {cycle} failed"
+  },
+  "qualify.compare.cycle-failed-at": {
+    "args": [
+      "cycle",
+      "step"
+    ],
+    "en": "cycle {cycle} failed at {step}"
+  },
+  "qualify.compare.soak-host-ended": {
+    "args": [
+      "died"
+    ],
+    "en": "the host ended during the soak ({died})"
+  },
+  "qualify.compare.soak-ended": {
+    "args": [],
+    "en": "the host ended during the soak"
+  },
+  "qualify.compare.latency-port-observable": {
+    "args": [],
+    "en": "the host sets a JACK latency callback: the plugin's latency is on its output port's capture range"
+  },
+  "qualify.compare.latency-hostd-port-observable": {
+    "args": [],
+    "en": "its worker (omx-clap-host) sets a JACK latency callback"
+  },
+  "qualify.compare.latency-not-observable-mod-host": {
+    "args": [],
+    "en": "mod-host sets no JACK latency callback, so a plugin's latency is not on its ports"
+  },
+  "qualify.compare.latency-unreadable": {
+    "args": [],
+    "en": "the output port's latency could not be read"
+  },
+  "qualify.compare.skipped-reason": {
+    "args": [
+      "reason"
+    ],
+    "en": "skipped: {reason}"
+  },
+  "qualify.compare.does-better-on": {
+    "args": [
+      "host",
+      "count",
+      "detail"
+    ],
+    "en": "{host} does better on {count}: {detail}"
+  },
+  "qualify.compare.beat-description": {
+    "args": [
+      "id",
+      "on",
+      "over"
+    ],
+    "en": "{id} ({on} over {over})"
+  },
+  "qualify.compare.not-publishable-with-missing": {
+    "args": [
+      "missing"
+    ],
+    "en": "not publishable: {missing}"
+  },
+  "qualify.compare.not-publishable-no-flag": {
+    "args": [],
+    "en": "not publishable (no --publish)"
+  },
+  "qualify.pin.hostd-not-installed": {
+    "args": [],
+    "en": "plugin-hostd is not installed: the files of a pin are plugin-hostd's to name"
+  },
+  "qualify.pin.hostd-no-pin-files": {
+    "args": [],
+    "en": "this plugin-hostd has no --pin-files (plugin-hostd 0.15.0 or later names the files of a pin)"
+  },
+  "qualify.pin.hostd-exited": {
+    "args": [
+      "status"
+    ],
+    "en": "plugin-hostd --pin-files exited {status}"
+  },
+  "qualify.pin.hostd-no-root-or-file": {
+    "args": [],
+    "en": "plugin-hostd --pin-files printed no root or no file"
+  },
+  "qualify.pin.file-unreadable": {
+    "args": [
+      "error"
+    ],
+    "en": "a file plugin-hostd names cannot be read: {error}"
+  },
+  "qualify.cli.unknown-option": {
+    "args": [
+      "option"
+    ],
+    "en": "unknown option {option}"
+  },
+  "qualify.cli.unknown-argument": {
+    "args": [
+      "argument"
+    ],
+    "en": "unknown argument {argument}"
+  },
+  "qualify.cli.needs-value": {
+    "args": [
+      "option"
+    ],
+    "en": "{option} needs a value"
+  },
+  "qualify.cli.is-needed": {
+    "args": [
+      "option"
+    ],
+    "en": "{option} is needed"
+  },
+  "qualify.cli.whole-above-zero": {
+    "args": [
+      "option"
+    ],
+    "en": "{option} takes a whole number above 0"
+  },
+  "qualify.cli.format-one-of": {
+    "args": [
+      "formats"
+    ],
+    "en": "--format must be one of {formats}"
+  },
+  "qualify.cli.format-text-or-json": {
+    "args": [],
+    "en": "--format is text or json"
+  },
+  "qualify.cli.option-problem": {
+    "args": [
+      "option",
+      "problem"
+    ],
+    "en": "{option}: {problem}"
+  },
+  "qualify.cli.all-takes-no-targets": {
+    "args": [],
+    "en": "--all takes no plugin targets"
+  },
+  "qualify.cli.all-with-targets": {
+    "args": [],
+    "en": "--all and named plugins do not go together"
+  },
+  "qualify.cli.name-target": {
+    "args": [],
+    "en": "name a plugin (URI or .lv2 bundle) or pass --all"
+  },
+  "qualify.cli.rates-list": {
+    "args": [],
+    "en": "--rates must be positive integers, comma-separated"
+  },
+  "qualify.cli.quanta-list": {
+    "args": [],
+    "en": "--quanta must be positive integers, comma-separated"
+  },
+  "qualify.cli.two-grids": {
+    "args": [],
+    "en": "--grid-hosts and --grid name two grids; give one"
+  },
+  "qualify.cli.cells-budget": {
+    "args": [],
+    "en": "--cells-per-plugin-budget must be a whole number, 0 or more"
+  },
+  "qualify.cli.blocks": {
+    "args": [],
+    "en": "--blocks must be a whole number, 1 or more"
+  },
+  "qualify.cli.pins-file": {
+    "args": [],
+    "en": "--pins needs a file name"
+  },
+  "qualify.adjust.options-only": {
+    "args": [
+      "argument"
+    ],
+    "en": "{argument}: adjust takes options only; the records are read from --qualification-dir"
+  },
+  "qualify.adjust.now-seconds": {
+    "args": [],
+    "en": "--now must be UTC seconds, a whole number"
+  },
+  "qualify.adjust.name-history": {
+    "args": [],
+    "en": "name the history file with --history"
+  },
+  "qualify.here.config-file": {
+    "args": [],
+    "en": "--config takes a file"
+  },
+  "qualify.compare.hosts-list": {
+    "args": [
+      "hosts"
+    ],
+    "en": "--hosts takes a list of {hosts}"
+  },
+  "qualify.compare.hosts-list-bad": {
+    "args": [
+      "hosts",
+      "bad"
+    ],
+    "en": "--hosts takes a list of {hosts}; not a host: {bad}"
+  },
+  "qualify.compare.name-targets": {
+    "args": [],
+    "en": "name the plugins (LV2 URIs, bundles or .clap files) or --all"
+  },
+  "qualify.compare.publish-needs": {
+    "args": [],
+    "en": "--publish writes a summary for the records: it needs --out, --host-class and --set"
+  },
+  "qualify.compare.publish-hosts": {
+    "args": [
+      "hosts"
+    ],
+    "en": "--publish compares against {hosts}: --hosts must name them"
+  },
+  "qualify.compare.one-directory": {
+    "args": [],
+    "en": "one directory"
+  },
+  "qualify.compare.name-directory": {
+    "args": [],
+    "en": "name the directory of the comparison records"
+  },
+  "qualify.compare.publish-needs-set": {
+    "args": [],
+    "en": "--publish needs --host-class and --set"
+  },
+  "qualify.grid.part-unknown": {
+    "args": [
+      "part"
+    ],
+    "en": "the grid is hosts, full, or cells as <rate>/<quantum>, comma-separated; \"{part}\" is none of them"
+  },
+  "qualify.memory.limit-unread": {
+    "args": [
+      "value"
+    ],
+    "en": "the memory limit is off, or bytes as 2147483648, 2048M or 2G; \"{value}\" is neither"
+  },
+  "qualify.adapter.no-version": {
+    "args": [
+      "tool"
+    ],
+    "en": "{tool} --version names no version, so a run could not say which host it was under"
+  },
+  "qualify.judge.name-probe-output": {
+    "args": [],
+    "en": "name at least one probe output"
+  },
+  "qualify.judged.name-one-record": {
+    "args": [],
+    "en": "name one record"
+  },
+  "qualify.judged.machine-class": {
+    "args": [],
+    "en": "--machine-class is required"
+  },
+  "qualify.records.name-directory": {
+    "args": [],
+    "en": "name a qualification directory or a run root"
+  },
+  "qualify.records.package-word": {
+    "args": [
+      "what",
+      "value"
+    ],
+    "en": "{what} {value}: a package name holds lowercase letters, digits, + - and . only"
+  },
+  "qualify.records.cell-unread": {
+    "args": [
+      "cell"
+    ],
+    "en": "--cell {cell} is not <rate>/<quantum>"
+  },
+  "qualify.records.cell-one-directory": {
+    "args": [],
+    "en": "--cell names the cell of one directory; name one"
+  },
+  "qualify.records.version-unread": {
+    "args": [
+      "version"
+    ],
+    "en": "--version {version} is not a Debian version"
+  },
+  "qualify.judged.schema-other": {
+    "args": [
+      "schema",
+      "expected"
+    ],
+    "en": "record schema {schema} is not {expected}"
+  },
+  "qualify.judged.no-verdict": {
+    "args": [
+      "host"
+    ],
+    "en": "no verdict under {host}"
+  },
+  "qualify.judged.no-verdict-format": {
+    "args": [
+      "format"
+    ],
+    "en": "no verdict under a host for {format}"
+  },
+  "qualify.judged.not-measured": {
+    "args": [
+      "host",
+      "deciding"
+    ],
+    "en": "{host}: not measured ({deciding})"
+  },
+  "qualify.judged.no-probe-version": {
+    "args": [],
+    "en": "the record names no plugin-hostd-probe version"
+  },
+  "qualify.judged.no-rules": {
+    "args": [],
+    "en": "the record states no rules, and no judgedBy was given"
+  },
+  "qualify.records.left-unmeasured": {
+    "args": [],
+    "en": "unmeasured, never applies"
+  },
+  "qualify.records.left-unreadable": {
+    "args": [],
+    "en": "does not read"
+  },
+  "qualify.records.left-not-record": {
+    "args": [
+      "schema"
+    ],
+    "en": "not a {schema} naming its probe output"
+  },
+  "qualify.records.left-other-cell": {
+    "args": [
+      "cells",
+      "cell"
+    ],
+    "en": "measured at {cells}, not at its set's {cell}"
+  },
+  "qualify.records.left-no-cell": {
+    "args": [
+      "cell"
+    ],
+    "en": "measured at no cell, not at its set's {cell}"
+  },
+  "qualify.records.left-no-probe-output": {
+    "args": [
+      "file"
+    ],
+    "en": "its probe output {file} is not there"
+  },
+  "qualify.records.left-probe-output-other": {
+    "args": [
+      "file"
+    ],
+    "en": "its probe output {file} is not the copy it names"
+  },
+  "qualify.search-path.no-key": {
+    "args": [
+      "key"
+    ],
+    "en": "plugin-hostd --search-path printed no {key} with its source"
+  },
+  "qualify.search-path.no-effective": {
+    "args": [],
+    "en": "plugin-hostd --search-path printed no effective lv2 and clap lists"
+  },
+  "qualify.search-path.no-hostd": {
+    "args": [],
+    "en": "plugin-hostd is not installed: the directories scanned are the ones plugin-hostd searches"
+  },
+  "qualify.search-path.unsupported": {
+    "args": [],
+    "en": "this plugin-hostd has no --search-path (plugin-hostd 0.20.3 or later names the directories it searches)"
+  },
+  "qualify.search-path.exited": {
+    "args": [
+      "status"
+    ],
+    "en": "plugin-hostd --search-path exited {status}"
+  },
+  "qualify.search-path.from-env": {
+    "args": [
+      "key",
+      "variable",
+      "where"
+    ],
+    "en": "{key} is plugin-hostd's environment ({variable}), not {where}: the running daemon may search other directories; write it in that file"
+  },
+  "qualify.search-path.from-env-own-file": {
+    "args": [
+      "key",
+      "variable"
+    ],
+    "en": "{key} is plugin-hostd's environment ({variable}), not plugin-hostd's own settings file: the running daemon may search other directories; write it there"
+  },
+  "qualify.search-path.from-default": {
+    "args": [
+      "key",
+      "where"
+    ],
+    "en": "{key} is plugin-hostd's default, not {where}: the running daemon may search other directories; write it in that file"
+  },
+  "qualify.search-path.from-default-own-file": {
+    "args": [
+      "key"
+    ],
+    "en": "{key} is plugin-hostd's default, not plugin-hostd's own settings file: the running daemon may search other directories; write it there"
+  },
+  "qualify.sync.no-plugin-listed": {
+    "args": [],
+    "en": "no plugin was listed"
+  },
+  "qualify.sync.no-document": {
+    "args": [],
+    "en": "the measurement wrote no document"
+  },
+  "qualify.descriptor.no-binary-hash": {
+    "args": [
+      "plugin"
+    ],
+    "en": "{plugin}: no SHA-256 of its binary"
+  },
+  "qualify.descriptor.binary-unreadable": {
+    "args": [
+      "path",
+      "error"
+    ],
+    "en": "{path}: {error}"
+  },
+  "qualify.descriptor.no-units-sheet": {
+    "args": [
+      "places"
+    ],
+    "en": "no omx-contract units sheet at {places}"
+  },
+  "qualify.descriptor.no-schema": {
+    "args": [
+      "places"
+    ],
+    "en": "no omx-contract schema at {places}"
+  },
+  "qualify.descriptor.no-jsonschema": {
+    "args": [],
+    "en": "python3-jsonschema is not installed"
+  },
+  "qualify.descriptor.origin-scanned": {
+    "args": [],
+    "en": "a scanned descriptor carries origin scanned"
+  },
+  "qualify.descriptor.schema-refused": {
+    "args": [
+      "where",
+      "message"
+    ],
+    "en": "{where}: {message}"
+  },
+  "qualify.descriptor.dir-unwritable": {
+    "args": [
+      "directory",
+      "error"
+    ],
+    "en": "{directory}: {error}"
+  },
+  "qualify.descriptor.not-clap-scan": {
+    "args": [],
+    "en": "not a CLAP scan document"
+  },
+  "qualify.judged.files-pin": {
+    "args": [],
+    "en": "--files must be the 64 hex digits of the files pin"
+  },
+  "qualify.judged.layout-form": {
+    "args": [],
+    "en": "--layout must be <scheme>:<sha256>"
+  }
+}

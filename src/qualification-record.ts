@@ -2,13 +2,11 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * The qualification record: what plugin-qualify wrote down about one plugin binary and one offer
- * after judging its probe output, kept in `qualification_dir`. Evidence, not a constraint: no
+ * after judging its probe output, kept in the qualification store. Evidence, not a constraint: no
  * reader refuses a descriptor because of it.
  *
- * Two files, always together. The record is the judgment; beside it is a byte copy of the probe
- * output it judged, because the probe directory is runtime and may be wiped. The record names the
- * copy and the SHA-256 of the copy's bytes, so the facts outlive the run without hostd keeping a
- * second store, and a reader can tell that the figures it holds are the ones the verdict came from.
+ * The record is the judgment. It names the probe output it judged (its file name, SHA-256 and size) as evidence of where
+ * the figures came from; no copy of that output is kept, and every figure a later judge needs is in the record.
  *
  * Not yet in the record: the fingerprint of the descriptor's controls, since the descriptor is
  * written by the scan (stage 5) and plugin-qualify does not read one yet.
@@ -21,13 +19,14 @@ import { join } from "node:path";
 
 import type { Adjustment } from "./history-adjust.js";
 import type { Judgment, RecordReason } from "./probe-judge.js";
-import { sha256Hex, PROBE_NOT_ATTEMPTED, PROBE_OK, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
+import { sha256Hex, probeNotAttempted, probeOk, type ProbeGridPoint, type ProbeOutput } from "./probe-output.js";
 import type { VoicesHeld } from "./measurement/format.js";
 import { packageOwnerOf, type PackageOwner } from "./package-owner.js";
 import { writeFileWhole } from "./whole-file.js";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { qualificationDomain } from "./qualification-domain.js";
 import { judgementRules, latencyMsOf, LATENCY_LINE_MS } from "./judgement-line.js";
+import { probeOutcome } from "./probe-domain.js";
 
 export const QUALIFICATION_RECORD_SCHEMA = "plugin-qualify.qualification-record/1";
 
@@ -162,7 +161,7 @@ export interface UnmeasuredFigure {
  */
 export function unmeasuredFigures(output: ProbeOutput): readonly UnmeasuredFigure[] {
   return output.steps
-    .filter((s) => (s.step === "latency" || s.step === "cost") && s.outcome !== PROBE_OK)
+    .filter((s) => (s.step === "latency" || s.step === "cost") && s.outcome !== probeOk())
     .map((s) => ({
       dimension: s.step as "latency" | "cost",
       ...(s.rate === undefined ? {} : { rate: s.rate }),
@@ -180,8 +179,8 @@ export function unmeasuredFigures(output: ProbeOutput): readonly UnmeasuredFigur
  * a plugin with no latency.
  */
 export function latencyNeverTaken(record: Pick<QualificationRecord, "probe" | "measurements">): boolean {
-  if (record.probe?.outcome !== PROBE_OK) return false;
-  const ok = (record.measurements?.grid ?? []).filter((p) => p.outcome === PROBE_OK);
+  if (record.probe?.outcome !== probeOk()) return false;
+  const ok = (record.measurements?.grid ?? []).filter((p) => p.outcome === probeOk());
   if (ok.length === 0) return false;
   if ((record.measurements.unmeasured ?? []).some((u) => u.dimension === "latency")) return false;
   // a point's latency is a figure, or the reason the probe gave for none; `not-attempted` with no step is the older probe's silence
@@ -247,11 +246,11 @@ export function gridPointOf(output: ProbeOutput, p: ProbeGridPoint): RecordGridP
 
 /** The unmeasured word of a cell whose run did not end well, by its outcome code. */
 const outcomeWords = (): Readonly<Record<string, string>> => ({
-  "probe.crashed": word("probeCrashed"),
-  "probe.timeout": word("probeTimeout"),
-  "probe.refused-instantiation": word("refusedInstantiation"),
-  "probe.non-finite-output": word("nonFiniteOutput"),
-  [PROBE_NOT_ATTEMPTED]: word("notAttempted"),
+  [probeOutcome("probeCrashed")]: word("probeCrashed"),
+  [probeOutcome("probeTimeout")]: word("probeTimeout"),
+  [probeOutcome("probeRefusedInstantiation")]: word("refusedInstantiation"),
+  [probeOutcome("probeNonFiniteOutput")]: word("nonFiniteOutput"),
+  [probeNotAttempted()]: word("notAttempted"),
 });
 
 /**
@@ -269,7 +268,7 @@ export function latencyOfCell(output: ProbeOutput, point: ProbeGridPoint): Recor
 
 function unmeasuredOfCell(output: ProbeOutput, point: ProbeGridPoint): UnmeasuredLatency {
   const code = HOSTING_CODE.latencyUnmeasured;
-  if (point.outcome !== PROBE_OK) return { unmeasuredReason: outcomeWords()[point.outcome] ?? word("probeError"), code };
+  if (point.outcome !== probeOk()) return { unmeasuredReason: outcomeWords()[point.outcome] ?? word("probeError"), code };
   const step = output.steps.find((st) => st.step === "latency" && st.rate === point.rate && (st.quantum === undefined || st.quantum === point.quantum));
   if (step === undefined) return { unmeasuredReason: word("notAttempted"), code };
   const said = step.detail?.split(":")[0]?.trim() ?? "";
@@ -353,6 +352,13 @@ export interface QualificationRecord {
   /** The plugin's version when it was tested; a newer installed one is shown as "tested on X, installed Y". */
   readonly testedVersion?: string;
   readonly binary: ProbeOutput["binary"];
+  /**
+   * The host extensions the run offered a CLAP plugin (the probe output's `offer.clapExtensions`): a profile is judged
+   * only against the extensions it offers, so the row judge reads them from here. Present on a CLAP record whose probe
+   * reached the offer, empty when none was offered; absent on an LV2 record, and on a CLAP record whose probe crashed or
+   * timed out first: absent is "not measured", never an empty set.
+   */
+  readonly hostExtensions?: readonly string[];
   /**
    * The installed package the binary came from (format, name, version, release, distro, arch), read from the package
    * manager's owner of `binary.path` when the record was written: null when no package owns it or a field is not stated.
@@ -521,6 +527,32 @@ export const verdictRows = (judgment: Judgment): RecordVerdict[] =>
     reasons: h.reasons,
   }));
 
+const byBytes = (a: string, b: string): number => Buffer.compare(Buffer.from(a), Buffer.from(b));
+
+/**
+ * The binary as the store holds it (the store spec's section 3.7): its path below the install root, never an absolute one,
+ * and the list of files in ascending byte order of their paths. The key is the entry at that path, which the probe
+ * output already names. The sync puts its records in this form; a record the `judge` command writes to a directory keeps
+ * the path the probe measured.
+ */
+export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
+  const files = [...b.files].sort((x, y) => byBytes(x.path, y.path));
+  const below = b.path.startsWith("/") ? b.path.slice(b.path.lastIndexOf("/") + 1) : b.path;
+  // a probe that named the bundle (not its binary) leaves the path no entry of the list: the binary is the entry of the key
+  const path = files.some((f) => f.path === below) ? below : (files.find((f) => f.sha256 === b.sha256)?.path ?? below);
+  return { ...b, path, files };
+}
+
+/**
+ * The record as the store takes it: its binary in the store's form (`storedBinary`), the list of what was not measured
+ * always present (empty when nothing was left out), and without `provenance`, which is its set's and which a layer's own
+ * record has none of. Every other field the record carries has a column.
+ */
+export function storedForm(record: QualificationRecord): QualificationRecord {
+  const { provenance: _set, ...rest } = record;
+  return { ...rest, notMeasured: record.notMeasured ?? [], binary: storedBinary(record.binary) };
+}
+
 export function buildQualificationRecord(
   judgment: Judgment,
   copy: { file: string; sha256: string; bytes: number },
@@ -533,6 +565,7 @@ export function buildQualificationRecord(
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
     binary: o.binary,
+    ...(o.plugin.format === "clap" && o.offer.clapExtensions !== undefined ? { hostExtensions: [...o.offer.clapExtensions] } : {}),
     ...(pkg === undefined ? {} : { package: pkg }),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),

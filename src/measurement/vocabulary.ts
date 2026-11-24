@@ -14,7 +14,7 @@
  * must be able to fall back on the `kind`, which is why the readers below return a term record
  * rather than a bare string.
  *
- * The WORDS are this package's (its `qualification` domain, contract.d/qualification/), read at
+ * The WORDS are plugin-hostd's (its `qualification` domain, contract.d/qualification/), read at
  * start-up from the installed document, in its order: a word is added there, once, and every consumer
  * reads it. What stays here is the prose, keyed by the word, so a word the document adds without a
  * description here, or a description for a word it lacks, is refused at start-up by the item's name.

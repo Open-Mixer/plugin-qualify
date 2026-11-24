@@ -14,12 +14,13 @@ import { afterAll, describe, expect, it } from "vitest";
 import { HOSTING_CODE } from "./hosting-codes.js";
 import { fixtureJson } from "./probe-output-fixtures.js";
 import type { ProbeRun } from "./probe-runner.js";
-import { MEMORY_PASS_NOT_MEASURED, OWED_CODE, OWED_SCHEMA, owedFile, rejudgeRecord } from "./qualify-rejudge.js";
+import { MEMORY_PASS_NOT_MEASURED, OWED_CODE, OWED_SCHEMA, owedFile, rejudgeFromRows } from "./qualify-rejudge.js";
 import type { QualificationRecord } from "./qualification-record.js";
+import { shadowKeyOf } from "./qualification-store.js";
 import { MEMORY_PASS_PROBE_NOTES } from "./qualify-declarations.js";
 import { provenAlone } from "./qualify-isolated.js";
 import { parseSyncArgs, runSync, summaryLine } from "./qualify-sync.js";
-import { CLAP_NOTES, CLAP_RT, FIXTURES, LV2_CLEAN, LV2_CRASHED, LV2_RT, adapterAdmitted, device, owesOf, probeFile, readJson, recordFile, rejudge, removeDevices, row, stored, type Device } from "./qualify-rejudge.support.js";
+import { CLAP_NOTES, CLAP_RT, FIXTURES, LV2_CLEAN, LV2_CRASHED, LV2_RT, adapterAdmitted, device, exportedFixture, owesOf, probeFile, readJson, recordFile, rejudge, removeDevices, row, stored, type Device } from "./qualify-rejudge.support.js";
 
 afterAll(removeDevices);
 
@@ -44,7 +45,7 @@ describe("--rejudge: a record judged unsuitable for RT violations", () => {
     expect(provenAlone(d.record(CLAP_RT))).toBe(false);
 
     const alone = { started: true, added: true, alive: true, workers: 1, instancesInWorker: 1, latencyFrames: 128, cpuPercent: 3, xruns: 0, finite: true, silent: false };
-    const done = await runSync(d.settings, { isolatedOnly: true, isolatedRunner: () => alone, env: {}, log: () => {} });
+    const done = await runSync(d.settings, { qualificationStore: d.store, isolatedOnly: true, isolatedRunner: () => alone, env: {}, log: () => {} });
     expect(done?.isolatedOnly).toEqual({ isolated: 1, refused: 0, notRun: 0 });
     expect(provenAlone(d.record(CLAP_RT))).toBe(true);
     await rejudge(d);
@@ -103,21 +104,19 @@ describe("--rejudge: a finished isolated step owes nothing", () => {
 });
 
 describe("--rejudge: what it says about itself", () => {
-  it("names who took the figures and when, and leaves the figures, the probe copy and their provenance as they were", async () => {
+  it("names who took the figures and when, and leaves the figures, the probe evidence and their provenance as they were", async () => {
     const d = device([CLAP_RT]);
-    const was = stored(CLAP_RT);
-    const copy = readFileSync(join(d.dir, probeFile(CLAP_RT)));
+    const was = exportedFixture(CLAP_RT).record;
     await rejudge(d);
     const r = d.record(CLAP_RT);
     expect(r.rejudged).toMatchObject({ figures: { tool: { runner: "plugin-hostd-probe 0.13.1", child: "clap-qualify" }, measuredAt: was.measuredAt } });
-    expect(r.rejudged!.figures.runId).toBe(readJson<{ run: { id: string } }>(join(d.dir, probeFile(CLAP_RT))).run.id);
+    expect(r.rejudged!.figures.runId).toBe(was.run!.id);
     expect(r.rejudged!.by).toMatch(/^plugin-qualify \d+\.\d+\.\d+/);
     expect(r.measurements).toEqual(was.measurements);
     expect(r.probe).toEqual(was.probe);
     expect(r.tool).toEqual(was.tool);
     expect(r.measuredAt).toBe(was.measuredAt);
     expect(r.notMeasured).toEqual(was.notMeasured);
-    expect(readFileSync(join(d.dir, probeFile(CLAP_RT))).equals(copy)).toBe(true);
   });
 
   it("a verdict with no soak does not read as soaked: the record still says the soak was not measured", async () => {
@@ -199,7 +198,7 @@ describe("--rejudge: a tier lacking its adapter run", () => {
     expect(summary!.rejudge).toEqual({ changed: 1, unchanged: 0, owing: 1 });
     expect(readJson(owedFile(d.settings.stateFile))).toEqual({
       schema: OWED_SCHEMA,
-      owing: [{ plugin: stored(LV2_CLEAN).plugin.id, record: recordFile(LV2_CLEAN), owes: [{ measurement: "adapter-run", host: "omx-clap-host", code: OWED_CODE.adapterRun }] }],
+      owing: [{ plugin: stored(LV2_CLEAN).plugin.id, record: "http://lv2plug.in/plugins/eg-amp (default, f046a60efd45)", owes: [{ measurement: "adapter-run", host: "omx-clap-host", code: OWED_CODE.adapterRun }] }],
     });
     expect(summaryLine(summary!)).toContain("rejudged 1, unchanged 0, owing 1");
   });
@@ -238,44 +237,49 @@ describe("--rejudge: a tier lacking its adapter run", () => {
 describe("--rejudge: what it cannot stand on is left alone", () => {
   it("a plugin whose bytes changed: the record and the pin untouched, a qualification owed", async () => {
     const d = device([CLAP_RT]);
-    const before = readFileSync(join(d.dir, recordFile(CLAP_RT)));
+    const before = JSON.stringify(d.fake.user());
     writeFileSync(join(Object.values(d.state().entries)[0]!.root, "plugin.bin"), "another build");
     const summary = await rejudge(d);
-    expect(readFileSync(join(d.dir, recordFile(CLAP_RT))).equals(before)).toBe(true);
+    expect(JSON.stringify(d.fake.user())).toBe(before);
     expect(d.pins()[0]!.verdict).toBe("refused");
     expect(summary!.rejudge).toEqual({ changed: 0, unchanged: 0, owing: 1 });
     expect(readJson<{ owing: { owes: { code: string }[] }[] }>(owedFile(d.settings.stateFile)).owing[0]!.owes[0]!.code).toBe(OWED_CODE.bytesChanged);
   });
 
-  it("a probe output that is not the copy the record names: the same", async () => {
+  it("a record whose rows lack a figure the judge needs: the same, owing figures-unreadable, and no probe output is looked for", async () => {
     const d = device([CLAP_RT]);
-    const before = readFileSync(join(d.dir, recordFile(CLAP_RT)));
-    writeFileSync(join(d.dir, probeFile(CLAP_RT)), readFileSync(join(d.dir, probeFile(CLAP_RT)), "utf8").replace("\"allocations\"", "\"allocations\" "));
+    const own = d.fake.user()[0]!;
+    const grid = own.record.measurements.grid.map((p) => (p.rtSafety === undefined ? p : { ...p, rtSafety: { ...p.rtSafety, syscalls: undefined } }));
+    d.store.put(shadowKeyOf(own), { ...own.record, measurements: { ...own.record.measurements, grid } });
+    const before = JSON.stringify(d.fake.user());
     await rejudge(d);
-    expect(readFileSync(join(d.dir, recordFile(CLAP_RT))).equals(before)).toBe(true);
+    expect(JSON.stringify(d.fake.user())).toBe(before);
     expect(readJson<{ owing: { owes: { code: string }[] }[] }>(owedFile(d.settings.stateFile)).owing[0]!.owes[0]!.code).toBe(OWED_CODE.figuresUnreadable);
   });
 });
 
 describe("--rejudge: a second run", () => {
-  it("changes nothing: every file the same bytes and the same modification time", async () => {
+  it("changes nothing: no record is put again, and the state, the pins and the list owed keep their bytes and times", async () => {
     const stems = [CLAP_RT, CLAP_NOTES, LV2_RT, LV2_CRASHED, LV2_CLEAN];
     const d = device(stems, { host: "omx-clap-host" });
     await rejudge(d);
-    const paths = [...stems.flatMap((s) => [recordFile(s), probeFile(s)]).map((f) => join(d.dir, f)), d.settings.stateFile, d.settings.pinFile, owedFile(d.settings.stateFile)];
+    const paths = [d.settings.stateFile, d.settings.pinFile, owedFile(d.settings.stateFile)];
     const before = paths.map((p) => [p, readFileSync(p, "utf8"), statSync(p).mtimeMs]);
+    const puts = d.fake.calls.filter((c) => c.startsWith("write put")).length;
+    const records = JSON.stringify(d.fake.user());
     await new Promise((r) => setTimeout(r, 20));
     const summary = await rejudge(d);
     expect(paths.map((p) => [p, readFileSync(p, "utf8"), statSync(p).mtimeMs])).toEqual(before);
+    expect(d.fake.calls.filter((c) => c.startsWith("write put")).length).toBe(puts);
+    expect(JSON.stringify(d.fake.user())).toBe(records);
     expect(summary!.rejudge).toEqual({ changed: 0, unchanged: 5, owing: 4 });
   });
 
   it("the function itself returns the record it was given", () => {
-    const bytes = readFileSync(join(FIXTURES, probeFile(CLAP_RT)));
     const opts = { host: "omx-clap-host", by: "plugin-qualify 9.9.9", at: "2026-10-31T00:00:00.000Z" };
-    const once = rejudgeRecord(stored(CLAP_RT), bytes, opts).record;
+    const once = rejudgeFromRows(exportedFixture(CLAP_RT), opts).record;
     const reread = JSON.parse(JSON.stringify(once)) as QualificationRecord;
-    expect(rejudgeRecord(reread, bytes, { ...opts, at: "2030-01-01T00:00:00.000Z" }).record).toBe(reread);
+    expect(rejudgeFromRows({ ...exportedFixture(CLAP_RT), record: reread }, { ...opts, at: "2030-01-01T00:00:00.000Z" }).record).toBe(reread);
   });
 });
 
@@ -310,7 +314,7 @@ function fakeRunner(id: string, sha: string, format: string, seen: { args: reado
 }
 
 const memoryEnv = { OMX_CLAP_QUALIFY: "/bin/true", OMX_RT_INTERPOSE: "/bin/true", OMX_PROBE_RUNNER: "/bin/true", OMX_LV2_MEASURE: "/bin/true" };
-const memoryPassOf = (d: Device, run: ProbeRun, force = false) => runSync(d.settings, { memoryOnly: true, force, env: memoryEnv, probeRun: run, pinFilesRun: () => ({ status: 1, stdout: "", stderr: "" }) });
+const memoryPassOf = (d: Device, run: ProbeRun, force = false) => runSync(d.settings, { qualificationStore: d.store, memoryOnly: true, force, env: memoryEnv, probeRun: run, pinFilesRun: () => ({ status: 1, stdout: "", stderr: "" }) });
 const idOf = (stem: string): { id: string; sha: string; format: string } => {
   const r = stored(stem);
   return { id: r.plugin.id, sha: r.binary.sha256, format: r.plugin.format };
@@ -321,20 +325,17 @@ describe("--memory-only", () => {
   it("merges the footprint at 48000/128 and 48000/256 and leaves every other figure byte for byte", async () => {
     const d = device([CLAP_RT]);
     const { id, sha, format } = idOf(CLAP_RT);
-    const path = join(d.dir, recordFile(CLAP_RT));
-    const was = readJson(path);
-    const copy = readFileSync(join(d.dir, probeFile(CLAP_RT)));
+    const was = d.record(CLAP_RT);
     expect(was.measurements.grid.map((p) => p.quantum)).toEqual([512]);
     const summary = await memoryPassOf(d, fakeRunner(id, sha, format, []));
     expect(summary!.memoryOnly).toEqual({ measured: 1, already: 0, failed: 0 });
-    const now = readJson(path);
+    const now = d.record(CLAP_RT);
     // the cost figures, as text: the cell they sit in serialises the same, its cost and latency keys untouched
     const asMeasured = JSON.stringify(was.measurements.grid[0]);
     expect(JSON.stringify(now.measurements.grid[0])).toBe(asMeasured);
     expect(JSON.stringify(now.cost)).toBe(JSON.stringify(was.cost));
     expect(JSON.stringify(now.verdicts)).toBe(JSON.stringify(was.verdicts));
     expect(JSON.stringify(now.probe)).toBe(JSON.stringify(was.probe));
-    expect(readFileSync(join(d.dir, probeFile(CLAP_RT))).equals(copy)).toBe(true);
     for (const q of [128, 256]) {
       expect(cell(now, q)).toMatchObject({ outcome: "probe.ok", memory: { ...FOOTPRINT, firstInstanceKb: 950, perInstanceKb: 300 } });
       expect(cell(now, q)!.cost).toBeUndefined();
@@ -399,11 +400,11 @@ describe("--memory-only", () => {
     const { id, sha, format } = idOf(CLAP_RT);
     const seen: { args: readonly string[]; env: Readonly<Record<string, string | undefined>> }[] = [];
     await memoryPassOf(d, fakeRunner(id, sha, format, seen));
-    const after = readFileSync(join(d.dir, recordFile(CLAP_RT)));
+    const after = JSON.stringify(d.fake.user());
     const again = await memoryPassOf(d, fakeRunner(id, sha, format, seen));
     expect(again!.memoryOnly).toEqual({ measured: 0, already: 1, failed: 0 });
     expect(seen.length).toBe(2);
-    expect(readFileSync(join(d.dir, recordFile(CLAP_RT))).equals(after)).toBe(true);
+    expect(JSON.stringify(d.fake.user())).toBe(after);
     await memoryPassOf(d, fakeRunner(id, sha, format, seen), true);
     expect(seen.length).toBe(4);
   });
@@ -422,19 +423,19 @@ describe("--memory-only", () => {
 
     const e = device([CLAP_NOTES]);
     const n = idOf(CLAP_NOTES);
-    const before = readFileSync(join(e.dir, recordFile(CLAP_NOTES)));
+    const before = JSON.stringify(e.fake.user());
     const summary = await memoryPassOf(e, fakeRunner(n.id, n.sha, n.format, [], "none"));
     expect(summary!.memoryOnly).toEqual({ measured: 0, already: 0, failed: 1 });
-    expect(readFileSync(join(e.dir, recordFile(CLAP_NOTES))).equals(before)).toBe(true);
+    expect(JSON.stringify(e.fake.user())).toBe(before);
   });
 
   it("a footprint of other bytes than the record's is not merged", async () => {
     const d = device([CLAP_RT]);
     const { id, format } = idOf(CLAP_RT);
-    const before = readFileSync(join(d.dir, recordFile(CLAP_RT)));
+    const before = JSON.stringify(d.fake.user());
     const summary = await memoryPassOf(d, fakeRunner(id, "a".repeat(64), format, []));
     expect(summary!.memoryOnly!.failed).toBe(1);
-    expect(readFileSync(join(d.dir, recordFile(CLAP_RT))).equals(before)).toBe(true);
+    expect(JSON.stringify(d.fake.user())).toBe(before);
   });
 });
 

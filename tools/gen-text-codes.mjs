@@ -2,18 +2,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /*
- * gen-text-codes.mjs — `src/text-codes.generated.ts`, the codes of schema/codes.json as one `key: code` map
- * and the args each one names, as plain data.
+ * gen-text-codes.mjs — the two files rendered from this package's `qualify` domain (contract.d/qualify/qualify.json, item
+ * QUALIFY_CODES): `schema/codes.json`, the codes in omx-contract's codes shape, and `src/text-codes.generated.ts`, the codes
+ * as one `key: code` map and the args each one names, as plain data.
  *
- * schema/codes.json is where a code, its args and its English source sentence are written, once. The call sites
+ * The domain is where a code, its args and its English source sentence are written, once; schema/codes.json is rendered
+ * from it, byte for byte the file the readers (src/text-catalog.ts, tools/descriptors.py) always read. The call sites
  * (src/compare.ts, src/hostd-pin-files.ts) name a code by its key; they reach it as a generated module rather than a read at
  * import, so every module a public subpath reaches stays free of `node:` imports and bundles for a browser (#134).
  * No sentence is in the generated module: the sentence is read from schema/codes.json where it is rendered
  * (src/text-catalog.ts). The file is committed and checked identical, as src/hosting-codes.generated.ts is.
  *
  * Usage:
- *   node tools/gen-text-codes.mjs --check   # exit 1 if the committed file is stale
- *   node tools/gen-text-codes.mjs --write   # (re)write the committed file
+ *   node tools/gen-text-codes.mjs --check   # exit 1 if a committed file is stale against the domain
+ *   node tools/gen-text-codes.mjs --write   # (re)write the committed files
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -21,8 +23,27 @@ import { fileURLToPath } from 'node:url';
 import { isMain } from '@openmixer/omx-contract/entry';
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-export const SOURCE = join(PKG, 'schema/codes.json');
+export const SOURCE = join(PKG, 'contract.d/qualify/qualify.json');
+export const CODES_OUT = join(PKG, 'schema/codes.json');
 export const OUT = join(PKG, 'src/text-codes.generated.ts');
+
+/** The item the codes are written in, and the problem a domain without it (or with a word missing its sentence) is refused by. */
+export const CODES_ITEM = 'QUALIFY_CODES';
+
+/** The codes file, as the readers read it, rendered from the domain document `domain`: `{ kind, doc, codes }` in the file's order. */
+export function codesFileOf(domain) {
+  const item = domain.components?.schemas?.[CODES_ITEM];
+  if (item === undefined || item['x-kind'] !== 'codes') throw new Error(`${SOURCE}: no ${CODES_ITEM} item of kind codes`);
+  const codes = {};
+  for (const w of item.oneOf) {
+    if (typeof w['x-text'] !== 'string' || !Array.isArray(w['x-args'])) throw new Error(`${SOURCE}: ${w.title} has no x-text or x-args`);
+    codes[w['x-name']] = { code: w.const, ...(w.description === undefined ? {} : { doc: w.description }), text: { en: w['x-text'] }, args: w['x-args'] };
+  }
+  return { kind: 'codes', doc: item.description, codes };
+}
+
+/** The text of schema/codes.json for `domain`. */
+export const codesFileText = (domain) => `${JSON.stringify(codesFileOf(domain), null, 2)}\n`;
 
 /** The generated module's text for the `codes` of a codes file. */
 export function textCodesFile(codes) {
@@ -56,23 +77,33 @@ function main() {
     console.error('usage: node tools/gen-text-codes.mjs --check|--write');
     process.exit(2);
   }
-  const content = textCodesFile(JSON.parse(readFileSync(SOURCE, 'utf8')).codes);
-  let onDisk;
-  try {
-    onDisk = readFileSync(OUT, 'utf8');
-  } catch {
-    onDisk = undefined;
+  const domain = JSON.parse(readFileSync(SOURCE, 'utf8'));
+  const outputs = [
+    [CODES_OUT, codesFileText(domain)],
+    [OUT, textCodesFile(codesFileOf(domain).codes)]
+  ];
+  let stale = 0;
+  for (const [path, content] of outputs) {
+    let onDisk;
+    try {
+      onDisk = readFileSync(path, 'utf8');
+    } catch {
+      onDisk = undefined;
+    }
+    if (mode === '--check') {
+      if (onDisk !== content) {
+        console.error(`gen-text-codes: ${path} is stale against ${SOURCE} — run with --write`);
+        stale++;
+      }
+    } else {
+      if (onDisk !== content) writeFileSync(path, content);
+      console.log(`gen-text-codes: ${onDisk === content ? 'up to date' : 'wrote'} ${path}`);
+    }
   }
   if (mode === '--check') {
-    if (onDisk !== content) {
-      console.error(`gen-text-codes: ${OUT} is stale against ${SOURCE} — run with --write`);
-      process.exit(1);
-    }
+    if (stale > 0) process.exit(1);
     console.log('gen-text-codes: up to date');
-    return;
   }
-  if (onDisk !== content) writeFileSync(OUT, content);
-  console.log(`gen-text-codes: ${onDisk === content ? 'up to date' : 'wrote'} ${OUT}`);
 }
 
 if (isMain(import.meta.url)) main();

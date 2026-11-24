@@ -9,7 +9,7 @@
 # omx-clap-core's LV2 feature provider, the static libomx-clap-lv2 and its header, at the version the
 # packages require, built against the fetched CLAP headers and installed into <dir>/omx-clap-lv2, for a
 # build with no omx-clap-lv2-devel installed. The same checkout's own ts/ (committed, not built) is
-# tools/gen-hosting-codes.mjs's fallback when no omx-clap-core-devel is installed (<dir>/omx-clap-core/ts).
+# tools/gen-hosting-codes.mjs's fallback when no omx-clap-devel is installed (<dir>/omx-clap-core/ts).
 #
 #   fetch-deps.sh <dir> <clap-tag> <plugin-hostd-protocol-tag> <omx-contract-version> <omx-clap-core-version> <omx-dsp-version> <plugin-db-tag>
 set -eu

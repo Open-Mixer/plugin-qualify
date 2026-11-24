@@ -71,3 +71,10 @@ jobs:
         run: npm install -g pnpm@10.33.0
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: node packaging/check-clap-floor.mjs
+
+  pr-fixes-issue:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: Open-Mixer/.github/.github/workflows/pr-fixes-issue.yml@openmixer-v1

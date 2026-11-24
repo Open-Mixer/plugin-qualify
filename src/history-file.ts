@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
- * The running-history file plugin-hostd writes and `plugin-qualify adjust --history` reads (plugin-hostd's `data/history.json`
+ * The running-history file plugin-hostd writes and `plugin-qualify adjust --history` reads (plugin-hostd's `history` domain
  * and `src/history.c`): a header line, then one line per plugin binary and host class,
  *
  *     history <uri> <binary digest> <host class> key=value ...
@@ -13,6 +13,8 @@
  * that grows a key inside history/1 does not blind the qualifier. Nothing here writes the file; only the daemon does.
  */
 
+import { HISTORY_KEYS_ITEM, HistoryDomainError, historyKeys } from "./history-domain.js";
+
 /** The header line of the format this reader knows, plugin-hostd's `PHD_HISTORY_HEADER`. */
 export const HISTORY_HEADER = "# plugin-hostd history/1";
 
@@ -23,29 +25,45 @@ export const HISTORY_RECORD = "history";
 type KeyKind = "count" | "time" | "decimal";
 
 /**
- * PLUGIN_HOSTD_HISTORY_KEYS in the daemon's order, each with the field it fills and how its value is written. The words
- * are plugin-hostd's (`data/history.json`); `history-file.test.ts` holds this table to them.
+ * The keys of a record line, in the daemon's order, each by the title plugin-hostd's `history` domain gives its word, with the
+ * field it fills and how its value is written (the parser's own). The WORD a line spells is the domain's, read at the first use
+ * (src/history-domain.ts): a row here the domain has no word for is refused by name.
  */
-const KEYS: readonly { readonly word: string; readonly field: keyof HistoryCounters; readonly kind: KeyKind }[] = [
-  { word: "first", field: "first", kind: "time" },
-  { word: "last", field: "last", kind: "time" },
-  { word: "windows_solo", field: "windowsSolo", kind: "count" },
-  { word: "windows_grouped", field: "windowsGrouped", kind: "count" },
-  { word: "cpu_p95_solo", field: "cpuP95Solo", kind: "decimal" },
-  { word: "cpu_max_solo", field: "cpuMaxSolo", kind: "decimal" },
-  { word: "pss_mb_solo", field: "pssMbSolo", kind: "decimal" },
-  { word: "xrun_windows_solo", field: "xrunWindowsSolo", kind: "count" },
-  { word: "xrun_windows_grouped", field: "xrunWindowsGrouped", kind: "count" },
-  { word: "crashes_solo", field: "crashesSolo", kind: "count" },
-  { word: "crashes_grouped", field: "crashesGrouped", kind: "count" },
-  { word: "restarts_grouped", field: "restartsGrouped", kind: "count" },
-  { word: "quarantines", field: "quarantines", kind: "count" },
-  { word: "last_crash", field: "lastCrash", kind: "time" },
-  { word: "last_crash_grouped", field: "lastCrashGrouped", kind: "time" },
+const KEYS: readonly { readonly title: string; readonly field: keyof HistoryCounters; readonly kind: KeyKind }[] = [
+  { title: "first", field: "first", kind: "time" },
+  { title: "last", field: "last", kind: "time" },
+  { title: "windowsSolo", field: "windowsSolo", kind: "count" },
+  { title: "windowsGrouped", field: "windowsGrouped", kind: "count" },
+  { title: "cpuP95Solo", field: "cpuP95Solo", kind: "decimal" },
+  { title: "cpuMaxSolo", field: "cpuMaxSolo", kind: "decimal" },
+  { title: "pssMbSolo", field: "pssMbSolo", kind: "decimal" },
+  { title: "xrunWindowsSolo", field: "xrunWindowsSolo", kind: "count" },
+  { title: "xrunWindowsGrouped", field: "xrunWindowsGrouped", kind: "count" },
+  { title: "crashesSolo", field: "crashesSolo", kind: "count" },
+  { title: "crashesGrouped", field: "crashesGrouped", kind: "count" },
+  { title: "restartsGrouped", field: "restartsGrouped", kind: "count" },
+  { title: "quarantines", field: "quarantines", kind: "count" },
+  { title: "lastCrash", field: "lastCrash", kind: "time" },
+  { title: "lastCrashGrouped", field: "lastCrashGrouped", kind: "time" },
 ];
 
-/** The words of the keys this reader knows, in the daemon's order. */
-export const HISTORY_KEY_WORDS: readonly string[] = KEYS.map((k) => k.word);
+/**
+ * The keys with the word each spells, from the domain, in the table's order. A row of the table the domain has no word for is
+ * refused by name; a word the domain adds without a row is a key this reader does not know, kept on the record as such.
+ */
+function keysOfDomain(): readonly { readonly word: string; readonly field: keyof HistoryCounters; readonly kind: KeyKind }[] {
+  const words = historyKeys();
+  return KEYS.map((k) => {
+    const found = words.find((w) => w.title === k.title);
+    if (found === undefined) throw new HistoryDomainError(HISTORY_KEYS_ITEM, `has no word titled ${k.title}`);
+    return { word: found.word, field: k.field, kind: k.kind };
+  });
+}
+
+/** The words of the keys this reader knows, in the daemon's order: the domain's. */
+export function historyKeyWords(): readonly string[] {
+  return keysOfDomain().map((k) => k.word);
+}
 
 /** The figures of one record. A key the line did not carry reads as 0, as the daemon's record starts at 0. */
 export interface HistoryCounters {
@@ -108,6 +126,7 @@ function number(text: string, kind: KeyKind): number | undefined {
 
 /** One record line, or the reason it is outside the grammar. */
 function parseRecord(words: readonly string[]): HistoryRecord | string {
+  const keys = keysOfDomain();
   if (words.length < 4 || words[0] !== HISTORY_RECORD) return `not a ${HISTORY_RECORD} line with a uri, a digest and a host class`;
   const [, uri, digest, hostClass] = words as [string, string, string, string];
   if (!HEX.test(digest)) return `${digest}: not a digest of 64 lowercase hex digits`;
@@ -121,7 +140,7 @@ function parseRecord(words: readonly string[]): HistoryRecord | string {
     const text = word.slice(eq + 1);
     if (seen.has(key)) return `${key}: given twice`;
     seen.add(key);
-    const known = KEYS.find((k) => k.word === key);
+    const known = keys.find((k) => k.word === key);
     if (known === undefined) {
       unknownKeys[key] = text;
       continue;
@@ -130,7 +149,7 @@ function parseRecord(words: readonly string[]): HistoryRecord | string {
     if (v === undefined) return `${key}=${text}: not ${known.kind === "decimal" ? "a decimal" : "a whole number"}, or negative`;
     values[known.field] = v;
   }
-  const counters = Object.fromEntries(KEYS.map((k) => [k.field, values[k.field] ?? 0])) as unknown as HistoryCounters;
+  const counters = Object.fromEntries(keys.map((k) => [k.field, values[k.field] ?? 0])) as unknown as HistoryCounters;
   return { uri, digest, hostClass, ...counters, unknownKeys };
 }
 

@@ -155,30 +155,65 @@ def schema_candidates(env=None):
 
 
 SCHEMA_MAJOR = re.search(r"\d+", DESCRIPTOR_SCHEMA_FLOOR).group(0)
-UNITS_SHEET = os.path.join("formats", "lv2", "units.json")
+LV2_DOMAIN = os.path.join("lv2", "lv2.json")
+OPENMIXER_UNIT_PREFIX = "urn:openmixer:unit#"
+INSTALLED_CONTRACT_DIR = "/usr/share/omx-contract/contract.d"
 
 
-def contract_data_candidates(rel, env=None):
-    """Where one of omx-contract's data files is looked for: in the same omx-contract as each place the schema is,
-    its package's `data/` beside `schema/`, or the contract directory beside the installed schema."""
-    out = []
-    for schema in schema_candidates(env):
-        here = os.path.dirname(schema)
-        out.append(os.path.join(os.path.dirname(here), "data", rel))
-        out.append(os.path.join(here, "contract.d", SCHEMA_MAJOR, "omx-contract", rel))
-    return out
+def contract_dir_candidates(env=None):
+    """Where plugin-db's `lv2` domain is looked for, in order: the directories of OMX_CONTRACT_PATH (a ':' list, the test
+    entry), then the installed contract directory."""
+    env = os.environ if env is None else env
+    return [d for d in env.get("OMX_CONTRACT_PATH", "").split(":") if d] + [INSTALLED_CONTRACT_DIR]
 
 
 def unit_words(env=None):
-    """omx-contract's units sheet as LV2 unit URI -> the word it is spelled by; a unit the sheet gives no word has
-    none here. The sheet is the owner: there is no table of units in this package."""
-    found = [p for p in contract_data_candidates(UNITS_SHEET, env) if os.path.isfile(p)]
+    """plugin-db's `lv2` domain as LV2 unit URI -> the word of omx-contract's PARAM_UNITS it is: each word of LV2_UNIT_IDS
+    names its unit term of LV2_UNITS_TERMS (its `x-from`), whose uri is the unit as an LV2 file writes it; the urn:openmixer:unit#
+    spellings are LV2_OPENMIXER_UNIT_IDS' (by their lower-cased name, see `unit_word`). A unit the domain gives no word has none
+    here. The domain is the owner: there is no table of units in this package."""
+    paths = [os.path.join(d, LV2_DOMAIN) for d in contract_dir_candidates(env)]
+    found = [p for p in paths if os.path.isfile(p)]
     if not found:
-        raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-units-sheet",
-                         places=", ".join(contract_data_candidates(UNITS_SHEET, env)))
-    with open(found[0], encoding="utf-8") as f:
-        terms = json.load(f)["LV2_UNITS_TERMS"]["terms"]
-    return {t["uri"]: t["word"] for t in terms.values() if t.get("kind") == "unit" and "word" in t}
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-units-sheet", places=", ".join(paths))
+    try:
+        with open(found[0], encoding="utf-8") as f:
+            schemas = json.load(f)["components"]["schemas"]
+        terms = {w["const"]: w["x-term"] for w in schemas["LV2_UNITS_TERMS"]["oneOf"]}
+        out = {}
+        for w in schemas["LV2_UNIT_IDS"]["oneOf"]:
+            for ref in w.get("x-from", []):
+                if ref["x-term"] not in terms:
+                    raise KeyError(f"LV2_UNIT_IDS {w['const']} names the term {ref['x-term']}, which LV2_UNITS_TERMS lacks")
+                out[terms[ref["x-term"]]["uri"]] = w["const"]
+        for w in schemas["LV2_OPENMIXER_UNIT_IDS"]["oneOf"]:
+            out[OPENMIXER_UNIT_PREFIX + w["title"]] = w["const"]
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where=found[0], message=str(e)) from e
+    return out
+
+
+def unit_word(uri, words):
+    """The word of `uri` in `words` (unit_words): exact, else a urn:openmixer:unit# spelling by its lower-cased name; None for none."""
+    if uri in words:
+        return words[uri]
+    if uri.startswith(OPENMIXER_UNIT_PREFIX):
+        return words.get(OPENMIXER_UNIT_PREFIX + uri[len(OPENMIXER_UNIT_PREFIX):].lower())
+    return None
+
+
+def meaning_words(env=None):
+    """omx-contract's closed list of control meanings (the schema's `$defs.meaning`), in its order. The schema is the
+    owner: a meaning this package names is held to this list, and there is no list of meanings in this package."""
+    found = [p for p in schema_candidates(env) if os.path.isfile(p)]
+    if not found:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA_MISSING, "qualify.descriptor.no-schema", places=", ".join(schema_candidates(env)))
+    try:
+        with open(found[0], encoding="utf-8") as f:
+            return tuple(json.load(f)["$defs"]["meaning"]["enum"])
+    except (OSError, ValueError, KeyError) as e:
+        raise refused_as(DESCRIPTOR_CODE_SCHEMA, "qualify.descriptor.schema-refused", where="$defs/meaning",
+                         message=f"{found[0]} has no list of meanings ({type(e).__name__})") from e
 
 
 class SchemaValidator:
