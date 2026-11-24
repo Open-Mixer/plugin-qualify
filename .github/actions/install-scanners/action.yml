@@ -1,10 +1,9 @@
 name: Install the scanners the tests read real plugins with
-description: python3-lilv and jsonschema, omx-clap-scan with omx-clap-host's fake plugin, two LV2 plugin packages and jackd, so the scanner goldens and the sync's daemon test run on CI and never skip there.
+description: python3-lilv and jsonschema, omx-clap-scan with omx-clap-host's fake plugin, three LV2 plugin packages and jackd, so the scanner goldens and the sync's daemon test run on CI and never skip there.
 
-# Shared by ci.yml and publish.yml, after install-plugin-hostd (which adds the OpenMixer channel to apt).
-# src/workflows-agree.test.ts fails if a workflow stops using this action. The lilv binding is pure ctypes, so the
-# distribution's python3-lilv serves the setup-python interpreter too: its module file is copied to a directory
-# PYTHONPATH names (not the whole system dist-packages, which carries modules built for another interpreter).
+# Shared by ci.yml and publish.yml, after install-plugin-hostd, in their fedora:45 container with the OpenMixer channel
+# added. src/workflows-agree.test.ts fails if a workflow stops using this action. The tools run under the system
+# python3, which imports the distribution's python3-lilv as it is.
 
 runs:
   using: composite
@@ -13,21 +12,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        sudo apt-get update -qq
-        # jackd2: a dummy JACK server, so the sync's test chains two plugins in a real omx-clap-host worker
-        # mda-lv2: a real instrument for the adapter pass, whose held note a stand-in cannot prove
-        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3-lilv python3-jsonschema zam-plugins calf-plugins mda-lv2 omx-clap-host omx-clap-host-tests jackd2
-        # the descriptor writer holds every scanned descriptor to the schema (tools/descriptors.py): the distribution's
-        # jsonschema serves the system interpreter, and a setup-python interpreter gets its own from pip
-        python3 -c 'import jsonschema' 2>/dev/null || python3 -m pip install --quiet jsonschema
-        python3 -c 'import jsonschema'
+        # jack-audio-connection-kit: a dummy JACK server, so the sync's test chains two plugins in a real omx-clap-host worker
+        # lv2-mdala-plugins: mda.lv2, a real instrument for the adapter pass, whose held note a stand-in cannot prove
+        # time: /usr/bin/time, the peak memory src/lv2-measure-pass-memory.test.ts reads
+        dnf install -y --setopt=install_weak_deps=False python3 python3-lilv python3-jsonschema python3-pytest time \
+          lv2-zam-plugins lv2-calf-plugins lv2-mdala-plugins jack-audio-connection-kit omx-clap-host omx-clap-host-tests
+        python3 -c 'import jsonschema, lilv'
         test -x /usr/bin/omx-clap-scan
         test -f /usr/libexec/omx-clap-host/tests/fake.clap
-        py="$RUNNER_TEMP/pylilv"
-        mkdir -p "$py"
-        cp "$(dpkg -L python3-lilv | grep -m1 '/lilv\.py$')" "$py/lilv.py"
         {
           echo "OMX_CLAP_SCAN=/usr/bin/omx-clap-scan"
           echo "OMX_CLAP_FAKE=/usr/libexec/omx-clap-host/tests/fake.clap"
-          echo "PYTHONPATH=$py"
         } >> "$GITHUB_ENV"

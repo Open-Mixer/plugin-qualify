@@ -21,9 +21,8 @@ describe("the packages name plugin-hostd-protocol-contract at the floor of the p
   it("debian/control depends on it at the same floor", () => {
     expect(CONTROL).toMatch(/plugin-hostd-protocol-contract \(>= 0\.8\.0~\)/);
   });
-  it("the CI install checks the floor on what it installed", () => {
-    expect(ACTION).toContain("dpkg-query -W -f='${Version}' plugin-hostd-protocol-contract");
-    expect(ACTION).toContain("0.8.0");
+  it("the CI install asks for it at the same floor", () => {
+    expect(ACTION).toContain("'plugin-hostd-protocol-contract >= 0.8.0'");
   });
   it("it is a floor only: no relation of another kind names the package", () => {
     for (const text of [SPEC, CONTROL]) expect(text).not.toMatch(/(Breaks|Replaces|Conflicts|Provides):[^\n]*plugin-hostd-protocol-contract/);

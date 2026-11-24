@@ -1,8 +1,11 @@
 name: Build the native tools
 description: The CLAP prober, the LV2 measurer, their interposer and the fixture plugins the tests qualify.
 
-# Shared by ci.yml and publish.yml. deps/ also holds omx-clap's LV2 feature provider at the packages' floor,
-# built for the measurer to link; asan is the measurer under AddressSanitizer, which the leak check runs.
+# Shared by ci.yml and publish.yml, whose jobs run in a fedora:45 container with the OpenMixer channel added. The headers
+# and libraries are the spec's BuildRequires (dnf builddep reads packaging/plugin-qualify.spec), so the suite builds
+# against exactly what the RPM builds against, omx-clap's LV2 feature provider at the packages' floor included; asan is
+# the measurer under AddressSanitizer, which the leak check runs. `make deps` still fetches the omx-clap checkout and
+# lv2_core.h that src/host-profiles.test.ts compares against (no package ships them).
 # src/workflows-agree.test.ts fails if a workflow stops using this action.
 
 runs:
@@ -12,6 +15,6 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        sudo apt-get update -qq
-        sudo apt-get install -y --no-install-recommends liblilv-dev lv2-dev libcjson-dev
+        dnf install -y --setopt=install_weak_deps=False gcc make pkgconf-pkg-config libasan dnf5-plugins
+        dnf builddep -y --setopt=install_weak_deps=False packaging/plugin-qualify.spec
         make -C native deps all asan

@@ -53,13 +53,18 @@ describe('ci.yml and publish.yml prepare the runner alike', () => {
     for (const variable of ['PLUGIN_HOSTD', 'PLUGIN_HOSTD_FAKE_HOST', 'OMX_PROBE_RUNNER_REQUIRED']) {
       expect(action).toContain(`echo "${variable}=`);
     }
-    expect(action).toMatch(/dpkg --compare-versions .* ge 0\.15\.3/);
+    // the floors are the spec's: each plugin-hostd package the spec Requires is installed at that floor, so dnf refuses a
+    // channel that serves less, by name
+    const spec = read('packaging/plugin-qualify.spec');
+    const floors = [...spec.matchAll(/^Requires:\s*(plugin-hostd(?:-contract|-protocol-contract)?)\s*>=\s*(\S+)$/gm)];
+    expect(floors.map((m) => m[1])).toEqual(expect.arrayContaining(['plugin-hostd', 'plugin-hostd-contract', 'plugin-hostd-protocol-contract']));
+    for (const [, name, floor] of floors) expect(action).toContain(`'${name!} >= ${floor!}'`);
   });
 
   it('the scanners action sets what the live scan tests ask for', () => {
     const action = read('.github/actions/install-scanners/action.yml');
-    for (const variable of ['OMX_CLAP_SCAN', 'OMX_CLAP_FAKE', 'PYTHONPATH']) expect(action).toContain(`echo "${variable}=`);
-    expect(action).toMatch(/apt-get install[^\n]*python3-lilv[^\n]*omx-clap-host-tests/);
+    for (const variable of ['OMX_CLAP_SCAN', 'OMX_CLAP_FAKE']) expect(action).toContain(`echo "${variable}=`);
+    expect(action).toMatch(/dnf install[^\n]*python3-lilv[\s\S]*?omx-clap-host-tests/);
   });
 
   it('the test files left out of an ordinary run are the ones the container job runs', () => {

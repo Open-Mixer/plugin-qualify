@@ -27,11 +27,23 @@ jobs:
     name: npm publish
     if: github.repository == 'Open-Mixer/plugin-qualify'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    # the suite needs plugin-hostd 0.21 and its contract packages, which the channel serves for Fedora x86_64 (no amd64
+    # Debian suite carries them): the job runs in a fedora:45 container with the channel added, as root
+    # the suite's private JACK servers each map their segments in /dev/shm, more than a container's default 64 MB
+    container:
+      image: fedora:45
+      options: --shm-size=1g
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: read
       id-token: write
     steps:
+      # git before the checkout, so the tree is a git checkout (src/shipped-scripts-executable.test.ts reads its modes)
+      - run: dnf install -y --setopt=install_weak_deps=False git
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
@@ -49,18 +61,22 @@ jobs:
             test "${{ inputs.dry-run }}" = true
           fi
 
-      - name: Install pnpm
-        run: npm install -g pnpm@10.33.0
+      - name: Add the OpenMixer channel
+        uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
 
-      - name: Install
-        run: pnpm install --frozen-lockfile
-
-      # the same two steps ci.yml runs: the suite on a tag needs what the suite on a branch needs
+      # the same steps ci.yml runs: the suite on a tag needs what the suite on a branch needs. Before the install, so
+      # the build's generators read omx-clap's and omx-dsp's installed data, as the RPM build does
       - uses: ./.github/actions/build-native
 
       - uses: ./.github/actions/install-plugin-hostd
 
       - uses: ./.github/actions/install-scanners
+
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
 
       # leaves out the files of .github/container-tests.txt (vitest.config.ts): they need omx-contract 3.20.0 as a
       # system package, which ci.yml's container-tests job installs and runs them with
