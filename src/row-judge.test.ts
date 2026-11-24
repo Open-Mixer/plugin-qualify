@@ -17,7 +17,7 @@ import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput, type ProbeOutput } from "./probe-output.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
-import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, unmeasuredWordOf, type QualificationRecord } from "./qualification-record.js";
+import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, storedBinary, unmeasuredWordOf, type QualificationRecord } from "./qualification-record.js";
 import { FIXTURES } from "./qualify-rejudge.support.js";
 import { MAPPED_COLUMNS, storeExport } from "./store-export.support.js";
 
@@ -147,8 +147,8 @@ async function firstDifference(e: Entry, omit?: string): Promise<string | undefi
   return undefined;
 }
 
-/** The probe's output as the store exports it: the binary's path below the install root, never the absolute one. */
-const probeWithRelativePath = (o: ProbeOutput): ProbeOutput => ({ ...o, binary: { ...o.binary, path: o.binary.path.slice(o.binary.path.lastIndexOf("/") + 1) } });
+/** The probe's output as the store exports it: the binary in the store's form, its path below the install root. */
+const probeWithRelativePath = (o: ProbeOutput): ProbeOutput => ({ ...o, binary: storedBinary(o.binary) });
 
 /** JSON with its keys in order: two readers of one document may build their objects in another. */
 const canon = (v: unknown): string => JSON.stringify(v, (_k, x) => (x !== null && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));

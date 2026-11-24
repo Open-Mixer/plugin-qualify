@@ -105,7 +105,8 @@ describe("plugin-qualify-records-package", () => {
       schema: "plugin-qualify.distributed-provenance/1",
       set: "test-set-48000-128",
       hostClass: "test-class",
-      cell: { rate: 48000, quantum: 128 },
+      // the store's records check reads the set's cell from the provenance's grid (#141)
+      grid: [{ rate: 48000, quantum: 128 }],
       package: { name: "plugin-db-qualification-test-class-test-set-48000-128", version: "2026.10.29" },
       date: p.date,
     });
@@ -165,7 +166,8 @@ describe("a run of two cells, one package per cell (#317, plugin-db-qualificatio
       readDeb(debOf(c.set), tree);
       const p = JSON.parse(readFileSync(join(tree, "usr", "share", "omx", "qualification", "x86-64", c.set, "provenance.json"), "utf8"));
       expect(p.set).toBe(c.set);
-      expect(p.cell).toEqual({ rate: c.rate, quantum: c.quantum });
+      expect(p.grid).toEqual([{ rate: c.rate, quantum: c.quantum }]);
+      expect(p.cell).toBeUndefined();
     }
   });
 

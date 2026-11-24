@@ -9,8 +9,8 @@
  * the run's root holding `b<rate>-<quantum>/qualification`. The sync reads none of them: it reads the qualification store.
  * Out: one `plugin-db-qualification-<class>-<set>-<rate>-<quantum>_<version>_all.deb` per cell, a package of plugin-db's
  * qualification layer, installing every record of that cell and the probe output it judged under
- * `/usr/share/omx/qualification/<class>/<set>-<rate>-<quantum>/`, beside the set's `provenance.json`, which names the
- * cell. A directory's cell is the one its base is named for (`b48000-512`), else `--cell`, else the one cell every
+ * `/usr/share/omx/qualification/<class>/<set>-<rate>-<quantum>/`, beside the set's `provenance.json`, whose `grid` names
+ * the cell. A directory's cell is the one its base is named for (`b48000-512`), else `--cell`, else the one cell every
  * record's grid holds; a record whose grid does not hold its set's cell stays out, named. A record goes in only with its probe output, byte for byte the copy the record names;
  * an unmeasured record never applies and stays out. The archive is written here, `ar` and two `tar.xz` members, so a
  * machine without dpkg builds it too; the tar members are GNU tar's, owned by root, in name order, at one time.
@@ -360,7 +360,8 @@ function buildRecordsPackage(args: RecordsPackageArgs & { readonly stateDir: str
     schema: DISTRIBUTED_PROVENANCE_SCHEMA,
     set,
     hostClass: args.hostClass,
-    cell: { rate: args.cell.rate, quantum: args.cell.quantum },
+    // the store's records check reads the set's cell here (#141): one cell, the set's
+    grid: [{ rate: args.cell.rate, quantum: args.cell.quantum }],
     package: { name, version },
     date: day.date,
   };
