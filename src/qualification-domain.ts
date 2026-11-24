@@ -8,17 +8,13 @@
  *
  * The document is validated at start-up: it states JSON Schema 2020-12 as its dialect, it is itself a valid schema of
  * that dialect (Ajv), it has the shape of a domain document (`DomainDocument`, derived from `DOMAIN_DOCUMENT_SCHEMA` by
- * `FromSchema`), and its `info.version` is at least the floor this package declares. A missing, invalid or too-old
- * document throws a {@link QualificationDomainError} that names the domain, the place looked and the reason.
+ * `FromSchema`). A missing or invalid document throws a {@link QualificationDomainError} that names the domain, the place looked and the reason.
  */
 import Ajv2020Module from "ajv/dist/2020.js";
 import type { FromSchema } from "json-schema-to-ts";
 
 /** The domain's name, its directory and its file's stem. */
 export const QUALIFICATION_DOMAIN = "qualification";
-
-/** The lowest `info.version` of the domain this package works with: the version its code was written against. */
-export const QUALIFICATION_DOMAIN_FLOOR = "1.1.0";
 
 /** The shape of a domain document that this reader relies on (omx-contract docs/contract-dir.md, "Domains"). */
 // TODO: read the domain-document schema from @openmixer/omx-contract (schema/domain.schema.json, omx-contract 3.20.0; omx-contract#113 is merged, the swap waits for the release): FromSchema over `domainSchema` of @openmixer/omx-contract/domain-schema; drop this const
@@ -78,7 +74,7 @@ export interface DomainWord {
   readonly text: string | undefined;
 }
 
-/** A domain document the package cannot use: absent, unreadable, not valid, or below the floor. */
+/** A domain document the package cannot use: absent, unreadable or not valid. */
 export class QualificationDomainError extends Error {
   constructor(place: string, reason: string) {
     super(`domain "${QUALIFICATION_DOMAIN}" at ${place}: ${reason}`);
@@ -94,14 +90,6 @@ export interface QualificationDomain {
   /** The words of an item with their title, group and English sentence, in the declared order. */
   entries(item: string): readonly DomainWord[];
 }
-
-const semverParts = (v: string): number[] => v.split(".").map(Number);
-const atLeast = (version: string, floor: string): boolean => {
-  const a = semverParts(version);
-  const b = semverParts(floor);
-  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return (a[i] ?? 0) > (b[i] ?? 0);
-  return true;
-};
 
 const Ajv2020 = Ajv2020Module as unknown as typeof Ajv2020Module.default;
 const ajv = new Ajv2020({ strict: false, allErrors: true });
@@ -124,9 +112,6 @@ export function parseQualificationDomain(raw: unknown, place: string): Qualifica
   if (!ajv.validateSchema(doc)) {
     throw new QualificationDomainError(file, `not a valid JSON Schema 2020-12 document: ${ajv.errorsText(ajv.errors)}`);
   }
-  if (!atLeast(doc.info.version, QUALIFICATION_DOMAIN_FLOOR)) {
-    throw new QualificationDomainError(file, `info.version ${doc.info.version} is below the floor ${QUALIFICATION_DOMAIN_FLOOR}`);
-  }
   const itemOf = (item: string) => {
     const schema = doc.components.schemas[item];
     if (schema === undefined) throw new QualificationDomainError(file, `has no item ${item}`);
@@ -145,7 +130,7 @@ let installedReader: (() => QualificationDomain) | undefined;
 
 /**
  * Hands the domain document to this package, validated exactly as the installed file is (`$schema`, Ajv 2020, the
- * shape, the `info.version` floor). A page calls it at start-up with the JSON its server serves, before it uses any
+ * shape). A page calls it at start-up with the JSON its server serves, before it uses any
  * word of the domain (WebAssembly's way, omx-contract docs/runtime-data.md); a Node program that wants another document
  * than the installed one calls it too.
  */

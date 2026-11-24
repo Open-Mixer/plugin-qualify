@@ -120,9 +120,4 @@ describe("the record store's words are items of the qualification domain", () =>
   it("hostAdmission and memory are measurable dimensions", () => {
     for (const w of ["memory", "hostAdmission"]) expect(wordsOf("QUALIFICATION_MEASUREMENT_DIMENSIONS")).toContain(w);
   });
-  it("the domain is a minor above 1.1.0", () => {
-    const [maj, min] = doc.info.version.split(".").map(Number);
-    expect(maj).toBe(1);
-    expect(min).toBeGreaterThanOrEqual(2);
-  });
 });

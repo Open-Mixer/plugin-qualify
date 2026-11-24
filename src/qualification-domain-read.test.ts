@@ -51,16 +51,21 @@ describe("the package reads its words from the installed JSON", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
-  it("a document without $schema, below the floor or absent is refused by name", () => {
+  it("a document is judged by its words, never by its info.version", () => {
+    const old = fixture((d) => void ((d as unknown as { info: { version: string } }).info.version = "0.0.1"));
+    try {
+      expect(openQualificationDomainAt(old).version).toBe("0.0.1");
+    } finally {
+      rmSync(old, { recursive: true, force: true });
+    }
+  });
+  it("a document without $schema or absent is refused by name", () => {
     const noSchema = fixture((d) => void delete (d as { $schema?: string }).$schema);
-    const tooOld = fixture((d) => void ((d as unknown as { info: { version: string } }).info.version = "0.0.1"));
     try {
       expect(() => openQualificationDomainAt(noSchema)).toThrow(/qualification.*\$schema/s);
-      expect(() => openQualificationDomainAt(tooOld)).toThrow(/qualification.*version/s);
       expect(() => openQualificationDomainAt(join(tmpdir(), "no-such-contract-dir"))).toThrow(/qualification.*(absent|not found|no-such)/s);
     } finally {
       rmSync(noSchema, { recursive: true, force: true });
-      rmSync(tooOld, { recursive: true, force: true });
     }
   });
 });
@@ -90,7 +95,6 @@ describe("a page hands the document", () => {
     const { init } = await import("./qualification-domain.js");
     const doc = JSON.parse(readFileSync(join(CONTRACT_DIR, "qualification", "qualification.json"), "utf8"));
     expect(() => init({ ...doc, $schema: undefined })).toThrow(/\$schema/);
-    expect(() => init({ ...doc, info: { ...doc.info, version: "0.0.1" } })).toThrow(/floor/);
   });
   it("refuses a document without info.x-stability, or with a value outside experimental|stable, by name", async () => {
     vi.resetModules();
