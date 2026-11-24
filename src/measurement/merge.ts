@@ -58,6 +58,7 @@ import type {
   RtSafetyMeasurement,
   StabilityMeasurement,
 } from "./format.js";
+import { isUntimedCost } from "./format.js";
 import { sameIntegrity } from "./format.js";
 import { type MeasurementDimension, MEASUREMENT_DIMENSIONS, unmeasuredKind } from "./vocabulary.js";
 
@@ -163,13 +164,18 @@ function resolvedOf<D extends MeasurementDimension>(
   return figures[dimension];
 }
 
+/** The rates of a map that hold a reading: an untimed footprint is none. */
+function timedRates(perRate: Readonly<Record<string, object>>): string[] {
+  return Object.keys(perRate).filter((rate) => !isUntimedCost(perRate[rate]!));
+}
+
 /** Rates a measurement actually carries, ascending. Excluded readings still count as
  *  covered: the rate WAS measured, and the exclusion is the finding. A soak covers the rates
  *  it rendered, an interposer count the one rate it ran at, and a feature list no rate at all. */
 function ratesOf(measurement: AnyMeasurement): number[] {
   const keys =
     "perRate" in measurement
-      ? Object.keys(measurement.perRate)
+      ? timedRates(measurement.perRate)
       : "soak" in measurement && measurement.soak !== undefined
         ? Object.keys(measurement.soak.perRate)
         : "rate" in measurement && measurement.rate !== undefined
@@ -190,8 +196,9 @@ function hasReadings(dimension: MeasurementDimension, measurement: AnyMeasuremen
   if (measurement === undefined) return false;
   switch (dimension) {
     case "latency":
-    case "cost":
       return "perRate" in measurement && Object.keys(measurement.perRate).length > 0;
+    case "cost":
+      return "perRate" in measurement && timedRates((measurement as CostMeasurement).perRate).length > 0;
     case "stability":
       return "lifecycle" in measurement && measurement.lifecycle !== undefined;
     case "rtSafety":

@@ -80,8 +80,9 @@ export const MEASUREMENT_FORMAT_MAJOR = 1;
  *  an instrument's cost was measured with ({@link CostAtRate.voices}); `1.5` the note sweep an instrument's
  *  `run()` was counted under ({@link RtSafetyMeasurement.noteSweep}); `1.6` an instance's memory footprint
  *  beside the cost reading ({@link CostAtRate.memory}), the soak's readings past warm-up
- *  ({@link SoakAtRate.rssAfterWarmupKb}), and a host profile's memory budget ({@link HostBudget.memory}). */
-export const MEASUREMENT_FORMAT_MINOR = 6;
+ *  ({@link SoakAtRate.rssAfterWarmupKb}), and a host profile's memory budget ({@link HostBudget.memory}); `1.7` a rate
+ *  that holds a footprint and no timing ({@link CostUntimedAtRate}), which a 1.6 reader drops. */
+export const MEASUREMENT_FORMAT_MINOR = 7;
 
 /** The version string this build writes, e.g. `"1.0"`. */
 export const MEASUREMENT_FORMAT_VERSION = `${MEASUREMENT_FORMAT_MAJOR}.${MEASUREMENT_FORMAT_MINOR}`;
@@ -349,10 +350,22 @@ export interface CostAtRate {
   readonly memory?: MemoryFootprint;
 }
 
+/** 1.7: a rate whose footprint was taken and whose blocks were not timed, with the reason when the run gave one. */
+export interface CostUntimedAtRate {
+  readonly memory: MemoryFootprint;
+  readonly unmeasuredReason?: string;
+  readonly unmeasuredDetail?: string;
+}
+
+/** True for a rate that holds a footprint and no timing, which is no cost reading. */
+export function isUntimedCost(at: object): at is CostUntimedAtRate {
+  return "memory" in at && !("nsPerSampleMedian" in at);
+}
+
 /** Everything one run learned about one plugin's CPU cost. */
 export interface CostMeasurement {
   /** Readings keyed by sample rate in Hz as a decimal string. May be empty. */
-  readonly perRate: Readonly<Record<string, CostAtRate>>;
+  readonly perRate: Readonly<Record<string, CostAtRate | CostUntimedAtRate>>;
   /** An {@link ../vocabulary.UNMEASURED_TERMS} code, set exactly when {@link perRate} is empty. */
   readonly unmeasuredReason?: string;
   /** The prober's own words for that reason, kept verbatim. See {@link LatencyMeasurement.unmeasuredDetail}. */
@@ -989,7 +1002,7 @@ export function readMemoryFootprint(value: unknown): MemoryFootprint | undefined
   return Object.keys(footprint).length > 0 ? footprint : undefined;
 }
 
-function readCostAtRate(value: unknown): CostAtRate | undefined {
+function readCostAtRate(value: unknown): CostAtRate | CostUntimedAtRate | undefined {
   if (!isRecord(value)) return undefined;
   const nsPerSampleMedian = finiteNumber(value.nsPerSampleMedian);
   const nsPerSamplePercentile = finiteNumber(value.nsPerSamplePercentile);
@@ -1001,7 +1014,8 @@ function readCostAtRate(value: unknown): CostAtRate | undefined {
     blocks === undefined ||
     blockFrames === undefined
   ) {
-    return undefined;
+    const memory = readMemoryFootprint(value.memory);
+    return memory === undefined ? undefined : { ...reasonOf(value), memory };
   }
   return {
     nsPerSampleMedian,
@@ -1028,7 +1042,7 @@ export function readVoicesHeld(value: unknown): VoicesHeld | undefined {
   return { held, basis, ...(capacity !== undefined && Number.isInteger(capacity) && capacity >= 0 ? { capacity } : {}) };
 }
 
-function readCost(value: unknown): CostMeasurement | undefined {
+export function readCost(value: unknown): CostMeasurement | undefined {
   if (!isRecord(value)) return undefined;
   return {
     perRate: readRateMap(value.perRate, readCostAtRate),

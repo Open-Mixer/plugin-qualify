@@ -5,6 +5,7 @@
  * dimensions through the merge: a TRANSLATION with no rule in it, and the same per-plugin,
  * per-DIMENSION precedence `latency` and `cost` obey.
  */
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { buildMeasurementDocument, readMeasurementDocument, serialiseMeasurementDocument } from "./format.js";
 import { mergeMeasurements } from "./merge.js";
@@ -106,7 +107,7 @@ describe("the hosting dimensions through the format and the merge", () => {
 
   it("a v1.1 document round-trips its three blocks through the reader", () => {
     const written = doc("shipped", swept);
-    expect(written.formatVersion).toBe("1.6");
+    expect(written.formatVersion).toBe("1.7");
     const read = readMeasurementDocument(JSON.parse(serialiseMeasurementDocument(written)));
     expect(read.ok).toBe(true);
     if (!read.ok) return;
@@ -196,5 +197,77 @@ describe("the note sweep lv2-measure printed travels in rtSafety (format 1.5)", 
     expect(bad?.rtSafety?.noteSweep?.allocationsInRun).toBeUndefined();
     const [none] = measuredPluginsFromSweep({ measurements: [QUICK] });
     expect(none?.rtSafety?.noteSweep).toBeUndefined();
+  });
+});
+
+// fixtures/sweep-memory/lines.jsonl: lv2_measure's own memory-only lines, plugin-qualify 0.21.2, one per plugin and rate
+const MEMORY_LINES = parseJsonl(readFileSync(new URL("../../fixtures/sweep-memory/lines.jsonl", import.meta.url), "utf8"));
+const COMPRESSOR = "http://calf.sourceforge.net/plugins/Compressor";
+const SAMPLER = "http://lsp-plug.in/plugins/lv2/sampler_mono";
+const CRASHED = "http://www.drowaudio.co.uk/audio/audio_plugins/reverb";
+const TOPOLOGY = [COMPRESSOR, SAMPLER, CRASHED].map((uri) => ({ uri, audioInputs: 2, audioOutputs: 2 }));
+const sweptMemory = () => measuredPluginsFromSweep({ measurements: TOPOLOGY, cost: MEMORY_LINES }, ["cost"]);
+const costOf = (uri: string) => sweptMemory().find((p) => p.uri === uri)?.cost;
+
+describe("the cost pass lands cost and memory, one line per plugin and rate", () => {
+  it("presence control: the fixture holds three plugins at three rates", () => {
+    expect(MEMORY_LINES).toHaveLength(9);
+  });
+
+  it("a memory-only line lands its footprint at its rate, with the reason its timing is not there", () => {
+    expect(Object.keys(costOf(COMPRESSOR)!.perRate)).toEqual(["48000", "96000", "192000"]);
+    expect(costOf(COMPRESSOR)!.perRate["192000"]).toEqual({
+      unmeasuredReason: "not-attempted",
+      unmeasuredDetail: "a memory-only run takes the footprint alone",
+      memory: { afterInstantiateKb: 10408, afterActivateKb: 10408, atRestKb: 10708, secondInstanceKb: 40 },
+    });
+  });
+
+  it("an instrument's footprint carries the notes held and their basis", () => {
+    expect(costOf(SAMPLER)!.perRate["192000"]!.memory).toMatchObject({ notesHeld: 1, basis: "probe" });
+  });
+
+  it("a footprint child that died keeps its reason and no figure", () => {
+    expect(costOf(CRASHED)!.perRate["192000"]!.memory).toEqual({
+      unmeasuredReason: "probe-crashed",
+      unmeasuredDetail: "the footprint's child gave no figure (status 139)",
+    });
+  });
+
+  it("a timed line lands its timing beside the footprint, under the document's names", () => {
+    const memory = { atRestKb: 10 };
+    const timed = { nsPerSampleMedian: 4, nsPerSampleP95: 6, nsPerSampleMin: 3, nsPerSampleMax: 9, blocks: 100, memory };
+    const row = { ...QUICK, cost: { blockFrames: 512, perRate: { "192000": timed } } };
+    expect(measuredPluginsFromSweep({ measurements: [row] }, ["cost"])[0]?.cost?.perRate["192000"]).toEqual({
+      nsPerSampleMedian: 4, nsPerSamplePercentile: 6, nsPerSampleMin: 3, nsPerSampleMax: 9, blocks: 100, blockFrames: 512, memory,
+    });
+  });
+
+  it("a later line of the same plugin and rate supersedes the earlier one", () => {
+    const line = (kb: number) => ({ uri: COMPRESSOR, cost: { perRate: { "48000": { memory: { atRestKb: kb } } } } });
+    const [plugin] = measuredPluginsFromSweep({ measurements: TOPOLOGY.slice(0, 1), cost: [line(1), line(2)] }, ["cost"]);
+    expect(plugin?.cost?.perRate["48000"]?.memory).toEqual({ atRestKb: 2 });
+  });
+
+  it("a run emits the dimensions it covers and no other", () => {
+    expect(Object.keys(sweptMemory()[0]!).sort()).toEqual(["cost", "topology", "uri"]);
+    expect(measuredPluginsFromSweep({ measurements: [QUICK], cost: MEMORY_LINES })[0]).not.toHaveProperty("cost");
+  });
+
+  it("the document keeps a memory-only rate through a write and a read", () => {
+    const written = buildMeasurementDocument(
+      buildRun({ id: "mem", measuredAt: "2026-11-24T19:41:00+01:00", dimensions: ["cost"], rates: [48000, 96000, 192000], tool: { name: "lv2_measure", version: "0.21.2" }, host: doc("h", []).run.host }),
+      sweptMemory(),
+    );
+    const read = readMeasurementDocument(JSON.parse(serialiseMeasurementDocument(written)));
+    expect(read.ok && read.document.plugins).toEqual(written.plugins);
+  });
+
+  it("a memory-only block is no cost reading: the merge keeps the timed one and resolves none by itself", () => {
+    const timed = { perRate: { "192000": { nsPerSampleMedian: 4, nsPerSamplePercentile: 6, blocks: 100, blockFrames: 512 } } };
+    const memoryOnly = sweptMemory().filter((p) => p.uri === COMPRESSOR);
+    const shipped = doc("shipped", [{ ...memoryOnly[0]!, cost: timed }]);
+    expect(mergeMeasurements(shipped, doc("local", memoryOnly)).get(COMPRESSOR)?.cost?.value).toEqual(timed);
+    expect(mergeMeasurements(doc("shipped", memoryOnly), undefined).get(COMPRESSOR)?.cost).toBeUndefined();
   });
 });

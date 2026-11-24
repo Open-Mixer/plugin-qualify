@@ -7,12 +7,19 @@
  * land on `probe-error` (a run property) and never on a structural reason, because a
  * structural reason overrides other people's figures.
  */
+import { isUntimedCost, type CostAtRate, type MeasuredPlugin } from "./format.js";
 import { describe, expect, it } from "vitest";
 
 import { measuredPluginFromProbeEntry, measuredPluginsFromProbeOutput, probeReasonCode } from "./probe-json.js";
 import { unmeasuredKind } from "./vocabulary.js";
 
 const BOTH = ["latency", "cost"] as const;
+
+/** The timed reading of one rate; a footprint alone is none. */
+function timedCostAt(plugin: MeasuredPlugin | undefined, rate: string): CostAtRate | undefined {
+  const at = plugin?.cost?.perRate[rate];
+  return at === undefined || isUntimedCost(at) ? undefined : at;
+}
 
 describe("mapping the prober's words", () => {
   it("passes the structural reasons through unchanged", () => {
@@ -120,7 +127,7 @@ describe("converting a prober descriptor", () => {
   });
 
   it("drops the DERIVED cost figures and keeps the measured primitive", () => {
-    const reading = plugin?.cost?.perRate["48000"];
+    const reading = timedCostAt(plugin, "48000");
     expect(reading?.nsPerSampleMedian).toBe(6.9);
     expect(reading?.nsPerSamplePercentile).toBe(7.2);
     expect(reading).not.toHaveProperty("coreFractionP95");
@@ -167,14 +174,16 @@ describe("an instrument's cost, timed with notes held (format 1.4)", () => {
         cpuCost: { perRate: { "96000": { ...timed, voices: { held: 32, basis: "probe" } } } } },
       BOTH,
     );
-    expect(plugin?.cost?.perRate["96000"]?.voices).toEqual({ held: 32, basis: "probe" });
-    expect(plugin?.cost?.perRate["96000"]?.nsPerSamplePercentile).toBe(44);
+    expect(timedCostAt(plugin, "96000")?.voices).toEqual({ held: 32, basis: "probe" });
+    expect(timedCostAt(plugin, "96000")?.nsPerSamplePercentile).toBe(44);
   });
 
   it("drops a held count it cannot vouch for, and keeps an effect's figure without one", () => {
     const read = (voices: unknown) =>
-      measuredPluginFromProbeEntry({ uri: "urn:x", audioInputs: 0, audioOutputs: 2, cpuCost: { perRate: { "48000": { ...timed, voices } } } }, BOTH)
-        ?.cost?.perRate["48000"]?.voices;
+      timedCostAt(
+        measuredPluginFromProbeEntry({ uri: "urn:x", audioInputs: 0, audioOutputs: 2, cpuCost: { perRate: { "48000": { ...timed, voices } } } }, BOTH),
+        "48000",
+      )?.voices;
     expect(read({ held: 32, basis: "guess" })).toBeUndefined();
     expect(read({ held: 0, basis: "probe" })).toBeUndefined();
     expect(read({ held: 2.5, basis: "probe" })).toBeUndefined();
