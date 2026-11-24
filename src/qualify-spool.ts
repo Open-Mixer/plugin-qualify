@@ -57,6 +57,8 @@ export function audioCpusOf(facts: { readonly driverCpu: number | null; readonly
 }
 
 export type Isolation = { readonly ok: true; readonly cpus: readonly number[] } | { readonly ok: false; readonly error: string };
+/** An isolation that holds: only this one may start a check. */
+export type Isolated = Extract<Isolation, { readonly ok: true }>;
 
 /** The cpus a check may run on: every online cpu that is not an audio cpu. */
 export function isolationFor(audio: readonly number[] | undefined, online: readonly number[]): Isolation {
@@ -66,7 +68,7 @@ export function isolationFor(audio: readonly number[] | undefined, online: reado
 }
 
 /** The command line that runs `argv` on those cpus only, at idle scheduling and idle io. */
-export function isolatedArgv(iso: { readonly cpus: readonly number[] }, argv: readonly string[]): string[] {
+export function isolatedArgv(iso: Isolated, argv: readonly string[]): string[] {
   return ["taskset", "-c", iso.cpus.join(","), "ionice", "-c", "3", "chrt", "-i", "0", ...argv];
 }
 
@@ -77,7 +79,7 @@ export type SpoolProbeEnd =
   | { readonly kind: "timeout" };
 
 /** Start `argv` isolated and wait for its end: the budget kills the whole process group; a kill that is not ours is the memory limit. */
-export function spawnIsolated(iso: { readonly cpus: readonly number[] }, argv: readonly string[], opts: { readonly timeoutMs: number; readonly env?: NodeJS.ProcessEnv }): Promise<SpoolProbeEnd & { stdout: string }> {
+export function spawnIsolated(iso: Isolated, argv: readonly string[], opts: { readonly timeoutMs: number; readonly env?: NodeJS.ProcessEnv }): Promise<SpoolProbeEnd & { stdout: string }> {
   return new Promise((resolve) => {
     const [cmd, ...args] = isolatedArgv(iso, argv);
     const child = spawn(cmd!, args, { detached: true, stdio: ["ignore", "pipe", "ignore"], env: opts.env ?? process.env });
@@ -134,7 +136,7 @@ export interface SpoolDeps {
   readonly audioCpus: () => readonly number[] | undefined;
   readonly onlineCpus: () => readonly number[];
   /** Runs the isolated check of one request; the default starts the quick check, isolated. */
-  readonly probe: (request: SpoolRequest, iso: { readonly cpus: readonly number[] }, cfg: SpoolConfig) => Promise<SpoolProbeEnd>;
+  readonly probe: (request: SpoolRequest, iso: Isolated, cfg: SpoolConfig) => Promise<SpoolProbeEnd>;
 }
 
 export type SpoolOutcome =
