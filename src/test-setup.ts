@@ -15,21 +15,25 @@ import "./probe-domain-node.js";
 import "./history-domain-node.js";
 
 /**
- * The place the tests read: the qualification and history domains (plugin-hostd's), the probe domain (plugin-hostd-protocol's)
- * and the plugin-db domain (plugin-db's) in one directory, as the installed contract directory holds them. Each domain comes
- * from the first directory of OMX_CONTRACT_PATH that holds it, else from the installed place; a domain found nowhere is not
- * linked, and the first read of it refuses by name. The CLIs a test spawns read the same variable, which names this
- * directory: the real plugin-db a test spawns (plugin-db-store.test.ts) reads its own domain from it, as one directory with
- * no fallback to the installed place, so its domain is here too (#162).
+ * The place the tests read: a copy of the installed contract directory, whole, as the programs a test spawns read it
+ * (plugin-hostd-probe reads the machine domain, omx-clap-scan the scan domain, the real plugin-db its own, #162: each as
+ * one directory with no fallback); the domains this package reads (the qualification and history domains, plugin-hostd's;
+ * the probe domain, plugin-hostd-protocol's; the plugin-db domain) come from the first directory of OMX_CONTRACT_PATH that
+ * holds them, over the installed ones. A domain found nowhere is not linked, and the first read of it refuses by name. The
+ * CLIs a test spawns read the same variable, which names this directory.
  */
 const CONTRACT_DIR = vi.hoisted(() => {
   const fs = process.getBuiltinModule("node:fs");
   const os = process.getBuiltinModule("node:os");
-  const dirs = [...(process.env.OMX_CONTRACT_PATH ?? "").split(":").filter((d) => d !== ""), "/usr/share/omx-contract/contract.d"];
+  const installed = "/usr/share/omx-contract/contract.d";
+  const named = (process.env.OMX_CONTRACT_PATH ?? "").split(":").filter((d) => d !== "" && d !== installed);
   const dir = fs.mkdtempSync(`${os.tmpdir()}/qualify-contract-dir-`);
+  if (fs.existsSync(installed)) fs.cpSync(installed, dir, { recursive: true });
   for (const domain of ["qualification", "probe", "plugin-hostd/history", "plugin-db"]) {
-    const holder = dirs.find((d) => fs.existsSync(`${d}/${domain}/${domain.split("/").pop()}.json`));
-    if (holder !== undefined) fs.cpSync(`${holder}/${domain}`, `${dir}/${domain}`, { recursive: true });
+    const holder = named.find((d) => fs.existsSync(`${d}/${domain}/${domain.split("/").pop()}.json`));
+    if (holder === undefined) continue;
+    fs.rmSync(`${dir}/${domain}`, { recursive: true, force: true });
+    fs.cpSync(`${holder}/${domain}`, `${dir}/${domain}`, { recursive: true });
   }
   process.on("exit", () => fs.rmSync(dir, { recursive: true, force: true }));
   process.env.OMX_CONTRACT_PATH = dir;
