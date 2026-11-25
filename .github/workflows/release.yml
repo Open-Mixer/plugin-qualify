@@ -16,6 +16,8 @@ name: release
 on:
   push:
     tags: ['v*']
+    # a merge to devel builds the real package and publishes it to staging (Open-Mixer/.github#289)
+    branches: [devel]
   workflow_dispatch:
     inputs:
       publish:
@@ -71,6 +73,11 @@ jobs:
       deb-arches: ${{ steps.derive.outputs.deb-arches }}
       cells: ${{ steps.cells.outputs.cells }}
       count: ${{ steps.cells.outputs.count }}
+      # each kind's own cells, so the install keeps the kind a devel merge built when the other is served and skipped
+      rpm-cells: ${{ steps.cells.outputs.rpm }}
+      rpm-count: ${{ steps.cells.outputs.rpm-count }}
+      deb-cells: ${{ steps.cells.outputs.deb }}
+      deb-count: ${{ steps.cells.outputs.deb-count }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -103,7 +110,7 @@ jobs:
     with:
       staged: ${{ inputs.staged == true }}
       package-name: plugin-qualify
-      publish: ${{ github.event_name == 'push' || inputs.publish == true }}
+      publish: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
       republish: ${{ github.event_name == 'workflow_dispatch' && inputs.republish == true }}
       catch-up: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
@@ -123,7 +130,7 @@ jobs:
     with:
       staged: ${{ inputs.staged == true }}
       package-name: plugin-qualify
-      publish: ${{ github.event_name == 'push' || inputs.publish == true }}
+      publish: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
       republish: ${{ github.event_name == 'workflow_dispatch' && inputs.republish == true }}
       catch-up: ${{ github.event_name == 'workflow_dispatch' && inputs.catch-up == true }}
@@ -143,8 +150,10 @@ jobs:
   installed:
     name: Install and qualify (${{ matrix.cell.image }}, ${{ matrix.cell.arch }})
     needs: [matrix, rpm, deb]
-    # not on a staged run: it reads packages a staged run does not build; no cell, no job
-    if: ${{ !cancelled() && inputs.staged != true && needs.matrix.outputs.count != '0' }}
+    # not on a staged run: it reads packages a staged run does not build; no cell, no job. Each kind is judged on its
+    # own build: a kind whose devel merge was served and skipped (Open-Mixer/.github#297, skipped == 'true') has no
+    # artifact and drops out of the cells, and the kind that was built is still installed (#192)
+    if: ${{ !cancelled() && inputs.staged != true && ((needs.rpm.outputs.skipped != 'true' && needs.matrix.outputs.rpm-count != '0') || (needs.deb.outputs.skipped != 'true' && needs.matrix.outputs.deb-count != '0')) }}
     runs-on: ${{ matrix.cell.runner }}
     timeout-minutes: 20
     permissions:
@@ -159,7 +168,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cell: ${{ fromJSON(needs.matrix.outputs.cells) }}
+        cell: ${{ fromJSON(needs.rpm.outputs.skipped == 'true' && needs.matrix.outputs.deb-cells || needs.deb.outputs.skipped == 'true' && needs.matrix.outputs.rpm-cells || needs.matrix.outputs.cells) }}
     steps:
       - uses: actions/checkout@v4
         with:
