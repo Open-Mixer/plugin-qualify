@@ -146,7 +146,7 @@ jobs:
     name: Install and qualify (${{ matrix.cell.image }}, ${{ matrix.cell.arch }})
     needs: [matrix, rpm, deb]
     # not on a staged run: it reads packages a staged run does not build; no cell, no job
-    if: ${{ !cancelled() && inputs.staged != true && needs.matrix.outputs.count != '0' }}
+    if: ${{ !cancelled() && inputs.staged != true && needs.matrix.outputs.count != '0' && needs.rpm.outputs.skipped != 'true' && needs.deb.outputs.skipped != 'true' }}
     runs-on: ${{ matrix.cell.runner }}
     timeout-minutes: 20
     permissions:
