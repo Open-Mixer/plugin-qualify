@@ -21,7 +21,7 @@ import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, storedBinary, un
 import { FIXTURES } from "./qualify-rejudge.support.js";
 import { MAPPED_COLUMNS, storeExport } from "./store-export.support.js";
 
-const PI = join(FIXTURES, "..", "records-rpi5-0.19.1");
+const PI = join(FIXTURES, "..", "records-rpi5");
 const OPTIONS = { host: "omx-clap-host", by: "plugin-qualify test", at: "2026-11-19T00:00:00.000Z" };
 
 /** The two judges, or the named reason they are not there yet. */
