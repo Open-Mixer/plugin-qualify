@@ -129,7 +129,7 @@ jobs:
           [ -n "$dir" ] || dir=/usr/share/omx-contract/contract.d
           mkdir -p /tmp/store-contract
           cp -a "$dir"/. /tmp/store-contract/
-          ls /tmp/store-contract /tmp/store-contract/3
+          ls /tmp/store-contract
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: Install
