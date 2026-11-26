@@ -197,6 +197,10 @@ jobs:
       - name: Add the OpenMixer channel (Fedora)
         if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a devel push stages its build and its dependencies, so its install reads the staging channel, as build-rpm.yml's
+          # and build-deb.yml's jobs do; the real channel serves none of the wave's packages
+          staging: ${{ github.event_name == 'push' && github.ref == 'refs/heads/devel' }}
 
       - name: Install the package (Fedora)
         if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
@@ -240,6 +244,10 @@ jobs:
       - name: Add the OpenMixer channel (Debian)
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a devel push stages its build and its dependencies, so its install reads the staging channel, as build-rpm.yml's
+          # and build-deb.yml's jobs do; the real channel serves none of the wave's packages
+          staging: ${{ github.event_name == 'push' && github.ref == 'refs/heads/devel' }}
 
       - name: Install the package (Debian)
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
