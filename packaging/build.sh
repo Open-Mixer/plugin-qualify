@@ -26,8 +26,11 @@ trap 'rm -rf "$work"' EXIT
 npm install --prefix "$work/pnpm" --no-audit --no-fund --loglevel=error "pnpm@$pnpm_version"
 "$work/pnpm/node_modules/.bin/pnpm" install --frozen-lockfile --ignore-scripts
 "$work/pnpm/node_modules/.bin/pnpm" run build
-make -s link-packaged PREFIX="${PREFIX:?build.sh: set PREFIX, where omx-contract is installed (/usr for a package build)}"
+# npm pack runs the prepare script (npm run build, tsc) even with --ignore-scripts, so it packs before the link: against
+# the packaged omx-contract, which ships no .d.mts, that tsc fails (TS7016). The pack holds no node_modules, so the link
+# after it changes nothing packed and only decides which omx-contract is bundled below.
 npm pack --ignore-scripts --pack-destination "$work" >/dev/null
+make -s link-packaged PREFIX="${PREFIX:?build.sh: set PREFIX, where omx-contract is installed (/usr for a package build)}"
 
 target=$dest$libdir/node_modules/@openmixer/plugin-qualify
 mkdir -p "$target" "$dest/usr/bin" "$dest/usr/share/man/man1"
