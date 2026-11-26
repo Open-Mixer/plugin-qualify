@@ -23,6 +23,8 @@ BuildRequires: pkgconfig(lv2)
 BuildRequires: pkgconfig(plugin-db)
 BuildRequires: pkgconfig(plugin-hostd-protocol)
 BuildRequires: pkgconfig(omx-contract)
+# the omx-contract module packaging/build.sh links in place of the registry's and bundles beside the package (%{_prefix}/lib/omx-contract)
+BuildRequires: omx-contract
 BuildRequires: pkgconfig(omx-clap-lv2)
 BuildRequires: pkgconfig(omxdsp)
 # src/dsp-rates.generated.ts is rendered from omx-dsp's rates file (tools/gen-dsp-rates.mjs), which its contract package ships
@@ -91,7 +93,7 @@ Its documentation is on openmixer.org.
 %make_build -C native
 
 %install
-packaging/build.sh %{buildroot} %{_prefix}/lib
+PREFIX=%{_prefix} packaging/build.sh %{buildroot} %{_prefix}/lib
 %make_install -C native LIBEXECDIR=%{_libexecdir}/%{name}
 install -d %{buildroot}%{_unitdir} %{buildroot}%{_presetdir} %{buildroot}%{_systemdgeneratordir}
 install -m 0755 packaging/systemd/plugin-qualify-sync-generator %{buildroot}%{_systemdgeneratordir}/

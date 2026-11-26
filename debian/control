@@ -12,6 +12,7 @@ Build-Depends: debhelper-compat (= 13),
                plugin-db-dev,
                libplugin-hostd-protocol-dev,
                libomx-contract-dev,
+               omx-contract,
                libomx-clap-lv2-dev,
                libomxdsp-dev,
                omx-dsp-contract

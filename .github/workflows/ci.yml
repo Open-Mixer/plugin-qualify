@@ -134,6 +134,9 @@ jobs:
         run: npm install -g pnpm@10.33.0
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+      # the suite reads the omx-contract installed above, not the registry's copy pnpm install fetched: a devel wave's
+      # is staged, never on npm (npm publishes from a tag only); the package lands under /usr, not the Makefile's /usr/local
+      - run: make link-packaged PREFIX=/usr
       - name: The generated rates are omx-dsp's
         run: node tools/gen-dsp-rates.mjs --check
       - name: Run them
