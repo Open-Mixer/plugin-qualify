@@ -13,15 +13,12 @@
 /** The domain's name, its directory and its file's stem. */
 export const PROBE_DOMAIN = "probe";
 
-/** The lowest `info.version` of the domain this package works with. */
-export const PROBE_DOMAIN_FLOOR = "1.0.0";
-
 /** What this package needs of an opened domain: the words of an item with their title, in the declared order. */
 export interface ProbeWordSource {
   words(item: string): readonly { readonly word: string; readonly title: string }[];
 }
 
-/** A probe domain this package cannot use: absent, not valid, below the floor, or without the item or the word asked for. */
+/** A probe domain this package cannot use: absent, not valid, or without the item or the word asked for. */
 export class ProbeDomainError extends Error {
   constructor(place: string, reason: string) {
     super(`domain "${PROBE_DOMAIN}" at ${place}: ${reason}`);

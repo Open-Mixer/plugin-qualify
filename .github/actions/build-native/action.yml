@@ -3,7 +3,7 @@ description: The CLAP prober, the LV2 measurer, their interposer and the fixture
 
 # Shared by ci.yml and publish.yml, whose jobs run in a fedora:45 container with the OpenMixer channel added. The headers
 # and libraries are the spec's BuildRequires (dnf builddep reads packaging/plugin-qualify.spec), so the suite builds
-# against exactly what the RPM builds against, omx-clap's LV2 feature provider at the packages' floor included; asan is
+# against exactly what the RPM builds against, omx-clap's LV2 feature provider included; asan is
 # the measurer under AddressSanitizer, which the leak check runs. `make deps` still fetches the omx-clap checkout and
 # lv2_core.h that src/host-profiles.test.ts compares against (no package ships them).
 # src/workflows-agree.test.ts fails if a workflow stops using this action.

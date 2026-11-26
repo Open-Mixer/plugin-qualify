@@ -25,7 +25,12 @@ import { readMemoryFootprint, readVoicesHeld, type MemoryFootprint, type VoicesH
 
 export const PROBE_OUTPUT_FORMAT = "plugin-hostd.probe-output";
 /** The one major this reader knows. A minor of it only adds fields. */
-export const PROBE_OUTPUT_MAJOR = 1;
+export const PROBE_OUTPUT_MAJOR = 2;
+/**
+ * The unit a cost is timed in: omx-contract's RESOURCE_UNITS id. Format 2 writes it (format 1 wrote "ns-per-sample",
+ * Open-Mixer/plugin-hostd#269); this reader reads format 2 only, and refuses a cost in any other unit.
+ */
+export const PROBE_COST_UNIT = "nsPerSample";
 
 export const PROBE_FORMAT_CODE = {
   majorUnknown: "probe.format.major-unknown",
@@ -260,6 +265,7 @@ function stringList(v: unknown): string[] | undefined {
 
 function readCost(v: unknown, where: string): ProbeCost {
   const o = record(v, where);
+  if (o["unit"] !== PROBE_COST_UNIT) invalid(`${where} unit is ${JSON.stringify(o["unit"])}, not ${PROBE_COST_UNIT}`);
   const pct = record(o["percentile"], `${where} percentile`);
   const p = num(pct, "p", `${where} percentile`);
   if (!(p > 50 && p <= 100)) invalid(`${where} percentile p ${p} is outside (50, 100]`);

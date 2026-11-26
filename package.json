@@ -19,6 +19,7 @@
   "bin": {
     "plugin-qualify": "./bin/plugin-qualify.mjs",
     "plugin-qualify-sync": "./bin/plugin-qualify-sync.mjs",
+    "plugin-qualify-spool": "./bin/plugin-qualify-spool.mjs",
     "plugin-qualify-records-package": "./bin/plugin-qualify-records-package.mjs"
   },
   "main": "./dist/index.js",
@@ -93,7 +94,7 @@
     "lint": "tsc -p tsconfig.lint.json",
     "test:py": "python3 -m pytest tools -q",
     "check:generated": "node tools/gen-python-declarations.mjs --check && node tools/gen-hosting-codes.mjs --check && node tools/gen-dsp-rates.mjs --check-if-present && node tools/gen-text-codes.mjs --check",
-    "check:private-refs": "${FREEMIXER_DOTGITHUB:-../freemixer-dotgithub}/.github/actions/private-refs-check/check.sh ."
+    "check:private-refs": "${OPENMIXER_DOTGITHUB:-$HOME/.cache/omx/openmixer-dotgithub}/.github/actions/private-refs-check/check.sh ."
   },
   "devDependencies": {
     "@types/node": "^24.9.0",
@@ -106,7 +107,7 @@
     "provenance": true
   },
   "dependencies": {
-    "@openmixer/omx-contract": ">=3.20.2",
+    "@openmixer/omx-contract": "*",
     "ajv": "8.20.0",
     "json-schema-to-ts": "3.1.1"
   }

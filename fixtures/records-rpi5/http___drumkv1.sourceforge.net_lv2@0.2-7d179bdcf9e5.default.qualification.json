@@ -2,33 +2,33 @@
   "schema": "plugin-qualify.qualification-record/1",
   "plugin": {
     "format": "lv2",
-    "id": "http://samplv1.sourceforge.net/lv2"
+    "id": "http://drumkv1.sourceforge.net/lv2"
   },
   "testedVersion": "0.2",
   "binary": {
-    "path": "samplv1.so",
-    "sha256": "c9cd8fb3102fd7e60bd35108fe97490dde414e2afb3afb20899a8a59d2dae236",
+    "path": "drumkv1.so",
+    "sha256": "7d179bdcf9e5b755855794eed0a764c3f53abb70c529ea97077d534fa39ae442",
     "files": [
       {
+        "path": "drumkv1.so",
+        "sha256": "7d179bdcf9e5b755855794eed0a764c3f53abb70c529ea97077d534fa39ae442"
+      },
+      {
+        "path": "drumkv1.ttl",
+        "sha256": "ef66e4a1fff9e9c53206dc6c679620f9b552aade7f7ef2026854be19ceacf831"
+      },
+      {
+        "path": "drumkv1_ui.ttl",
+        "sha256": "6f0e871e0f10a5f98a78d47721886c17d693356cf22bc2c9780f4d3fd2c8da24"
+      },
+      {
         "path": "manifest.ttl",
-        "sha256": "ad06bcfc23720f0a5622e045f8a308aaeec99efbc6125764ce0ab014146696c8"
-      },
-      {
-        "path": "samplv1.so",
-        "sha256": "c9cd8fb3102fd7e60bd35108fe97490dde414e2afb3afb20899a8a59d2dae236"
-      },
-      {
-        "path": "samplv1.ttl",
-        "sha256": "7722d13cbae4d7d547dcebdf712be84cd498707a4307b20c4179fcb8f8a368a9"
-      },
-      {
-        "path": "samplv1_ui.ttl",
-        "sha256": "6f04c36ea787976e1e85af3c01ecd3c7590ed1811e2e0e9fe702628be0cdad82"
+        "sha256": "b66fed04b78253873ae51e1b31eeddc95cf76e1aa99d8dbb30983ad41f04cade"
       }
     ],
     "layout": {
       "scheme": "omx-layout/1",
-      "sha256": "2edf41e8367c7424f326e11bbeb4c0e6fa70d910ce35907c86abfbe752cb5e93"
+      "sha256": "ae0fca82111ac3f7310ace9fcc27e7f0345e1937d47f5e7532115b0b536d07ce"
     }
   },
   "verdicts": [
@@ -52,12 +52,10 @@
         },
         {
           "dimension": "rtSafety",
-          "rating": "conditional",
-          "code": "hosting.rt-safety.violations-in-run",
+          "rating": "suitable",
+          "code": "hosting.rt-safety.clean-under-sweep",
           "params": {
-            "allocations": 0,
-            "syscalls": 0,
-            "locks": 1533
+            "blocks": 512
           }
         },
         {
@@ -82,12 +80,10 @@
       "reasons": [
         {
           "dimension": "rtSafety",
-          "rating": "conditional",
-          "code": "hosting.rt-safety.violations-in-run",
+          "rating": "suitable",
+          "code": "hosting.rt-safety.clean-under-sweep",
           "params": {
-            "allocations": 0,
-            "syscalls": 0,
-            "locks": 1533
+            "blocks": 512
           }
         },
         {
@@ -184,10 +180,10 @@
           "measuredFrames": 0
         },
         "cost": {
-          "median": 200.086,
+          "median": 172.129,
           "percentile": {
             "p": 95,
-            "value": 320.746
+            "value": 173.537
           },
           "blocks": 512,
           "warmupBlocks": 64
@@ -198,11 +194,9 @@
           "sweepApplicable": true,
           "blocks": 512,
           "allocations": 0,
-          "locks": 1533,
+          "locks": 0,
           "syscalls": 0,
-          "events": [
-            "mutex_lock libQt6Core.so.6 _ZN14QWaitCondition7wakeAllEv"
-          ]
+          "events": []
         },
         "noteSweep": {
           "applicable": true,
@@ -212,12 +206,12 @@
           "syscalls": 0
         },
         "memory": {
-          "afterInstantiateKb": 22000,
-          "afterActivateKb": 22576,
-          "atRestKb": 22576,
-          "secondInstanceKb": 960,
-          "firstInstanceKb": 22576,
-          "perInstanceKb": 960
+          "afterInstantiateKb": 21792,
+          "afterActivateKb": 22512,
+          "atRestKb": 22528,
+          "secondInstanceKb": 976,
+          "firstInstanceKb": 22528,
+          "perInstanceKb": 976
         }
       }
     ],
@@ -251,11 +245,11 @@
     "child": "lv2_measure",
     "interposer": "rt_interpose.so"
   },
-  "measuredAt": "2026-11-08T23:26:59+00:00",
+  "measuredAt": "2026-11-08T23:26:50+00:00",
   "probe": {
-    "file": "http___samplv1.sourceforge.net_lv2@0.2-c9cd8fb3102f.default.probe.json",
-    "sha256": "6b642b3331f260e82ca80da523d8911ae88355823b4a3b9b85e4e97721d9f548",
-    "bytes": 4762,
+    "file": "http___drumkv1.sourceforge.net_lv2@0.2-7d179bdcf9e5.default.probe.json",
+    "sha256": "446fde6165ab7967fc66f9e35a527384468e4eb2c03721d4738097ead66eddfc",
+    "bytes": 4700,
     "protocol": {
       "name": "plugin-hostd.probe-protocol",
       "version": 1
@@ -273,12 +267,12 @@
     },
     "meetsProtocol": false,
     "load": {
-      "loadavg1": 0.47,
+      "loadavg1": 0.46,
       "cores": 4
     }
   },
   "run": {
-    "id": "20261108T232659Z-1a20f-da571497",
+    "id": "20261108T232650Z-1a1a6-f541efcb",
     "steps": [
       {
         "step": "scan",
@@ -295,6 +289,16 @@
       {
         "step": "rt-safety",
         "result": "safe"
+      },
+      {
+        "step": "isolated",
+        "result": "isolated",
+        "figures": {
+          "latencyFrames": 0,
+          "cpuPercent": 0.6666666666666666,
+          "xruns": 0,
+          "midiInputsLinked": 1
+        }
       }
     ]
   }

@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * What the qualification store holds of a record, as its reader exports it (`query --json --records`), built from a record
- * and its probe output by a test helper that follows the column map of the store's writer (`tools/qualification_db.py`,
- * `_record()` and `_cell()` at aee1ffda4): a leaf with no column is not in the export, a sentence is not in the export, and
+ * and its probe output by a test helper that follows the column map of the store's writer
+ * (`plugin-db-qualification:tools/qualification_db.py`, `_record()` and `_cell()` at aee1ffda4): a leaf with no column is not in the export, a sentence is not in the export, and
  * a CLAP record's `hostExtensions` is the probe output's `offer.clapExtensions`. The store is the reader repository's; this
  * is the stand-in the row judge's proofs run on until its reader answers (`StoredRecord` is the wrapper section 6 documents).
  *
@@ -11,7 +11,7 @@
  * each test reads the same helper.
  */
 import type { ProbeOutput } from "./probe-output.js";
-import type { QualificationRecord } from "./qualification-record.js";
+import { storedBinary, type QualificationRecord } from "./qualification-record.js";
 import type { StoredRecord } from "./qualification-store.js";
 
 type Json = Record<string, any>;
@@ -121,8 +121,9 @@ export function storeExport(record: QualificationRecord, probe: ProbeOutput, omi
   for (const s of doc.run?.steps ?? []) delete s.detail;
   for (const u of doc.measurements?.unmeasured ?? []) delete u.detail;
   delete doc.binary.unpinnable;
-  // the records are written with the binary's path below the install root, never an absolute one (section 3.7)
-  doc.binary.path = String(doc.binary.path).slice(String(doc.binary.path).lastIndexOf("/") + 1);
+  // the records are written with the binary's path below the install root, never an absolute one (section 3.7): the
+  // store's form, as the writer takes it (a record of an older run may still name the path the probe measured)
+  doc.binary = storedBinary(doc.binary as ProbeOutput["binary"]);
   doc.measurements.grid = doc.measurements.grid.map(cellOf);
   if (record.plugin.format === "clap" && probe.offer.clapExtensions !== undefined) doc.hostExtensions = [...probe.offer.clapExtensions];
   else delete doc.hostExtensions;

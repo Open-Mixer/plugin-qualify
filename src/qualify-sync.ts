@@ -157,6 +157,10 @@ export interface SyncArgs {
   readonly isolatedOnly: boolean;
   /** `--pool-only`: the pool step of each CLAP record already judged that owes it, extending its run and giving its pin the word. */
   readonly poolOnly: boolean;
+  /** `--plugin <target>`: qualify that one plugin (plugin-hostd's uri of it), never another: plugin-hostd's ask. */
+  readonly plugin?: string;
+  /** `--under-load`: the engine runs while the plugin is measured; its run condition is {@link MEASURED_UNDER_LOAD}. */
+  readonly underLoad: boolean;
   readonly help: boolean;
   /** The settings given as flags, by key. */
   readonly values: ReadonlyMap<string, string>;
@@ -178,6 +182,8 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
   let adapterOnly = false;
   let isolatedOnly = false;
   let poolOnly = false;
+  let plugin: string | undefined;
+  let underLoad = false;
   let help = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -191,7 +197,12 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
     else if (a === "--adapter-only") adapterOnly = true;
     else if (a === "--isolated-only") isolatedOnly = true;
     else if (a === "--pool-only") poolOnly = true;
-    else if (a === "--help") help = true;
+    else if (a === "--under-load") underLoad = true;
+    else if (a === "--plugin") {
+      const v = argv[++i];
+      if (v === undefined) return { ok: false, error: `${a} needs a value` };
+      plugin = v;
+    } else if (a === "--help") help = true;
     else if (a === "--grid-hosts") values.set("grid", "hosts");
     else if (a === "--config" || byFlag.has(a)) {
       const v = argv[++i];
@@ -203,7 +214,9 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
   }
   if (rejudge && (memoryOnly || adapterOnly || isolatedOnly || poolOnly || force || refreshPinsOnly)) return { ok: false, error: "--rejudge measures nothing: it goes with none of --memory-only, --adapter-only, --isolated-only, --pool-only, --force and --refresh-pins" };
   if ([memoryOnly, adapterOnly, isolatedOnly, poolOnly, refreshPinsOnly].filter(Boolean).length > 1) return { ok: false, error: "--memory-only, --adapter-only, --isolated-only, --pool-only and --refresh-pins are different runs: one at a time" };
-  return { ok: true, args: { ...(config === undefined ? {} : { config }), system, force, noDistributed, noWait, refreshPins: refreshPinsOnly, rejudge, memoryOnly, adapterOnly, isolatedOnly, poolOnly, help, values } };
+  if (underLoad && plugin === undefined) return { ok: false, error: "--under-load marks plugin-hostd's ask: it goes with --plugin only" };
+  if (plugin !== undefined && (rejudge || memoryOnly || adapterOnly || isolatedOnly || poolOnly || refreshPinsOnly)) return { ok: false, error: "--plugin qualifies one plugin as a scan does: it goes with none of --rejudge, --memory-only, --adapter-only, --isolated-only, --pool-only and --refresh-pins" };
+  return { ok: true, args: { ...(config === undefined ? {} : { config }), ...(plugin === undefined ? {} : { plugin }), underLoad, system, force, noDistributed, noWait, refreshPins: refreshPinsOnly, rejudge, memoryOnly, adapterOnly, isolatedOnly, poolOnly, help, values } };
 }
 
 export function syncHelpText(): string {
@@ -226,6 +239,8 @@ function syncHelpTextBody(): string {
     "  --isolated-only                     run only the isolated step each record still owes, adding it to the record's run",
     "  --pool-only                         run only the pool step each CLAP record still owes: a plugin that asks for the thread pool is run with it off and on, and its pin gets pool=cores or pool=off",
     "  --adapter-only                      run each LV2 plugin only under omx-clap-host's LV2 adapter at the Pi's cells, on private JACK servers, and merge it; with --force, those already done too",
+    "  --plugin <target>                   qualify this one plugin (a CLAP clap:<path>#<id> or an LV2 uri) as a scan does, and no other",
+    "  --under-load                        with --plugin: the engine runs meanwhile; no figure is stored as a quiet machine's, the next scan measures it again",
     "  --grid-hosts                        the fast grid, the same as --grid hosts (7 cells with the shipped hosts)",
     "  --help                              this text",
     ...rows,
@@ -514,6 +529,15 @@ export function digestFiles(root: string, files: readonly string[], known: reado
 export const SYNC_STATE_SCHEMA = "plugin-qualify.sync-state/2";
 
 /** How the quick qualification of one plugin ended. */
+/**
+ * The run condition of a qualification measured while the engine plays (the qualify domain's QUALIFY_RUN_CONDITIONS,
+ * contract.d/qualify/qualify.json): plugin-hostd's ask (omx-panel docs/descriptions-store.md, section 7). Absent is a
+ * quiet machine. Its figures are never read as a quiet machine's: none is put into the store, so the planner reads the
+ * plugin's cost as unknown; its verdicts and pin are used; the next scan with the engine idle measures it again whole.
+ */
+export const MEASURED_UNDER_LOAD = "measured-under-load" as const;
+export type RunCondition = typeof MEASURED_UNDER_LOAD;
+
 export const SYNC_OUTCOMES = ["qualified", "refused", "crashed", "hung", "unmeasured"] as const;
 export type SyncOutcome = (typeof SYNC_OUTCOMES)[number];
 
@@ -586,6 +610,8 @@ export interface SyncEntry {
   readonly seconds: number;
   /** The shipped set the plugins were taken from, when they were not measured here. */
   readonly distributed?: string;
+  /** How the machine was when the item was measured; absent: quiet. */
+  readonly runCondition?: RunCondition;
 }
 
 export interface SyncState {
@@ -661,6 +687,8 @@ export interface SyncContext {
   readonly isolatedRunner?: IsolatedRunner;
   /** The pool step, a stand-in in tests. */
   readonly poolRunner?: PoolRunner;
+  /** The engine runs meanwhile ({@link MEASURED_UNDER_LOAD}): no record is put into the store. */
+  readonly underLoad?: boolean;
 }
 
 /**
@@ -784,8 +812,9 @@ function judgedPlugins(ctx: SyncContext, item: SyncItem, runs: readonly { bytes:
     // the record's list is the files of the pin as plugin-hostd names them (the store spec's section 3.7), the probe's own
     // when plugin-hostd could not name them
     const files = pin?.integrity.files ?? record.binary.files;
-    ctx.store.put(key, storedForm({ ...record, binary: { ...record.binary, files }, run: { id: judgment.output.run.id, steps } }));
-    const plugin: SyncPlugin = { uri: pin?.uri ?? judgment.output.plugin.id, outcome, ...(code === undefined ? {} : { code }), ...(pin === undefined ? {} : { pin }), record: key };
+    // figures measured under load are no quiet machine's: the store holds none of them (the planner's cost is unknown)
+    if (ctx.underLoad !== true) ctx.store.put(key, storedForm({ ...record, binary: { ...record.binary, files }, run: { id: judgment.output.run.id, steps } }));
+    const plugin: SyncPlugin = { uri: pin?.uri ?? judgment.output.plugin.id, outcome, ...(code === undefined ? {} : { code }), ...(pin === undefined ? {} : { pin }), ...(ctx.underLoad === true ? {} : { record: key }) };
     return { plugin, judgedHere: judgment.hosts.some((h) => h.verdict.host === host) };
   });
   // The pass also judges the console's other tier, which writes its own record; that run is no second plugin of this
@@ -1312,6 +1341,8 @@ export interface SyncSummary {
   readonly poolOnly?: { readonly cores: number; readonly off: number; readonly notAsked: number; readonly notRun: number };
   /** `--adapter-only`: the plugins run, those done already at these host versions, and those whose host could not be run. */
   readonly adapterOnly?: { readonly measured: number; readonly already: number; readonly failed: number };
+  /** `--plugin`: the target no plugin on the search path is; nothing was measured. */
+  readonly pluginAbsent?: string;
 }
 
 /**
@@ -1438,6 +1469,10 @@ export interface SyncRunOptions {
   readonly poolRunner?: PoolRunner;
   /** `--pool-only`: take only the pool steps records still owe. */
   readonly poolOnly?: boolean;
+  /** `--plugin`: qualify this one plugin, by plugin-hostd's uri of it, and no other. */
+  readonly plugin?: string;
+  /** `--under-load`: the engine runs meanwhile ({@link MEASURED_UNDER_LOAD}). */
+  readonly underLoad?: boolean;
   /** `--adapter-only`: take only the adapter runs; `force` takes those already done again. */
   readonly adapterOnly?: boolean;
   /** Stand-ins for the pass's hosts, in tests. */
@@ -1511,6 +1546,14 @@ function addSummaries(a: SyncSummary, b: SyncSummary): SyncSummary {
   };
 }
 
+/** Whether an item is the `--plugin` target: an LV2 plugin by its uri, a `.clap` by `clap:<path>` with or without `#<id>`. */
+function isTarget(item: SyncItem, target: string): boolean {
+  if (item.format === "lv2") return item.uri === target;
+  if (!target.startsWith("clap:")) return false;
+  const hash = target.indexOf("#");
+  return item.key === `clap:${resolve(target.slice(5, hash < 0 ? undefined : hash))}`;
+}
+
 /** Whether this run's scan covers an entry: its root lies under one of the run's directories of its own format. */
 function scannedBy(settings: Pick<SyncSettings, "lv2Dirs" | "clapDirs">, entry: SyncEntry): boolean {
   const root = resolve(entry.root);
@@ -1532,7 +1575,7 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
   {
     const started = Date.now();
     const dirs = [...settings.clapDirs, ...settings.lv2Dirs];
-    const ctx: SyncContext = { settings, env, log, store: options.qualificationStore ?? new QualificationStore(settings.system ? "system" : "user", { env }), ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }), ...(options.isolatedRunner === undefined ? {} : { isolatedRunner: options.isolatedRunner }), ...(options.poolRunner === undefined ? {} : { poolRunner: options.poolRunner }) };
+    const ctx: SyncContext = { settings, env, log, store: options.qualificationStore ?? new QualificationStore(settings.system ? "system" : "user", { env }), ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }), ...(options.isolatedRunner === undefined ? {} : { isolatedRunner: options.isolatedRunner }), ...(options.poolRunner === undefined ? {} : { poolRunner: options.poolRunner }), ...(options.underLoad === true ? { underLoad: true } : {}) };
     // an absent base is an empty base layer (the store spec, section 6.1): said once a run, when the reader first says it
     ctx.store.whenBaseAbsent((path) => log(`qualification store: base-absent: ${path}: the base layer is empty; the ${ctx.store.scope} layer's records alone are read`));
     // the pins first, before the quiet wait and any measurement: an upgrade of plugin-hostd that collects more files
@@ -1589,14 +1632,21 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     // a change made while a pass ran is caught by one more pass, a few at most
     for (let pass = 0; pass < 3; pass++) {
       const signature = directoriesSignature(dirs);
-      const { items, problems, notes } = discoverSyncItems(settings, options.lv2Resolve ?? LILV_RESOLVE);
+      const discovered = discoverSyncItems(settings, options.lv2Resolve ?? LILV_RESOLVE);
+      const { problems, notes } = discovered;
+      // --plugin: the one item that is the target, every other recorded entry kept as it is (never a scan)
+      const items = options.plugin === undefined ? discovered.items : discovered.items.filter((i) => isTarget(i, options.plugin!));
+      if (options.plugin !== undefined && items.length === 0) {
+        log(`${options.plugin}: no plugin on the search path is this target; nothing was measured`);
+        return { ...count, seconds: (Date.now() - started) / 1000, pluginAbsent: options.plugin };
+      }
       for (const p of problems) log(p);
       if (pass === 0) for (const n of notes) log(n);
       unreadable = problems.length > 0;
       const found = new Set(items.map((i) => i.key));
       const entries: Record<string, SyncEntry> = {};
       for (const [key, entry] of Object.entries(state.entries)) {
-        if (found.has(key)) entries[key] = entry;
+        if (found.has(key) || options.plugin !== undefined) entries[key] = entry;
         // a run scoped to some directories keeps what it did not scan: gone means not found where this run looked
         else if (!scannedBy(settings, entry)) {
           entries[key] = entry;
@@ -1605,7 +1655,9 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
       }
       for (const item of items) {
         const recorded = recordedAsIs(item, entries[item.key]);
-        const retry = recorded.same ? entries[item.key]!.plugins.map(machineReason).find((r) => r !== undefined) : undefined;
+        // measured under load is measured again by a run that is not (descriptions-store section 7)
+        const loaded = recorded.same && options.underLoad !== true && entries[item.key]!.runCondition === MEASURED_UNDER_LOAD;
+        const retry = recorded.same ? (loaded ? MEASURED_UNDER_LOAD : entries[item.key]!.plugins.map(machineReason).find((r) => r !== undefined)) : undefined;
         const owed = recorded.same && options.force !== true && retry === undefined ? figureOwed(entries[item.key]!, ctx.store) : undefined;
         if (recorded.same && options.force !== true && retry === undefined && owed === undefined) {
           if (pass === 0) count.skipped += entries[item.key]!.plugins.length;
@@ -1624,7 +1676,8 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
           writeFileWhole(settings.pinFile, syncPinsText(state));
           continue;
         }
-        if (recorded.same && retry !== undefined) log(`${item.key}: unmeasured last run by the machine (${retry}); measured again`);
+        if (loaded) log(`${item.key}: measured last run with the engine playing (${MEASURED_UNDER_LOAD}); measured again`);
+        else if (recorded.same && retry !== undefined) log(`${item.key}: unmeasured last run by the machine (${retry}); measured again`);
         if (owed !== undefined) log(`${item.key}: its record never took the ${owed} figure (a probe from before that pass); measured again`);
         const files = recorded.files ?? digestFiles(item.root, item.files);
         if (files === undefined) {
@@ -1642,17 +1695,18 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
           writeFileWhole(settings.pinFile, syncPinsText(state));
           continue;
         }
-        const entry = qualifyItem(ctx, item, files);
+        const measuredEntry = qualifyItem(ctx, item, files);
+        const entry: SyncEntry = options.underLoad === true ? { ...measuredEntry, runCondition: MEASURED_UNDER_LOAD } : measuredEntry;
         entries[item.key] = entry;
         if (item.format === "lv2") lv2Pinned.push(...entry.plugins.filter((p) => p.pin !== undefined).map((p) => p.uri));
         for (const p of entry.plugins) {
           count[p.outcome]++;
           measuredHere++;
-          // a reason of the machine is said once: the plugins after the first are counted, not listed
+          // every plugin is named by its key (#154); a reason of the machine is said in full once, on the first
           const why = machineReason(p);
           if (why !== undefined) byMachine.set(why, (byMachine.get(why) ?? 0) + 1);
-          if (why !== undefined && byMachine.get(why)! > 1) continue;
-          log(`${p.uri}: ${p.outcome}${p.code === undefined ? "" : ` (${p.code})`}${p.detail === undefined ? "" : `: ${reasonText(p.detail, localeOf(env))}`}`);
+          const said = why !== undefined && byMachine.get(why)! > 1 ? `by the machine (${why}), as above` : p.detail === undefined ? undefined : reasonText(p.detail, localeOf(env));
+          log(`${p.uri}: ${p.outcome}${p.code === undefined ? "" : ` (${p.code})`}${said === undefined ? "" : `: ${said}`}`);
         }
         state = { schema: SYNC_STATE_SCHEMA, entries };
         writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
@@ -1689,7 +1743,7 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     const replies = "replies" in sent ? sent.replies : [];
     for (let i = 0; i < replies.length; i++) if (replies[i] !== "resp 0") log(`plugin-hostd answered ${replies[i]!} to ${pinLineUri(changed[i]!)!}`);
     const taken = replies.filter((r) => r === "resp 0").length;
-    for (const [why, n] of byMachine) if (n > 1) log(`${String(n)} plugins unmeasured by the machine (${why}); the first is listed above`);
+    for (const [why, n] of byMachine) if (n > 1) log(`${String(n)} plugins unmeasured by the machine (${why}); each is named above`);
     const [only] = byMachine.size === 1 ? [...byMachine] : [];
     const machineFailure = only !== undefined && only[1] === measuredHere ? only[0] : undefined;
     if (machineFailure !== undefined) log(`every plugin this run measured was left unmeasured by the machine (${machineFailure}): the run failed`);

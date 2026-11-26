@@ -4,7 +4,12 @@
 #
 # Build the package's files and install exactly the set npm publishes.
 #
-#   packaging/build.sh <destdir> <libdir>
+#   PREFIX=/usr packaging/build.sh <destdir> <libdir>
+#
+# PREFIX is where the channel's omx-contract is installed (<PREFIX>/lib/omx-contract): once the tree is compiled, its
+# @openmixer/omx-contract is linked there (make link-packaged), so the copy bundled below, the one the installed program
+# runs, is the channel's, never the registry's (a devel wave's is staged, not on npm). The compile reads the registry
+# copy's declarations: the packaged omx-contract ships no .d.mts.
 #
 # The tree is compiled with the pnpm and the dependencies the lockfile names, then `npm pack` picks
 # the files that go in the package, and they land in <destdir><libdir>/node_modules/@openmixer/plugin-qualify
@@ -21,6 +26,7 @@ trap 'rm -rf "$work"' EXIT
 npm install --prefix "$work/pnpm" --no-audit --no-fund --loglevel=error "pnpm@$pnpm_version"
 "$work/pnpm/node_modules/.bin/pnpm" install --frozen-lockfile --ignore-scripts
 "$work/pnpm/node_modules/.bin/pnpm" run build
+make -s link-packaged PREFIX="${PREFIX:?build.sh: set PREFIX, where omx-contract is installed (/usr for a package build)}"
 npm pack --ignore-scripts --pack-destination "$work" >/dev/null
 
 target=$dest$libdir/node_modules/@openmixer/plugin-qualify

@@ -210,7 +210,7 @@
   "measuredAt": "2026-10-27T01:22:54+00:00",
   "probe": {
     "file": "http___lv2plug.in_plugins_eg-amp@unversioned-f046a60efd45.default.probe.json",
-    "sha256": "391812d7d0427cefec9556ffb40b91ba5725897f230c5dce3404a5a0158027f6",
+    "sha256": "8436e5fe495b38a78916c70ce8e3486c505eb85b80358323301c12c9005c54e9",
     "bytes": 3303,
     "protocol": {
       "name": "plugin-hostd.probe-protocol",

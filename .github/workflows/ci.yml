@@ -58,7 +58,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
 
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
@@ -110,17 +110,17 @@ jobs:
     container:
       image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git nodejs npm pkgconf-pkg-config
+      - run: dnf install -y --setopt=install_weak_deps=False git nodejs26 nodejs26-bin nodejs26-npm nodejs26-npm-bin pkgconf-pkg-config
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.20.2' 'omx-contract-devel >= 3.20.2' 'omx-contract-data >= 3.20.0' 'plugin-hostd-contract >= 0.21.0' 'plugin-hostd >= 0.21.0'
+      - run: dnf install -y --setopt=install_weak_deps=False omx-contract omx-contract-devel omx-contract-data plugin-hostd-contract plugin-hostd
       # the store's reader and writer, and the contract packages whose domains the writer checks a record's words against
       - run: >-
           dnf install -y --setopt=install_weak_deps=False
-          'plugin-qualification-db >= 2026112401' 'plugin-qualification-db-write >= 2026112401'
-          'plugin-hostd-contract >= 0.21.0' 'plugin-db-contract >= 0.5.0' omx-clap-contract 'omx-dsp-contract >= 0.34.0'
+          plugin-qualification-db plugin-qualification-db-write
+          plugin-hostd-contract plugin-db-contract omx-clap-contract omx-dsp-contract
       # the installed contract directory, qualification domain included (plugin-hostd-contract's): a writable copy the store
       # contract tests use
       - name: The store commands' contract directory
@@ -129,11 +129,14 @@ jobs:
           [ -n "$dir" ] || dir=/usr/share/omx-contract/contract.d
           mkdir -p /tmp/store-contract
           cp -a "$dir"/. /tmp/store-contract/
-          ls /tmp/store-contract /tmp/store-contract/3
+          ls /tmp/store-contract
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: Install
         run: pnpm install --frozen-lockfile --ignore-scripts
+      # the suite reads the omx-contract installed above, not the registry's copy pnpm install fetched: a devel wave's
+      # is staged, never on npm (npm publishes from a tag only); the package lands under /usr, not the Makefile's /usr/local
+      - run: make link-packaged PREFIX=/usr
       - name: The generated rates are omx-dsp's
         run: node tools/gen-dsp-rates.mjs --check
       - name: Run them
@@ -153,20 +156,28 @@ jobs:
     container:
       image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs gnupg2
+      - run: dnf install -y --setopt=install_weak_deps=False git python3 nodejs26 nodejs26-bin gnupg2
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
-      - run: dnf install -y --setopt=install_weak_deps=False 'omx-contract >= 3.16.0' 'omx-contract-data >= 3.16.0'
+      - run: dnf install -y --setopt=install_weak_deps=False omx-contract omx-contract-data
       # an ordinary run builds against the channel: name where each omx package came from, refuse one from staging (D25,
       # plugin-hostd-protocol#27: a stale staged contract package outranked the channel)
       - name: Every omx package comes from the channel
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.base_ref }}
         run: |
           set -euo pipefail
           dnf repoquery --installed --qf '%{name} %{version} %{from_repo}\n' 'omx-*' 'plugin-*' | tee /tmp/from-repo
-          if grep staging /tmp/from-repo; then echo "a package above came from the staging channel: an ordinary run builds against the channel"; exit 1; fi
+          # a pull request into devel builds against the staging channel (devel -> staging -> prod,
+          # Open-Mixer/.github add-openmixer): there a package from staging is expected; elsewhere refused
+          case $EVENT:$BASE in
+            pull_request*:devel) echo "a pull request into devel: a package from the staging channel is expected here" ;;
+            *) if grep staging /tmp/from-repo; then echo "a package above came from the staging channel: an ordinary run builds against the channel"; exit 1; fi ;;
+          esac
       - uses: Open-Mixer/.github/.github/actions/langpacks@openmixer-v1
         with:
           name: plugin-qualify

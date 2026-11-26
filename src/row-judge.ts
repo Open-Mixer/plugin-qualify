@@ -39,7 +39,7 @@ function pointOf(cell: StoredRecord["record"]["measurements"]["grid"][number]): 
 export function outputOfRows(s: StoredRecord): ProbeOutput {
   const r = s.record;
   return {
-    formatVersion: "1.0",
+    formatVersion: "2.0",
     run: { id: r.run?.id ?? "", startedAt: r.measuredAt, elapsedMs: 0, complete: r.probe.complete, outcome: r.probe.outcome, ...(r.probe.reason === undefined ? {} : { reason: r.probe.reason }), protocol: r.probe.protocol, tools: r.tool, via: "store" },
     plugin: { format: r.plugin.format as "clap" | "lv2", id: r.plugin.id, ...(r.plugin.name === undefined ? {} : { name: r.plugin.name }), ...(r.testedVersion === undefined ? {} : { version: r.testedVersion }) },
     binary: r.binary,

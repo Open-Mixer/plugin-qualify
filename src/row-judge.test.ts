@@ -17,11 +17,11 @@ import { fixtureJson } from "./probe-output-fixtures.js";
 import { readProbeOutput, type ProbeOutput } from "./probe-output.js";
 import { judgeProbeOutput } from "./probe-judge.js";
 import { shippedHostProfile, type HostProfile } from "./host-profiles.js";
-import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, unmeasuredWordOf, type QualificationRecord } from "./qualification-record.js";
+import { QUALIFICATION_RECORD_SCHEMA, buildQualificationRecord, storedBinary, unmeasuredWordOf, type QualificationRecord } from "./qualification-record.js";
 import { FIXTURES } from "./qualify-rejudge.support.js";
 import { MAPPED_COLUMNS, storeExport } from "./store-export.support.js";
 
-const PI = join(FIXTURES, "..", "records-rpi5-0.19.1");
+const PI = join(FIXTURES, "..", "records-rpi5");
 const OPTIONS = { host: "omx-clap-host", by: "plugin-qualify test", at: "2026-11-19T00:00:00.000Z" };
 
 /** The two judges, or the named reason they are not there yet. */
@@ -63,7 +63,7 @@ function enriched(doc: Record<string, any>, memoryUnmeasured = false): Record<st
   for (const p of out.grid ?? []) {
     if (p.outcome !== "probe.ok") continue;
     p.latency = { declaredFrames: 3, measuredFrames: 4, method: "impulse-onset" };
-    p.cost = { unit: "ns-per-sample", median: 41.2, percentile: { p: 95, value: 47.9 }, min: 39, max: 112, iqr: 3, blocks: 100, warmupBlocks: 8, warmupMedian: 50, timingFloorNsPerBlock: 180, voices: { held: 8, basis: "declared", capacity: 16 } };
+    p.cost = { unit: "nsPerSample", median: 41.2, percentile: { p: 95, value: 47.9 }, min: 39, max: 112, iqr: 3, blocks: 100, warmupBlocks: 8, warmupMedian: 50, timingFloorNsPerBlock: 180, voices: { held: 8, basis: "declared", capacity: 16 } };
     p.memory = memoryUnmeasured ? { unmeasuredReason: unmeasuredWordOf("probe.crashed"), unmeasuredDetail: "the run ended probe.crashed" } : { afterInstantiateKb: 20_000, afterActivateKb: 21_000, atRestKb: 20_500, secondInstanceKb: 20_900, notesHeldKb: 22_000, notesHeld: 8, basis: "declared" };
     p.memoryLimit = { bytes: 2_147_483_648, mechanism: "rlimit-as" };
     p.rtSafety = { interposer: true, swept: true, sweepApplicable: true, blocks: 512, allocations: 1, locks: 2, syscalls: 3, threadViolations: 0, processErrors: 0, events: ["alloc"], ownThreads: 1, otherThreads: { allocations: 2, locks: 3, syscalls: 4 } };
@@ -147,8 +147,8 @@ async function firstDifference(e: Entry, omit?: string): Promise<string | undefi
   return undefined;
 }
 
-/** The probe's output as the store exports it: the binary's path below the install root, never the absolute one. */
-const probeWithRelativePath = (o: ProbeOutput): ProbeOutput => ({ ...o, binary: { ...o.binary, path: o.binary.path.slice(o.binary.path.lastIndexOf("/") + 1) } });
+/** The probe's output as the store exports it: the binary in the store's form, its path below the install root. */
+const probeWithRelativePath = (o: ProbeOutput): ProbeOutput => ({ ...o, binary: storedBinary(o.binary) });
 
 /** JSON with its keys in order: two readers of one document may build their objects in another. */
 const canon = (v: unknown): string => JSON.stringify(v, (_k, x) => (x !== null && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));

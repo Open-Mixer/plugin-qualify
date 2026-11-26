@@ -73,6 +73,11 @@ jobs:
       deb-arches: ${{ steps.derive.outputs.deb-arches }}
       cells: ${{ steps.cells.outputs.cells }}
       count: ${{ steps.cells.outputs.count }}
+      # each kind's own cells, so the install keeps the kind a devel merge built when the other is served and skipped
+      rpm-cells: ${{ steps.cells.outputs.rpm }}
+      rpm-count: ${{ steps.cells.outputs.rpm-count }}
+      deb-cells: ${{ steps.cells.outputs.deb }}
+      deb-count: ${{ steps.cells.outputs.deb-count }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -80,7 +85,7 @@ jobs:
       # tools/release-matrix.mjs decides that it was run with omx-contract's isMain (@openmixer/omx-contract/entry)
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - run: pnpm install --frozen-lockfile --ignore-scripts
@@ -145,8 +150,10 @@ jobs:
   installed:
     name: Install and qualify (${{ matrix.cell.image }}, ${{ matrix.cell.arch }})
     needs: [matrix, rpm, deb]
-    # not on a staged run: it reads packages a staged run does not build; no cell, no job
-    if: ${{ !cancelled() && inputs.staged != true && needs.matrix.outputs.count != '0' && needs.rpm.outputs.skipped != 'true' && needs.deb.outputs.skipped != 'true' }}
+    # not on a staged run: it reads packages a staged run does not build; no cell, no job. Each kind is judged on its
+    # own build: a kind whose devel merge was served and skipped (Open-Mixer/.github#297, skipped == 'true') has no
+    # artifact and drops out of the cells, and the kind that was built is still installed (#192)
+    if: ${{ !cancelled() && inputs.staged != true && ((needs.rpm.outputs.skipped != 'true' && needs.matrix.outputs.rpm-count != '0') || (needs.deb.outputs.skipped != 'true' && needs.matrix.outputs.deb-count != '0')) }}
     runs-on: ${{ matrix.cell.runner }}
     timeout-minutes: 20
     permissions:
@@ -161,7 +168,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cell: ${{ fromJSON(needs.matrix.outputs.cells) }}
+        cell: ${{ fromJSON(needs.rpm.outputs.skipped == 'true' && needs.matrix.outputs.deb-cells || needs.deb.outputs.skipped == 'true' && needs.matrix.outputs.rpm-cells || needs.matrix.outputs.cells) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -190,6 +197,10 @@ jobs:
       - name: Add the OpenMixer channel (Fedora)
         if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a devel push stages its build and its dependencies, so its install reads the staging channel, as build-rpm.yml's
+          # and build-deb.yml's jobs do; the real channel serves none of the wave's packages
+          staging: ${{ github.event_name == 'push' && github.ref == 'refs/heads/devel' }}
 
       - name: Install the package (Fedora)
         if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
@@ -233,6 +244,10 @@ jobs:
       - name: Add the OpenMixer channel (Debian)
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a devel push stages its build and its dependencies, so its install reads the staging channel, as build-rpm.yml's
+          # and build-deb.yml's jobs do; the real channel serves none of the wave's packages
+          staging: ${{ github.event_name == 'push' && github.ref == 'refs/heads/devel' }}
 
       - name: Install the package (Debian)
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
@@ -291,7 +306,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
       - name: Install pnpm
         run: npm install -g pnpm@10.33.0
       - name: The tag names the package version

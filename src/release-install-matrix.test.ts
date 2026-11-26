@@ -28,7 +28,11 @@ function builtArtifacts(m: ReturnType<typeof deriveMatrix>): string[] {
 describe('release.yml reads one declaration of its targets (#98)', () => {
   it('the workflow lists no install cell of its own: build and install read the matrix job', () => {
     expect(text).not.toMatch(/^\s*- \{ image: /m);
-    expect(text).toMatch(/cell: \$\{\{ fromJSON\(needs\.matrix\.outputs\.cells\) \}\}/);
+    // the cells are the matrix job's, all of them or one kind's (#192): never a list of the workflow's own
+    const cell = /^ {8}cell: \$\{\{ fromJSON\((.*)\) \}\}$/m.exec(text)?.[1] ?? '';
+    expect(cell).toContain('needs.matrix.outputs.cells');
+    expect([...cell.matchAll(/needs\.matrix\.outputs\.([a-z-]+)/g)].map((m) => m[1]).sort()).toEqual(['cells', 'deb-cells', 'rpm-cells']);
+    expect(cell).not.toMatch(/[[{]/);
     expect(text).toMatch(/suite-matrix: \$\{\{ needs\.matrix\.outputs\.deb-suites \}\}/);
     expect(text).toMatch(/fedora-versions: \$\{\{ needs\.matrix\.outputs\.rpm-fedora \}\}/);
     expect(text).toMatch(/arch-matrix: \$\{\{ needs\.matrix\.outputs\.deb-arches \}\}/);
@@ -79,6 +83,41 @@ describe('release.yml reads one declaration of its targets (#98)', () => {
     const m = deriveMatrix(DECL, { arm: true });
     expect(m.installRpmArches).toEqual(['x86_64']);
     expect(m.installDebArches).toEqual(['arm64']);
+  });
+
+  it('a devel merge whose one kind is served and skipped still install-checks the kind it built (#192)', () => {
+    // the `installed` job's own `if:` and cell list, evaluated as GitHub reads them: && binds tighter than ||, and
+    // each returns the operand that decided it, so `a && b || c` picks b or c
+    const block = text.slice(text.indexOf('\n  installed:\n'));
+    const ifExpr = /^ {4}if: \$\{\{ (.*) \}\}$/m.exec(block)?.[1];
+    const cellExpr = /^ {8}cell: \$\{\{ fromJSON\((.*)\) \}\}$/m.exec(block)?.[1];
+    expect(ifExpr, 'the installed job has an if').toBeTruthy();
+    expect(cellExpr, 'the installed job has a cell list').toBeTruthy();
+    // the skipped output is the string 'true' (.github#299): the quoted form only
+    expect(block.slice(0, block.indexOf('steps:'))).not.toMatch(/outputs\.skipped [!=]= true\b/);
+    const evaluate = (expr: string, ctx: Record<string, unknown>): unknown =>
+      new Function('ctx', `with (ctx) { return (${expr}); }`)(ctx);
+    const RPM = '[{"fedora":"45","arch":"x86_64"}]';
+    const DEB = '[{"suite":"trixie","arch":"arm64"}]';
+    const BOTH = '[{"fedora":"45","arch":"x86_64"},{"suite":"trixie","arch":"arm64"}]';
+    const run = (rpmSkipped: boolean, debSkipped: boolean) => {
+      const ctx = {
+        cancelled: () => false,
+        inputs: {},
+        needs: {
+          matrix: { outputs: { cells: BOTH, count: '2', 'rpm-cells': RPM, 'rpm-count': '1', 'deb-cells': DEB, 'deb-count': '1' } },
+          rpm: { outputs: { skipped: rpmSkipped ? 'true' : '' } },
+          deb: { outputs: { skipped: debSkipped ? 'true' : '' } },
+        },
+      };
+      // GitHub's hyphenated property reads are bracket reads in JS
+      const js = (e: string) => e.replace(/\.([a-z]+-[a-z-]+)/g, "['$1']");
+      return { runs: Boolean(evaluate(js(ifExpr!), ctx)), cells: String(evaluate(js(cellExpr!), ctx)) };
+    };
+    expect(run(false, false)).toEqual({ runs: true, cells: BOTH });
+    expect(run(true, false)).toEqual({ runs: true, cells: DEB });
+    expect(run(false, true)).toEqual({ runs: true, cells: RPM });
+    expect(run(true, true).runs).toBe(false);
   });
 
   it('the rpm target is Fedora 45 alone, and its built artifact is fc45 (no fc44)', () => {

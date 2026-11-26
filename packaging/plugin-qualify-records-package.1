@@ -14,7 +14,7 @@ run writes them (\fBplugin-qualify \-\-out\fR): each directory is a cell, named 
 (\fIrun\fB/b48000-512/qualification\fR), and a run root stands for every
 \fBb\fIrate\fB-\fIquantum\fB/qualification\fR under it. Each package installs every record of its cell, with the probe
 output it judged, under /usr/share/omx/qualification/\fIclass\fR/\fIset\fB-\fIrate\fB-\fIquantum\fR/ beside
-\fBprovenance.json\fR, which names the cell, and depends on the minor
+\fBprovenance.json\fR, whose \fBgrid\fR names the cell, and depends on the minor
 of the plugin-qualify that wrote it, up to the next minor. plugin-qualify-sync(1) reads no directory of records: it reads
 the qualification store, whose base is built from record documents.
 .PP

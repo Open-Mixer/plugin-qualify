@@ -28,11 +28,11 @@ function ownerIn(command: RegExp): string {
 describe('the owner of /usr/share/omx-clap/ts the install check names is the one the package depends on', () => {
   it('Fedora: rpm -qf names a package the spec Requires', () => {
     const owner = ownerIn(/rpm -qf/);
-    expect(spec).toMatch(new RegExp(`^Requires:\\s*${owner.replace(/[.+]/g, '\\$&')}\\s*>=`, 'm'));
+    expect(spec).toMatch(new RegExp(`^Requires:\\s*${owner.replace(/[.+]/g, '\\$&')}\$`, 'm'));
   });
 
   it('Debian: dpkg -S names a package debian/control Depends on', () => {
     const owner = ownerIn(/dpkg -S/);
-    expect(control).toMatch(new RegExp(`[\\s,]${owner.replace(/[.+]/g, '\\$&')} \\(>=`));
+    expect(control).toMatch(new RegExp(`[\\s,]${owner.replace(/[.+]/g, '\\$&')}(,|$)`));
   });
 });

@@ -251,7 +251,7 @@ describe("cost at rate and quantum, from the grid of a probe output", () => {
   function withCost(points: { quantum: number; p95: number; median: number; voices?: object }[]): ProbeOutput {
     const doc = fixtureJson("success-msi");
     const costOf = (p: { p95: number; median: number; voices?: object }) => ({
-      unit: "ns-per-sample",
+      unit: "nsPerSample",
       median: p.median,
       percentile: { p: 95, value: p.p95 },
       blocks: 1000,
@@ -309,7 +309,7 @@ describe("cost at rate and quantum, from the grid of a probe output", () => {
   it("a cost point whose voices are not a count with its basis is refused, not read as an effect's", () => {
     const doc = fixtureJson("success-msi");
     doc["grid"] = [{ rate: 96000, quantum: 1024, outcome: "probe.ok", rtSafety: doc["grid"][0]["rtSafety"],
-      cost: { unit: "ns-per-sample", median: 1, percentile: { p: 95, value: 2 }, blocks: 10, warmupBlocks: 4, voices: { held: 32, basis: "guess" } } }];
+      cost: { unit: "nsPerSample", median: 1, percentile: { p: 95, value: 2 }, blocks: 10, warmupBlocks: 4, voices: { held: 32, basis: "guess" } } }];
     const read = readProbeOutput(JSON.stringify(doc));
     expect(read.ok).toBe(false);
   });

@@ -1,10 +1,10 @@
 name: Install plugin-hostd and its fake worker
-description: plugin-hostd at the package's floor and its fake worker, from the OpenMixer channel, for the pins-file test.
+description: plugin-hostd and its fake worker, from the OpenMixer channel, for the pins-file test.
 
 # Shared by ci.yml and publish.yml: both run the whole suite, and the pins-file test starts the real daemon on a
 # qualified pins file. Their jobs run in a fedora:45 container with the OpenMixer channel added: the channel serves
 # plugin-hostd for Fedora x86_64 at every release, and no amd64 Debian suite carries the 0.21 line (bookworm stopped at
-# 0.20.4, with no qualification domain, which failed the v0.21.0 npm publish). The floors are the spec's Requires.
+# 0.20.4, with no qualification domain, which failed the v0.21.0 npm publish).
 # src/workflows-agree.test.ts fails if a workflow stops using this action.
 
 runs:
@@ -14,9 +14,9 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        # the floors of packaging/plugin-qualify.spec: dnf refuses a channel that serves less, by name
-        dnf install -y --setopt=install_weak_deps=False 'plugin-hostd >= 0.21.0' 'plugin-hostd-tests >= 0.21.0' \
-          'plugin-hostd-contract >= 0.21.0' 'plugin-hostd-protocol-contract >= 0.8.0'
+        # the packages packaging/plugin-qualify.spec requires, as the channel serves them
+        dnf install -y --setopt=install_weak_deps=False plugin-hostd plugin-hostd-tests \
+          plugin-hostd-contract plugin-hostd-protocol-contract
         # the qualification domain is plugin-hostd-contract's: the ordinary test run reads it at the installed place, so
         # a plugin-hostd without it fails here by name, not in the first test
         test -f /usr/share/omx-contract/contract.d/qualification/qualification.json || { echo "::error::plugin-hostd-contract in the channel ships no qualification domain"; exit 1; }

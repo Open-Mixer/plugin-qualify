@@ -5,7 +5,7 @@
  * gen-dsp-rates.mjs — `src/dsp-rates.generated.ts`, omx-dsp's ORACLE_FLOOR_RATES and RT_HARD_TARGET as plain data.
  *
  * Both are omx-dsp's declarations (data/primitives/rates.json there, shipped by omx-dsp-contract as
- * `<contractdir>/<schema major>/omx-dsp/primitives/rates.json`). src/qualify-declarations.ts reaches a public subpath that
+ * `<contractdir>/omx-dsp/primitives/rates.json`). src/qualify-declarations.ts reaches a public subpath that
  * must bundle for a browser, so it cannot read the file: it imports this generated module instead, committed and checked
  * identical, as src/hosting-codes.generated.ts is.
  *
@@ -23,9 +23,8 @@ import { isMain } from '@openmixer/omx-contract/entry';
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 export const OUT = join(PKG, 'src/dsp-rates.generated.ts');
-const SCHEMA_MAJOR = '3';
 const INSTALLED_CONTRACT_DIR = '/usr/share/omx-contract/contract.d';
-const RATES_FILE = join(SCHEMA_MAJOR, 'omx-dsp', 'primitives', 'rates.json');
+const RATES_FILE = join('omx-dsp', 'primitives', 'rates.json');
 
 /** Where omx-dsp's rates file is looked for, in order. */
 export function ratesFileCandidates(env = process.env) {

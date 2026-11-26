@@ -9,13 +9,13 @@
 import { openDomainAt } from "@openmixer/omx-contract/domain-reader";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { initProbeDomain, PROBE_DOMAIN, PROBE_DOMAIN_FLOOR, ProbeDomainError, registerInstalledProbeReader, type ProbeWordSource } from "./probe-domain.js";
+import { initProbeDomain, PROBE_DOMAIN, ProbeDomainError, registerInstalledProbeReader, type ProbeWordSource } from "./probe-domain.js";
 import { INSTALLED_CONTRACT_DIR } from "./qualification-installed-dir.js";
 
 /** Opens the domain from `<dir>/probe/probe.json` (the first of a list that holds it): the explicit entry of a test or a CLI. */
 export function openProbeDomainAt(dirs: string | readonly string[]): ProbeWordSource {
   try {
-    return openDomainAt(dirs, PROBE_DOMAIN, PROBE_DOMAIN_FLOOR);
+    return openDomainAt(dirs, PROBE_DOMAIN);
   } catch (e) {
     throw new ProbeDomainError(Array.isArray(dirs) ? dirs.join(":") : String(dirs), (e as Error).message);
   }

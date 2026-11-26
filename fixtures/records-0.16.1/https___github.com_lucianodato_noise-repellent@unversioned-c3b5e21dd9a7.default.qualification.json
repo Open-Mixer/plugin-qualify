@@ -223,7 +223,7 @@
   "measuredAt": "2026-10-27T00:35:59+00:00",
   "probe": {
     "file": "https___github.com_lucianodato_noise-repellent@unversioned-c3b5e21dd9a7.default.probe.json",
-    "sha256": "7520c08b8bfab1159cb221754a94b075887c360080f8db36a7ffbf665ff08251",
+    "sha256": "e6d90e59b4f92d669bb852653fba069e8c4789558f60d7769b08949acfbdcc79",
     "bytes": 3390,
     "protocol": {
       "name": "plugin-hostd.probe-protocol",

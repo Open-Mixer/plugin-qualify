@@ -9,7 +9,7 @@ importers:
   .:
     dependencies:
       '@openmixer/omx-contract':
-        specifier: '>=3.20.2'
+        specifier: '*'
         version: 3.20.2
       ajv:
         specifier: 8.20.0

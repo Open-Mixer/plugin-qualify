@@ -20,7 +20,7 @@ import {
   parseJsonl,
 } from '../dist/measurement/index.js';
 
-/** The dimensions a hosting sweep covers. */
+/** The dimensions a hosting sweep covers when its run record names none. */
 export const HOSTING_DIMENSIONS = ['stability', 'rtSafety', 'features'];
 
 /**
@@ -32,16 +32,19 @@ export function hostingSweepDocument(dir) {
   const passes = run.passes ?? {};
   if (!passes.measurements) throw new Error(`${dir}/sweep-run.json names no measurements pass`);
   const read = (name) => (name ? parseJsonl(readFileSync(join(dir, name), 'utf8')) : undefined);
+  const dimensions = run.dimensions ?? HOSTING_DIMENSIONS;
+  const cost = [passes.cost ?? []].flat().flatMap((name) => read(name));
   const plugins = measuredPluginsFromSweep({
     measurements: read(passes.measurements),
     lifecycle: read(passes.lifecycle),
     soak: read(passes.soak),
-  });
+    cost,
+  }, dimensions);
   return buildMeasurementDocument(
     buildRun({
       id: run.id,
       measuredAt: run.measuredAt,
-      dimensions: HOSTING_DIMENSIONS,
+      dimensions,
       rates: run.rates,
       tool: run.tool,
       host: run.host,

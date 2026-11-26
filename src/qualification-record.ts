@@ -532,8 +532,9 @@ const byBytes = (a: string, b: string): number => Buffer.compare(Buffer.from(a),
 /**
  * The binary as the store holds it (the store spec's section 3.7): its path below the install root, never an absolute one,
  * and the list of files in ascending byte order of their paths. The key is the entry at that path, which the probe
- * output already names. The sync puts its records in this form; a record the `judge` command writes to a directory keeps
- * the path the probe measured.
+ * output already names. Every record is written in this form, the sync's and the one `--out` or `judge` writes to a
+ * directory alike, since a set is imported from such a directory as it is (#141); the probe output beside it keeps the
+ * path the probe measured.
  */
 export function storedBinary(b: ProbeOutput["binary"]): ProbeOutput["binary"] {
   const files = [...b.files].sort((x, y) => byBytes(x.path, y.path));
@@ -564,7 +565,7 @@ export function buildQualificationRecord(
     schema: QUALIFICATION_RECORD_SCHEMA,
     plugin: { format: o.plugin.format, id: o.plugin.id, ...(o.plugin.name === undefined ? {} : { name: o.plugin.name }) },
     ...(o.plugin.version === undefined ? {} : { testedVersion: o.plugin.version }),
-    binary: o.binary,
+    binary: storedBinary(o.binary),
     ...(o.plugin.format === "clap" && o.offer.clapExtensions !== undefined ? { hostExtensions: [...o.offer.clapExtensions] } : {}),
     ...(pkg === undefined ? {} : { package: pkg }),
     verdicts: verdictRows(judgment),

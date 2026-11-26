@@ -123,8 +123,8 @@
   "measuredAt": "2026-10-28T20:56:58+00:00",
   "probe": {
     "file": "in.lsp-plug.impulse_responses_mono@unversioned-d5235d2f5f53.custom.probe.json",
-    "sha256": "bc818dfeff46238de3b5558ab8d54aa5677a18f6e3cad79c67bc117313d0a79d",
-    "bytes": 3894,
+    "sha256": "5854f7b504b0172956871add7d6991bbf11bce6a7423cd69124e1a1c4eac9ba6",
+    "bytes": 3892,
     "protocol": {
       "name": "plugin-hostd.probe-protocol",
       "version": 1

@@ -650,7 +650,7 @@ With several profiles, the exit code is `0` only if every plugin qualifies under
 
 ### The JSON document
 
-`--out <dir>` writes one interchange document per run (`lv2-plugin-measurements`, format 1.6,
+`--out <dir>` writes one interchange document per run (`lv2-plugin-measurements`, format 1.7,
 the same format the OpenMixer console reads). The
 `plugins` array holds the raw, host-free measurements. Beside it, `hostProfiles` holds each
 profile the run judged against, in full, and `verdicts` holds one entry per plugin per profile:
@@ -937,7 +937,7 @@ plugin-qualify-records-package out/ --cell 48000/256 --host-class rpi5 --set zyn
 
 A directory's cell is the one its base is named for (`b48000-512`), else `--cell`, else the one cell every record's
 grid holds; a directory whose records hold several cells and that names none is refused, and so are two directories
-of one cell. Each cell's set is `<set>-<rate>-<quantum>`, and its `provenance.json` carries `cell`. A record whose grid
+of one cell. Each cell's set is `<set>-<rate>-<quantum>`, and its `provenance.json` names that cell in its `grid`. A record whose grid
 does not hold its set's cell is left out and named. A sync applies a set only at the cell its records were measured at.
 
 It writes `plugin-db-qualification-<host class>-<set>-<rate>-<quantum>_<version>_all.deb` per cell, a package of plugin-db's qualification
