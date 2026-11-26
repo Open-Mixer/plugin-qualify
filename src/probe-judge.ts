@@ -16,6 +16,7 @@
  * - The note sweep's block count is the parameter sweep's: both run in one prober process at one
  *   block count, and the schema holds the note sweep's counts but not its blocks.
  */
+import type { ResourceHintsCheck } from "./resource-hints-check.js";
 import { GROUPABLE_CONDITIONAL_CODES, sharesAWorker } from "./pin-grouping.js";
 import { DEFAULT_HOSTING_POLICY } from "./qualify-declarations.js";
 import {
@@ -220,6 +221,8 @@ export interface Judgment {
   readonly hosts: readonly HostJudgment[];
   /** For a CLAP plugin, the document of each host that today's judge writes; the pins are taken from these. */
   readonly documents: readonly RtSafetyDocument[];
+  /** The plugin's declared resource hints against what this run measured (#198), when the plugin states any. Beside the verdicts. */
+  readonly resourceHints?: ResourceHintsCheck;
 }
 
 function decidingOf(reasons: readonly RecordReason[], rating: SuitabilityRating): RecordReason | undefined {

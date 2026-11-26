@@ -144,6 +144,24 @@ ceiling and does not say the plugin fits. The other hosts have no budget, and re
 A soak (LV2; the CLAP prober has no continuous render yet) also reads the growth: past 10 MB per minute of audio over its
 second half, provisional, the rate fails as `leaks`.
 
+### Declared resource hints against the measurement
+
+A CLAP plugin may state its own footprint in `org.openmixer.resource-hints.draft/0` (omx-contract's `RESOURCE_HINTS`).
+omx-clap-scan prints what it states, and a hint is a claim: the record's `resourceHints` block holds, for each of the seven
+hints in the declaration's order, the declared figure, the measured one, the cell it was taken at and a verdict
+(`src/resource-hints-check.ts`):
+
+| Hint | Measured as | Verdict |
+|---|---|---|
+| `footprint-at-rest` | the largest `atRestKb` of a cell that ran to its end | `exceeds` past the declared figure plus 25 % and 256 KB (`RESOURCE_HINT_MEMORY_TOLERANCE`, `RESOURCE_HINT_MEMORY_SLACK_KB`), else `agrees` |
+| `footprint-per-voice` | what the notes held added over the rest figure, per note | the same |
+| `threads-spawned` | the threads the plugin started itself while the interposer watched (`rtSafety.ownThreads`) | `exceeds` above the declared count, else `agrees` |
+| `shared-load`, `streams-from-disk`, `opens-sockets`, `activate-time` | not measured | `unmeasured` |
+
+A hint the plugin does not state is `unknown`, never zero, and a stated hint no cell took a figure for is `unmeasured`,
+never agreed. A declaration the host refused (`hosting.resource-hints.*`) keeps its code and has no rows. A plugin that
+states no hint has no block. The comparison sits beside the verdicts and does not change them.
+
 Why each piece is built this way: the technical note
 [How a plugin's memory is judged](https://openmixer.org/notes/how-a-plugins-memory-is-judged). A plugin that returns with
 a callee-saved register changed is the note

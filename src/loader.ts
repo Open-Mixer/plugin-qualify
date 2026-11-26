@@ -5,6 +5,7 @@
  * loader turns a command-line target into the plugins it names. `lv2Loader` and `clapLoader` are
  * its implementations.
  */
+import type { DeclaredResourceHints } from "./resource-hints-check.js";
 
 /** One plugin a target resolved to. */
 export interface PluginTarget {
@@ -17,6 +18,8 @@ export interface PluginTarget {
   readonly binary?: string;
   /** The shared object's full path, when the format's loader reads it off the scan (a CLAP). */
   readonly binaryPath?: string;
+  /** The resource hints the plugin declares, as the scan read them (a CLAP that states any); absent when it states none. */
+  readonly resourceHints?: DeclaredResourceHints;
 }
 
 export interface PluginLoader {

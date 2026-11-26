@@ -11,6 +11,7 @@
  * Not yet in the record: the fingerprint of the descriptor's controls, since the descriptor is
  * written by the scan (stage 5) and plugin-qualify does not read one yet.
  */
+import type { ResourceHintsCheck } from "./resource-hints-check.js";
 import { sharesAWorker } from "./pin-grouping.js";
 import type { MemoryFootprint } from "./measurement/format.js";
 import { firstInstanceKb, perInstanceKb } from "./memory-budget.js";
@@ -371,6 +372,11 @@ export interface QualificationRecord {
    * its code, or `measured: false` when it was not tried. Beside the verdicts, which it does not change (#223).
    */
   readonly adapter?: AdapterBlock;
+  /**
+   * The plugin's declared resource hints against the figures below (#198): per hint, declared, measured and the verdict
+   * (`agrees`, `exceeds`, `unknown` when not stated, `unmeasured` when no figure was taken). Absent when it states none.
+   */
+  readonly resourceHints?: ResourceHintsCheck;
   readonly tiers: RecordTiers;
   /** The cost reasons at each host's rate and quantum, beside the verdicts; an instrument's with the notes it held. */
   readonly cost: readonly {
@@ -570,6 +576,7 @@ export function buildQualificationRecord(
     ...(pkg === undefined ? {} : { package: pkg }),
     verdicts: verdictRows(judgment),
     ...(judgment.adapter === undefined ? {} : { adapter: judgment.adapter }),
+    ...(judgment.resourceHints === undefined ? {} : { resourceHints: judgment.resourceHints }),
     tiers: tiersOf(judgment),
     cost: judgment.hosts.map((h) => ({ host: h.verdict.host, ...h.cost })),
     measurements: {

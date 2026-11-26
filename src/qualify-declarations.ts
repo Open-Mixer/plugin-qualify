@@ -41,6 +41,17 @@ export const QUALIFY_RATES: readonly number[] = ORACLE_FLOOR_RATES;
 /** The quanta (frames) a run rates cost at when `--quanta` is not given: the contract's hard-target quantum, the reference, 512 and the long quantum. */
 export const QUALIFY_QUANTA: readonly number[] = [RT_HARD_TARGET.quantum, QUANTUM_FRAMES, 512, LONG_QUANTUM_FRAMES];
 
+/**
+ * How far a measured footprint may sit above the figure a plugin's resource hint declares before the hint reads as
+ * exceeded (`resource-hints-check.ts`): this fraction of the declared figure, plus {@link RESOURCE_HINT_MEMORY_SLACK_KB}.
+ * The measurement is the resident set's growth, read in pages and beside the allocator's own slack, so a hint exact to
+ * the byte still reads a little above its figure.
+ */
+export const RESOURCE_HINT_MEMORY_TOLERANCE = 0.25;
+
+/** The fixed slack, in KB, a measured footprint may sit above a declared hint beside the tolerance (one allocator arena's worth of pages). */
+export const RESOURCE_HINT_MEMORY_SLACK_KB = 256;
+
 /** Seconds one plugin's offline pass may take before its worker is killed and it reads as a timeout. */
 export const PLUGIN_TIMEOUT_S = 15;
 

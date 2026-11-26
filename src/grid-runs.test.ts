@@ -78,6 +78,26 @@ const invokedCells = (cs: readonly Call[]) => cs.flatMap((c) => (c.plugin.starts
 const FULL = QUALIFY_RATES.flatMap((r) => QUALIFY_QUANTA.map((q) => `${r}/${q}`)).sort();
 const exists = () => true;
 
+describe("a CLAP plugin's declared resource hints ride the pass into its record (#198)", () => {
+  it("each run's judgment and its record carry the comparison; a target that states none carries none", () => {
+    const hinted = {
+      ...CLAP,
+      resourceHints: { declared: 1, hints: { "footprint-at-rest": { unit: "bytes", figure: 1 << 20 }, "threads-spawned": { unit: "count", figure: null } } },
+    };
+    const pass = qualifyTargets([hinted], { rates: [48000], quanta: [256], profiles: [OMX_CLAP_HOST_PROFILE], env: env(), exists, admissions: HOSTS_ADMIT });
+    expect(pass.failures).toEqual([]);
+    expect(pass.runs.length).toBeGreaterThan(0);
+    for (const run of mergeRunsByRecord(pass.runs)) {
+      const { record } = writeQualification(join(scratch, `hints-${String(n)}`), run.bytes, run.judgment);
+      expect(record.resourceHints?.declared).toBe(1);
+      expect(record.resourceHints?.hints.find((h) => h.hint === "footprint-at-rest")?.declared).toBe(1 << 20);
+      expect(record.resourceHints?.hints.find((h) => h.hint === "threads-spawned")?.verdict).toBe("unknown");
+    }
+    const bare = qualifyTargets([CLAP], { rates: [48000], quanta: [256], profiles: [OMX_CLAP_HOST_PROFILE], env: env(), exists, admissions: HOSTS_ADMIT });
+    for (const run of bare.runs) expect(run.judgment.resourceHints).toBeUndefined();
+  });
+});
+
 describe("the runner is invoked at every cell of the grid, an LV2 plugin like a CLAP one", () => {
   for (const target of [CLAP, LV2]) {
     it(`${target.format}: the full grid is sixteen cells asked for and sixteen in the record`, () => {

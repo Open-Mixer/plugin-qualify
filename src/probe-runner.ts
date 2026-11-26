@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:f
 import { availableParallelism, loadavg, tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { checkResourceHints } from "./resource-hints-check.js";
 import { ClapQualifyError, clapQualifyTools, proberOffer, type RtSafetyDocument } from "./clap-qualify.js";
 import { locateNativeTool } from "./tool-paths.js";
 import type { HostProfile } from "./host-profiles.js";
@@ -366,7 +367,13 @@ export function qualifyTargets(
       for (const { offer, profiles: forOffer } of byOffer.values()) {
         const probed = probeTarget(target, { ...options, ...measured, offer });
         const plain = judgeProbeOutput(probed.output, forOffer, { admissions });
-        const judgment = { ...plain, ...(adapter === undefined ? {} : { adapter }), ...(probed.load === undefined ? {} : { load: probed.load }) };
+        const hints = target.resourceHints === undefined ? undefined : checkResourceHints(target.resourceHints, probed.output.grid);
+        const judgment = {
+          ...plain,
+          ...(adapter === undefined ? {} : { adapter }),
+          ...(probed.load === undefined ? {} : { load: probed.load }),
+          ...(hints === undefined ? {} : { resourceHints: hints }),
+        };
         targetRuns.push({ bytes: probed.bytes, judgment, stderr: probed.stderr });
         for (const v of judgmentVerdicts(judgment)) judged.set(v.host, v);
       }
