@@ -1,3 +1,11 @@
+plugin-qualify (0.21.3) unstable; urgency=medium
+
+  * Published by the devel release of the full matrix (every Fedora release
+    and architecture, every Debian cell), with every change merged to devel
+    since 0.21.2.
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Thu, 26 Nov 2026 23:12:02 +0100
+
 plugin-qualify (0.21.2) unstable; urgency=medium
 
   * The npm publish job marks its container checkout safe for git, so the
