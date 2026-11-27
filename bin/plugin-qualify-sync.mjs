@@ -4,12 +4,13 @@
 /**
  * `plugin-qualify-sync`, the entry point. Every decision is in `src/qualify-sync.ts`; this file reads argv and the
  * settings file, runs one sync, prints its summary line and exits. The exit is 0 whenever the run went through,
- * whatever the plugins' verdicts: a refused plugin is a result, not a failure of the service.
+ * whatever the plugins' verdicts: a refused plugin is a result, not a failure of the service. A record the store's writer
+ * refused is skipped and named, the run goes on, and the exit is 1. `--queue` lists what a run would measure, and why.
  */
 import "../dist/qualification-cli-start.js";
 import { readFileSync } from "node:fs";
 
-import { QualificationStore, SYNC_CONF, localeOf, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, resolveSyncSettings, runSync, summaryLine, syncHelpText, textOf } from "../dist/index.js";
+import { QualificationStore, SYNC_CONF, localeOf, parseSyncArgs, parseSyncConf, pluginCounts, pluginCountsLine, queueText, requalifyQueue, resolveSyncSettings, runSync, summaryLine, syncHelpText, textOf } from "../dist/index.js";
 
 const log = (line) => process.stderr.write(`plugin-qualify-sync: ${line}\n`);
 
@@ -46,6 +47,18 @@ if (!resolved.ok) {
 }
 for (const w of resolved.warnings) log(textOf(w, localeOf(process.env)));
 const s = resolved.settings;
+if (parsed.args.queue) {
+  // the re-qualify queue (#204): what a run would measure here and why; nothing is measured or written
+  try {
+    const q = requalifyQueue(s);
+    process.stdout.write(queueText(q.queued));
+    log(`queue: ${String(q.queued.length)} of ${String(q.installed)} installed plugins to measure for the class ${s.hostClass ?? "(none)"} at ${s.grid.kind === "cells" ? s.grid.cells.map((c) => `${String(c.rate)}/${String(c.quantum)}`).join(",") : s.grid.kind}`);
+    process.exit(0);
+  } catch (e) {
+    log(`the queue could not be read: ${e.message}`);
+    process.exit(2);
+  }
+}
 const grid = s.grid.kind === "cells" ? s.grid.cells.map((c) => `${String(c.rate)}/${String(c.quantum)}`).join(",") : s.grid.kind;
 log(
   `CLAP ${s.clapDirs.join(":")}; LV2 ${s.lv2Dirs.join(":")}; host ${s.hostProfile.id}; grid ${grid}` +
@@ -63,6 +76,11 @@ try {
     if (summary.machineFailure !== undefined) process.exit(1);
     // --plugin with a target no plugin on the search path is: the ask could not run
     if (summary.pluginAbsent !== undefined) process.exit(2);
+    // a record the store's writer refused: skipped and named, every other stored and pinned (#205)
+    if (summary.refusedRecords !== undefined) {
+      log(`refused by the store's writer: ${summary.refusedRecords.join(", ")}`);
+      process.exit(1);
+    }
   }
 } catch (e) {
   log(`the run stopped: ${e.message}`);

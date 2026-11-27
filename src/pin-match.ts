@@ -18,8 +18,10 @@ import type { SuitabilityRating } from "./rating.js";
 export type StoredMatch =
   /** No record names the plugin: it is measured, and nothing is said. */
   | { readonly status: "none" }
-  /** Every reason a record found was not taken, one line each; the plugin is measured. */
-  | { readonly status: "ignored"; readonly lines: readonly string[] }
+  /** Every reason a record found was not taken, one line each; the plugin is measured. `why` is the first reason that
+   * left none: no record of these bytes, none at the cells the sync runs at, none judged for this host, or one the
+   * source itself left unmeasured (the re-qualify queue's reason, #204). */
+  | { readonly status: "ignored"; readonly lines: readonly string[]; readonly why: "bytes" | "cell" | "host" | "source-unmeasured" }
   /** The plugin's keys of these bytes, in the order the reader gave them (the user layer first). Which record of a key is
    * taken is the store's claim at the machine's cell (`QualificationStore.recordAt`), not this order (#152). */
   | { readonly status: "applies"; readonly keys: readonly ShadowKey[]; readonly lines: readonly string[] };
@@ -63,7 +65,7 @@ export function matchStored(
     }
     mine.set(id, cellsOf);
   }
-  if (mine.size === 0) return { status: "ignored", lines };
+  if (mine.size === 0) return { status: "ignored", lines, why: "bytes" };
   const atCell = [...mine.values()].filter((cellsOf) => {
     const held = new Set(cellsOf.map((c) => cellKey(c)));
     if (cells.every((c) => held.has(cellKey(c)))) return true;
@@ -78,9 +80,9 @@ export function matchStored(
   });
   if (unmeasured !== undefined) {
     say(`stored: ${storedUri(item, unmeasured[0]!)}: unmeasured at the source, measured here`);
-    return { status: "ignored", lines };
+    return { status: "ignored", lines, why: "source-unmeasured" };
   }
-  if (judged.length === 0) return { status: "ignored", lines };
+  if (judged.length === 0) return { status: "ignored", lines, why: atCell.length === 0 ? "cell" : "host" };
   return { status: "applies", keys: atCell.map((c) => keyOf(c[0]!)), lines };
 }
 
