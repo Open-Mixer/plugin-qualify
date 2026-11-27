@@ -1,3 +1,10 @@
+plugin-qualify (0.21.3) unstable; urgency=medium
+
+  * a patch: 0.21.2 was tagged on an earlier commit, so the staged build ships
+    as 0.21.3
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Fri, 27 Nov 2026 06:20:33 +0000
+
 plugin-qualify (0.21.2) unstable; urgency=medium
 
   * The npm publish job marks its container checkout safe for git, so the
