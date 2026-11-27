@@ -1,3 +1,10 @@
+plugin-qualify (0.22.1) unstable; urgency=medium
+
+  * plugin-qualify-sync --queue lists what a run would measure and why; a
+    record the writer refuses is skipped and named (#207)
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Fri, 27 Nov 2026 18:08:43 +0100
+
 plugin-qualify (0.22.0) unstable; urgency=medium
 
   * Resource hints: a plugin's declared hints compared with what the run
