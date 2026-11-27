@@ -133,6 +133,55 @@ class ClapMapping(unittest.TestCase):
         validator().check(doc)
 
 
+def kind_vectors():
+    """omx-contract's vectors of the one rule for a scanned CLAP parameter's kind (its docs/descriptors.md, "A scanned
+    CLAP parameter's kind"), from the first place that holds them (descriptors.clap_kind_vectors_candidates)."""
+    for path in d.clap_kind_vectors_candidates():
+        if os.path.isfile(path):
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)["vectors"]
+    raise AssertionError(f"omx-contract's clap-kind-vectors.json is in none of {d.clap_kind_vectors_candidates()}")
+
+
+def vector_param(i):
+    """A vector's input as clap-qualify's scan prints the parameter: the flag words, the range, an enum's labels."""
+    p = {"id": 0, "name": "p", "module": "", "min": i["min"], "max": i["max"], "default": i["default"],
+         "flags": [f[len("CLAP_PARAM_IS_"):].lower() for f in i["flags"]]}
+    if i["points"] and "enum" in p["flags"]:
+        p["labels"] = [{"value": v, "label": f"{v} text{v}"} for v in range(int(i["min"]), int(i["max"]) + 1)]
+    return p
+
+
+class ClapKind(unittest.TestCase):
+    """A scanned CLAP parameter's kind is omx-contract's one rule, as plugin-hostd's describe reads it: the vectors are
+    the test, never restated. clap-qualify's scan carries no org.openmixer.param-contract/1 entry, so the vectors with a
+    contract entry are not a scan this writer sees. Measured on the Pi: omx-comp 0.21.1's switches (Key Listen, a
+    stepped 0 to 1) were written as stepped travels, and omx-panel refused the panel ("'p14' is drawn as a switch and is
+    not a toggle"), so its screen drew no panel."""
+
+    def test_every_vector_without_a_contract_entry(self):
+        vectors = [v for v in kind_vectors() if v["input"]["contract"] is None]
+        self.assertGreaterEqual(len(vectors), 10, "the vectors file holds the rule's cases")
+        for v in vectors:
+            with self.subTest(v["name"]):
+                c = d.clap_control(vector_param(v["input"]), "kind.clap#clap_entry[org.openmixer.test.kind]")
+                self.assertEqual(c["kind"], v["expect"]["kind"])
+                if c["kind"] == "toggle":
+                    self.assertEqual(c.get("default"), v["expect"]["default"])
+                    self.assertNotIn("travel", c)
+                if c["kind"] == "travel":
+                    self.assertEqual(c["travel"]["scale"], v["expect"]["scale"])
+
+    def test_a_switch_of_omx_comp_is_a_toggle_and_the_descriptor_holds(self):
+        scan = controls_scan(SHA_A)
+        scan["files"][0]["plugins"][0]["params"].append(
+            {"id": 14, "name": "Key Listen", "module": "Key", "min": 0, "max": 1, "default": 0, "flags": ["stepped", "automatable"]})
+        [(doc, _)] = d.clap_described(scan)
+        key = [c for c in doc["controls"] if c["id"] == 14][0]
+        self.assertEqual((key["kind"], key["default"]), ("toggle", False))
+        validator().check(doc)
+
+
 class Writing(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.mkdtemp(prefix="descriptors-")
