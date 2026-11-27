@@ -6,7 +6,9 @@
  * omx-clap declares every hosting code: one `HOSTING_<DIMENSION>_CODES` table per dimension,
  * rendered into the modules its package installs under `pkg-config --variable=tsdir omx-clap`
  * (BUILDING.md) — `omx-clap-vocabulary.js` for the dimensions carried from omx-contract,
- * `omx-clap-hosting.js` for `hosting.idle.*`. `tools/gen-hosting-codes.mjs` reads them here
+ * `omx-clap-hosting-codes.js` for the dimensions of omx-clap's own hosting domain (`hosting.idle.*`,
+ * `hosting.window.*`, rendered from the hosting domain document omx-clap ships since 0.36.0; the
+ * `omx-clap-hosting.js` beside it now carries the stage limits, no code). `tools/gen-hosting-codes.mjs` reads them here
  * to write `src/hosting-codes.generated.ts`, and the conformance test reads them here to hold that
  * file to them.
  *
@@ -19,7 +21,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The two TypeScript modules omx-clap's `tsdir` carries, each a `HOSTING_<DIMENSION>_CODES` source. */
-export const CLAP_TS_MODULES = Object.freeze(['omx-clap-vocabulary.js', 'omx-clap-hosting.js']);
+export const CLAP_TS_MODULES = Object.freeze(['omx-clap-vocabulary.js', 'omx-clap-hosting-codes.js']);
 
 /** This package's root. */
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -73,9 +75,12 @@ export async function loadHostingTables(dir) {
     // CommonJS and refuses `export`, so the source is imported as a data: module, which is a module on every Node.
     const source = readFileSync(join(dir, name), 'utf8');
     const mod = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
-    for (const [exportName, table] of Object.entries(mod)) {
-      if (isHostingTableName(exportName)) tables[exportName] = table;
-    }
+    const names = Object.keys(mod).filter(isHostingTableName);
+    // a module of the list that exports no hosting table is a module that moved, never an empty dimension: refused by
+    // name, so its codes are never dropped from the generated file in silence (omx-clap 0.36.0 moved hosting.idle.* and
+    // hosting.window.* out of omx-clap-hosting.js)
+    if (names.length === 0) throw new Error(`${join(dir, name)} exports no HOSTING_<DIMENSION>_CODES table: omx-clap's hosting codes are not where this tool reads them`);
+    for (const exportName of names) tables[exportName] = mod[exportName];
   }
   return tables;
 }
