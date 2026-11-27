@@ -201,6 +201,8 @@ jobs:
           # a devel push stages its build and its dependencies, so its install reads the staging channel, as build-rpm.yml's
           # and build-deb.yml's jobs do; the real channel serves none of the wave's packages
           staging: ${{ github.event_name == 'push' && github.ref == 'refs/heads/devel' }}
+          # a pull request into devel in a wave reads that wave's devel channel above staging (Open-Mixer/.github#329)
+          devel-channel: ${{ startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel' && vars.OMX_DEVEL_CHANNEL || '' }}
 
       - name: Install the package (Fedora)
         if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
@@ -248,6 +250,8 @@ jobs:
           # a devel push stages its build and its dependencies, so its install reads the staging channel, as build-rpm.yml's
           # and build-deb.yml's jobs do; the real channel serves none of the wave's packages
           staging: ${{ github.event_name == 'push' && github.ref == 'refs/heads/devel' }}
+          # a pull request into devel in a wave reads that wave's devel channel above staging (Open-Mixer/.github#329)
+          devel-channel: ${{ startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel' && vars.OMX_DEVEL_CHANNEL || '' }}
 
       - name: Install the package (Debian)
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
