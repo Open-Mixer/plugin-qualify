@@ -153,6 +153,23 @@ def schema_candidates(env=None):
     ]
 
 
+CLAP_KIND_VECTORS_ENV = "OMX_CONTRACT_KIND_VECTORS"
+
+
+def clap_kind_vectors_candidates(env=None):
+    """Where omx-contract's vectors of the CLAP kind rule are looked for, in order: the setting, this package's
+    omx-contract, the installed one (omx-contract-data's data directory)."""
+    env = os.environ if env is None else env
+    named = env.get(CLAP_KIND_VECTORS_ENV)
+    if named:
+        return [named]
+    rel = os.path.join("share", "omx-contract", "clap-kind-vectors.json")
+    return [
+        os.path.join(PKG, "node_modules", "@openmixer", "omx-contract", rel),  # a checkout
+        os.path.join(os.path.dirname(DESCRIPTOR_SCHEMA_INSTALLED), "clap-kind-vectors.json"),
+    ]
+
+
 LV2_DOMAIN = os.path.join("lv2", "lv2.json")
 OPENMIXER_UNIT_PREFIX = "urn:openmixer:unit#"
 INSTALLED_CONTRACT_DIR = "/usr/share/omx-contract/contract.d"
@@ -350,6 +367,13 @@ def clap_control(p, entry):
         for i, lb in enumerate(labels):
             if lb["value"] == p.get("default"):
                 c["default"] = ids[i]
+    elif "stepped" in flags and p["min"] == 0 and p["max"] == 1:
+        # omx-contract's one rule for a scanned CLAP parameter's kind (docs/descriptors.md, held by its
+        # clap-kind-vectors.json, as plugin-hostd's describe reads it): stepped, no enumeration, from 0 to 1 is a
+        # toggle, on from 0.5. The scan carries no param-contract entry, so the step is the stepped flag's, 1.
+        c["kind"] = "toggle"
+        if _number(p.get("default")):
+            c["default"] = p["default"] >= 0.5
     else:
         c["kind"] = "travel"
         travel = {
