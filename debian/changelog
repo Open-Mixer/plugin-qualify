@@ -1,3 +1,10 @@
+plugin-qualify (0.22.0) unstable; urgency=medium
+
+  * Resource hints: a plugin's declared hints compared with what the run
+    measured, per hint, in the record (#198).
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Fri, 27 Nov 2026 03:27:39 +0100
+
 plugin-qualify (0.21.2) unstable; urgency=medium
 
   * The npm publish job marks its container checkout safe for git, so the
