@@ -2,6 +2,9 @@ plugin-qualify (0.22.0) unstable; urgency=medium
 
   * Resource hints: a plugin's declared hints compared with what the run
     measured, per hint, in the record (#198).
+  * A scanned CLAP parameter that is stepped, no enumeration, from 0 to 1 is
+    written as a toggle, by omx-contract's kind rule, so omx-panel draws the
+    switch a plugin's panel declares (#208).
 
  -- Pau Aliagas <linuxnow@gmail.com>  Fri, 27 Nov 2026 03:27:39 +0100
 

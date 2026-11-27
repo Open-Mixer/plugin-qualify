@@ -244,6 +244,9 @@ the English source sentence.
 * Fri Nov 27 2026 Pau Aliagas <linuxnow@gmail.com> - 0.22.0-1
 - Resource hints: a plugin's declared hints compared with what the run
   measured, per hint, in the record (#198).
+- A scanned CLAP parameter that is stepped, no enumeration, from 0 to 1 is
+  written as a toggle, by omx-contract's kind rule, so omx-panel draws the
+  switch a plugin's panel declares (#208).
 
 * Thu Nov 26 2026 Pau Aliagas <linuxnow@gmail.com> - 0.21.3-1
 - Published by the devel release of the full matrix (every Fedora release
