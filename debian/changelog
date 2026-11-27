@@ -1,3 +1,11 @@
+plugin-qualify (0.21.4) unstable; urgency=medium
+
+  * A scanned CLAP parameter that is stepped, no enumeration, from 0 to 1 is
+    written as a toggle, by omx-contract's kind rule, so omx-panel draws the
+    switch a plugin's panel declares (#208).
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Fri, 27 Nov 2026 14:28:37 +0100
+
 plugin-qualify (0.21.3) unstable; urgency=medium
 
   * Published by the devel release of the full matrix (every Fedora release
