@@ -3,8 +3,7 @@ description: plugin-hostd and its fake worker, from the OpenMixer channel, for t
 
 # Shared by ci.yml and publish.yml: both run the whole suite, and the pins-file test starts the real daemon on a
 # qualified pins file. Their jobs run in a fedora:45 container with the OpenMixer channel added: the channel serves
-# plugin-hostd for Fedora x86_64 at every release, and no amd64 Debian suite carries the 0.21 line (bookworm stopped at
-# 0.20.4, with no qualification domain, which failed the v0.21.0 npm publish).
+# plugin-hostd for Fedora x86_64 at every release.
 # src/workflows-agree.test.ts fails if a workflow stops using this action.
 
 runs:
