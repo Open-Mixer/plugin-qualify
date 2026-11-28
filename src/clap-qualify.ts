@@ -10,7 +10,7 @@
  * read, a prober that is absent, crashed or timed out, is a {@link ClapQualifyError}: nothing was
  * measured, and nothing is rated.
  */
-import { GROUPABLE_CONDITIONAL_CODES } from "./pin-grouping.js";
+import { groupableConditionalCodes } from "./pin-grouping.js";
 import { existsSync } from "node:fs";
 
 import { CLAP_QUALIFY_TOOL_NAME, RT_INTERPOSE_NAME } from "./qualify-declarations.js";
@@ -497,7 +497,7 @@ export function rtSafetyDocument(line: ClapQualifyLine, profile: HostProfile = O
   const deciding = [...reasons]
     // of equally rated reasons, a groupable one decides last (D20)
     .sort((a, b) => RATING_SEVERITY[contributedHostingRating(b)] - RATING_SEVERITY[contributedHostingRating(a)]
-      || Number(GROUPABLE_CONDITIONAL_CODES.has(a.code)) - Number(GROUPABLE_CONDITIONAL_CODES.has(b.code)))
+      || Number(groupableConditionalCodes().has(a.code)) - Number(groupableConditionalCodes().has(b.code)))
     .find((r) => contributedHostingRating(r) === rating);
   return {
     schema: RT_SAFETY_DOCUMENT_SCHEMA,

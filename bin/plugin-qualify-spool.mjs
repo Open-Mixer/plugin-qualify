@@ -3,9 +3,10 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /**
  * `plugin-qualify-spool`, the runner of R-112: it watches plugin-hostd's qualify spool and qualifies each request,
- * isolated, writing the verdict into the pins directory. Every decision is in `src/qualify-spool.ts`.
+ * isolated, with plugin-qualify-sync --plugin, which puts the record into the qualification store, where plugin-hostd
+ * reads the verdict (--system as root, the store the daemon reads then). Every decision is in `src/qualify-spool.ts`.
  *
- *   plugin-qualify-spool [--once]    env: PLUGIN_QUALIFY_CONSOLE (http://127.0.0.1:8800/api), PLUGIN_QUALIFY_PINS_DIR,
+ *   plugin-qualify-spool [--once]    env: PLUGIN_QUALIFY_CONSOLE (http://127.0.0.1:8800/api),
  *                                    PLUGIN_QUALIFY_BUDGET_S (600), XDG_STATE_HOME
  */
 import { cpus } from "node:os";
@@ -16,10 +17,8 @@ import { consoleAudioCpus, defaultProbe, runSpoolOnce } from "../dist/index.js";
 const state = join(process.env.XDG_STATE_HOME ?? join(process.env.HOME ?? "", ".local/state"), "plugin-hostd");
 const cfg = {
   spoolDir: join(state, "qualify"),
-  pinsDir: process.env.PLUGIN_QUALIFY_PINS_DIR ?? "/etc/plugin-hostd/pins.d",
-  storePath: join(state, "pins"),
   budgetMs: Number(process.env.PLUGIN_QUALIFY_BUDGET_S ?? 600) * 1000,
-  quick: ["plugin-qualify", "--cells-per-plugin-budget", "1"],
+  quick: ["plugin-qualify-sync", "--cells-per-plugin-budget", "1", ...(process.getuid?.() === 0 ? ["--system"] : [])],
 };
 const base = process.env.PLUGIN_QUALIFY_CONSOLE ?? "http://127.0.0.1:8800/api";
 const once = process.argv.includes("--once");
