@@ -7,7 +7,7 @@
  * `benchmark.py`'s `DEFAULT_BLOCK`, `DEFAULT_RATES` and timeouts are these facts under its own names.
  *
  * `benchmark.py` cannot import a TS module — that scan's own comment already names the mirror as
- * "known" — so this is the `omx_contract_limits.h` shape in its cheapest form: a file emitted on
+ * "known" — so this is the `omx_contract.h` shape in its cheapest form: a file emitted on
  * demand, committed, and checked byte-identical rather than hand-typed twice.
  *
  * Usage:
