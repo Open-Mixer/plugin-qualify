@@ -5,6 +5,9 @@
  * (`native/lv2-measure.c`) is run on fixture plugins whose delay is known by construction, and its line is read through
  * the probe output, the judge and the record, down to `measurements.grid[]`, where zynthian-ui reads
  * `latency.measuredFrames`. On CI a missing build is a failure; elsewhere the live tests skip, saying how to build.
+ * Its cost comparisons are timing proofs (timing-proof.support.ts): a miss on a loaded node skips the test, not measured.
+ *
+ * verify: timing-proof
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
@@ -221,12 +224,12 @@ describe("lv2-measure, live: the cost", () => {
     expect(curve.map((e) => e.held)).toEqual([1, 8, 32, 48]);
     const [one, eight, thirtyTwo, fortyEight] = curve.map((e) => e.nsPerSampleMedian) as [number, number, number, number];
     // ns per sample at each count: a timing proof (ruling 2026-11-11), a warning on a loaded node, a failure on a quiet one
+    for (const e of curve) expect(e.nsPerSampleP95).toBeGreaterThanOrEqual(e.nsPerSampleMedian);
     timing("an instrument is timed at each count of the curve", () => {
       expect(eight).toBeGreaterThan(one);
       expect(thirtyTwo).toBeGreaterThan(eight);
       expect(Math.abs(fortyEight - thirtyTwo) / thirtyTwo).toBeLessThan(0.25);
     });
-    for (const e of curve) expect(e.nsPerSampleP95).toBeGreaterThanOrEqual(e.nsPerSampleMedian);
   });
 
   live("a decaying patch is timed while its voices sound: its curve rises with the notes held (#26)", () => {
