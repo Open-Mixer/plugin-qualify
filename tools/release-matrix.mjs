@@ -3,8 +3,10 @@
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 /*
  * release-matrix.mjs — what release.yml's builds and its install-and-qualify job read, derived from the ONE declaration
- * .github/release-matrix.json. The install cells are the first architecture of every target the builds make, so a
- * target dropped from the declaration is dropped from the install with it ("Artifact not found", #98).
+ * .github/release-matrix.json. The install cells are every architecture of every target the builds make (owner ruling
+ * 2026-11-26: every package in every cell; an architecture built and never installed is how a missing amd64 dependency
+ * reached the next layer), so a target dropped from the declaration is dropped from the install with it ("Artifact not
+ * found", #98).
  *
  * Usage (the workflow's `matrix` job):  node tools/release-matrix.mjs <arm: true|false>   (writes $GITHUB_OUTPUT lines; the workflow's check-matrix step turns the install arches into cells with a runner each)
  */
@@ -18,8 +20,8 @@ export function deriveMatrix(decl, { arm }) {
   const first = (arches) => (arm ? arches : arches.slice(0, 1));
   const rpmArches = first(decl.rpm.arches);
   const debArches = first(decl.deb.arches);
-  // the install cells are the first architecture of each kind; check-matrix gives each cell its image and its runner
-  return { rpmFedora: decl.rpm.fedora, rpmArches, debSuites: decl.deb.suites, debArches, installRpmArches: rpmArches.slice(0, 1), installDebArches: debArches.slice(0, 1) };
+  // the install cells are every architecture each kind builds; check-matrix gives each cell its image and its runner
+  return { rpmFedora: decl.rpm.fedora, rpmArches, debSuites: decl.deb.suites, debArches, installRpmArches: rpmArches, installDebArches: debArches };
 }
 
 if (isMain(import.meta.url)) {

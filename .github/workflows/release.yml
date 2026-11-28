@@ -1,13 +1,14 @@
 name: release
 
-# A version tag builds the RPM (Fedora 45, x86_64 only; no Fedora aarch64 RPM) and the DEB (Debian trixie,
-# amd64 and arm64), signs them, publishes them into the rpm/ and deb/ trees of the OpenMixer Pages
+# A version tag builds the RPM (Fedora 45, x86_64 and aarch64) and the DEB (Debian trixie,
+# amd64 and arm64): every package in every cell (owner ruling 2026-11-26), signs them, publishes them into the rpm/ and deb/ trees of the OpenMixer Pages
 # repository and attaches them to the GitHub release, beside the `pnpm pack` tarball
 # openmixer-plugin-qualify-<version>.tgz (dist/ built in). Anything else builds unsigned trees and packs
 # and checks the tarball, and publishes nothing. The RPM and DEB builds are in Open-Mixer/.github; the
 # secrets are the organisation's. The npm registry has its own workflow, publish.yml.
 
-# A manual run with staged on (never a tag) builds fc45 x86_64 and trixie arm64 only, against the staging channel, and
+# A manual run with staged on (never a tag) builds the full matrix (Open-Mixer/.github's default since the owner ruling of
+# 2026-11-26; the quick set, fc45 x86_64 and trixie arm64, only when the organisation's OMX_RELEASE_MATRIX says quick), against the staging channel, and
 # publishes them, signed, to the staging channel (staging/rpm and staging/deb of the channel repository), where the
 # next layer of the release chain finds them by adding the staging channel beside the real one. Nothing reaches the
 # real channel, and the real release still publishes once from the v<version> tag (Open-Mixer/.github build-rpm.yml
@@ -33,7 +34,7 @@ on:
         type: boolean
         default: false
       staged:
-        description: 'Build fc45 x86_64 and trixie arm64 only and publish them to the staging channel for the next layer; publishes nothing to the real channel'
+        description: 'Build the full matrix (the quick set while OMX_RELEASE_MATRIX is quick) and publish it to the staging channel for the next layer; publishes nothing to the real channel'
         type: boolean
         default: false
       catch-up:
@@ -48,7 +49,7 @@ on:
       arm:
         type: boolean
         default: true
-        description: 'Build the arm64 DEBs too (no Fedora aarch64 RPM is built); the pull-request dry run passes false (arm builds run at release only)'
+        description: 'Build the arm64 DEB and the aarch64 RPM too; the pull-request dry run passes false (arm builds run at release only)'
       staged:
         type: boolean
         default: false
@@ -92,8 +93,9 @@ jobs:
       - id: derive
         # only a pull request's dry run (arm: false) builds the first architecture alone
         run: node tools/release-matrix.mjs "${{ (github.event_name != 'push' && inputs.arm == false && !inputs.source-ref) && 'false' || 'true' }}" >> "$GITHUB_OUTPUT"
-      # the install cells, each with the runner of its own architecture, and only those the release set builds: the quick
-      # set holds trixie arm64 alone, so no amd64 deb cell is asked for while it is quick (#130)
+      # the install cells, each with the runner of its own architecture, and only those the release set builds: every
+      # architecture built (owner ruling 2026-11-26), the first alone on a pull request's dry run; while the set is quick
+      # check-matrix keeps the quick cells alone (#130)
       - id: cells
         uses: Open-Mixer/.github/.github/actions/check-matrix@openmixer-v1
         with:

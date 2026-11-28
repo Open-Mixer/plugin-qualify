@@ -79,10 +79,15 @@ describe('release.yml reads one declaration of its targets (#98)', () => {
     expect(planted.installDebArches).toEqual(['amd64']);
   });
 
-  it('the install cells name the first architecture of each kind, for check-matrix to give a runner', () => {
+  it('every package in every cell (owner ruling 2026-11-26): the builds and the install cells are the full matrix', () => {
     const m = deriveMatrix(DECL, { arm: true });
-    expect(m.installRpmArches).toEqual(['x86_64']);
-    expect(m.installDebArches).toEqual(['arm64']);
+    expect(m.rpmArches).toEqual(['x86_64', 'aarch64']);
+    expect(m.debArches).toEqual(['arm64', 'amd64']);
+    expect(m.installRpmArches).toEqual(['x86_64', 'aarch64']);
+    expect(m.installDebArches).toEqual(['arm64', 'amd64']);
+    // fixture: the 2026-11-19 development matrix is the narrowing this refuses
+    const narrow = deriveMatrix({ ...DECL, rpm: { ...DECL.rpm, arches: ['x86_64'] }, deb: { ...DECL.deb, arches: ['arm64'] } }, { arm: true });
+    expect(narrow.installDebArches).not.toContain('amd64');
   });
 
   it('a devel merge whose one kind is served and skipped still install-checks the kind it built (#192)', () => {
