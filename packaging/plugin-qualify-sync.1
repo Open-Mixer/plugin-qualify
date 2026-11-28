@@ -3,7 +3,7 @@
 plugin-qualify-sync \- qualify every plugin on the machine once, and again when its files change
 .SH SYNOPSIS
 .B plugin-qualify-sync
-[\fB\-\-system\fR] [\fB\-\-force\fR] [\fB\-\-rejudge\fR | \fB\-\-memory\-only\fR | \fB\-\-adapter\-only\fR] [\fB\-\-no\-distributed\fR] [\fB\-\-config\fR \fIfile\fR] [\fB\-\-\fIsetting\fR \fIvalue\fR]...
+[\fB\-\-system\fR] [\fB\-\-force\fR] [\fB\-\-rejudge\fR | \fB\-\-memory\-only\fR | \fB\-\-adapter\-only\fR] [\fB\-\-queue\fR] [\fB\-\-no\-distributed\fR] [\fB\-\-config\fR \fIfile\fR] [\fB\-\-\fIsetting\fR \fIvalue\fR]...
 .SH DESCRIPTION
 Finds every CLAP and LV2 plugin on the search paths and gives each new or changed one the quick
 qualification: its pin, the real-time safety sweep, cost and latency, and its descriptor. A plugin whose
@@ -65,6 +65,14 @@ record with the host versions. No other figure changes; run \fB\-\-rejudge\fR af
 plugin's recorded outcome. It refuses to start when a host does not say its version. A plugin done at these host
 versions is skipped; with \fB\-\-force\fR it is run again.
 .TP
+.B \-\-queue
+Measure and write nothing. List, for this machine's class and cells, every installed plugin a run would measure rather
+than take from the records, one line each: the reason, the plugin's key and the detail, separated by tabs. The reasons are
+\fBno\-record\fR (no record of these bytes: a new plugin, or its bytes changed), \fBcell\-unmeasured\fR (records of
+these bytes at no cell this machine runs), \fBhost\-unmeasured\fR (none judged for this host), \fBrules\-newer\fR (a
+record from before a pass or rule of this version), \fBunmeasured\-at\-source\fR, \fBunmeasured\-here\fR and
+\fBfile\-unreadable\fR. A plugin whose record stands is not listed.
+.TP
 .B \-\-no\-distributed
 Take no stored record.
 .TP
@@ -91,7 +99,9 @@ place (an upgrade). A plugin from a package is still caught at once, by the dist
 over the standard folders; an unpackaged bundle replaced in place in an extra folder is caught at the next run
 of plugin-qualify-sync.timer, at most about 15 minutes after the change.
 .SH EXIT STATUS
-0 the run went through, whatever the verdicts; 2 it could not run.
+0 the run went through, whatever the verdicts; 1 every plugin it measured was left unmeasured by the machine, or the
+store's writer refused a record (each refused record is named and skipped; every other record is stored and pinned);
+2 it could not run.
 .SH SEE ALSO
 .BR plugin-qualify (1),
 .BR plugin-hostd (1)

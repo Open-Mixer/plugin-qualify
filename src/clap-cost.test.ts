@@ -5,7 +5,10 @@
  * holding notes down: as many as the voice capacity it declares (basis `declared`), or the caller's
  * probe count when it declares none (basis `probe`). The live tests run the built prober against the
  * fixture synth, whose every voice costs a sine per sample, so the figure must grow with the notes
- * held; the rest reads lines by hand. On CI a missing build is a failure; elsewhere the live tests skip.
+ * held; the rest reads lines by hand. On CI a missing build is a failure; elsewhere the live tests skip. Its cost
+ * comparisons are timing proofs (timing-proof.support.ts): a miss on a loaded node skips the test, not measured.
+ *
+ * verify: timing-proof
  */
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -72,8 +75,8 @@ describe("clap-qualify, live — an instrument's cost is taken with notes held",
       expect(low.voices).toEqual({ held: 1, basis: "probe" });
       expect(high.voices).toEqual({ held: 16, basis: "probe" });
       // sixteen sines a sample against one: the median grows with the voices, far past timing noise
-      timing("an instrument costs more with more notes", () => expect(high.nsPerSampleMedian).toBeGreaterThan(3 * low.nsPerSampleMedian));
       expect(high.nsPerSampleP95).toBeGreaterThanOrEqual(high.nsPerSampleMedian);
+      timing("an instrument costs more with more notes", () => expect(high.nsPerSampleMedian).toBeGreaterThan(3 * low.nsPerSampleMedian));
     }
   });
 
