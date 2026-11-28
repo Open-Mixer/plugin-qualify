@@ -10,14 +10,12 @@ qualification: its pin, the real-time safety sweep, cost and latency, and its de
 files hash as they did when it was qualified is skipped. The soak is not part of it, and each record says so.
 .PP
 Each plugin runs in processes of its own under a wall clock (\fBbudget_s\fR). One that crashes, hangs or is
-refused is recorded as such, and the run goes on to the next. The pin file plugin-hostd loads as
-\fBpin_file\fR is written whole after every plugin. When plugin-hostd answers on its command port, the
-changed pins are also sent to it with \fBpin_set\fR; while a controller holds that port, they apply at its
-next start.
+refused is recorded as such, and the run goes on to the next. Each record is put in the qualification store,
+where plugin-hostd reads every pin and verdict; the sync writes no pin file and sends plugin-hostd nothing.
 .PP
 A plugin that is no longer found, or whose bytes changed, leaves nothing behind: its pin, its qualification
-record in the qualification store, and its descriptor are removed, and a running plugin-hostd is told with
-\fBpin_clear\fR. Nothing is removed in a run that could not read a plugin bundle.
+record in the qualification store, and its descriptor are removed; the daemon reads its pins from the store, so
+nothing is sent to it. Nothing is removed in a run that could not read a plugin bundle.
 .PP
 Before a plugin is measured, the qualification store is asked for its records (\fBplugin\-qualification\-db\fR). A record
 applies only when the files of the installed item are exactly the record's list, each with the SHA-256 it recorded; the
@@ -83,7 +81,7 @@ The settings file (default /etc/omx/qualify.conf).
 Any setting of the file, as a flag: \fB\-\-budget\-s 30\fR for \fBbudget_s 30\fR.
 \fBplugin-qualify-sync \-\-help\fR lists them with their defaults.
 .SH FILES
-/etc/omx/qualify.conf, /var/lib/omx/qualified.pins, /var/lib/omx/qualification, /var/lib/omx/descriptors,
+/etc/omx/qualify.conf, /var/lib/omx/qualification, /var/lib/omx/descriptors,
 /var/lib/omx/qualify-sync.json, /var/lib/omx/qualify-owed.json, /usr/share/omx/qualification
 .PP
 plugin-qualify-sync.path watches the standard plugin folders. The other folders plugin-hostd searches

@@ -32,8 +32,13 @@ check() { # check <what> <command...>
 }
 absent() { ! "$@"; }
 has_file_with() { grep -rqF -- "$2" "$1" 2>/dev/null; } # has_file_with <dir> <text>
-pins() { cat "$state/qualified.pins" 2>/dev/null; }
-pin_of() { pins | grep -F -- "$1" | head -1; }
+# the sync writes no pin file (plugin-hostd reads the pins from the store): what it pinned is in its state
+pins() { python3 -c 'import json,sys
+s=json.load(open(sys.argv[1]))
+for e in s["entries"].values():
+    for p in e["plugins"]:
+        if "pin" in p: print(p["uri"], json.dumps(p["pin"], sort_keys=True))' "$state/qualify-sync.json" 2>/dev/null; }
+pin_of() { pins | grep -F -- "$1 " | head -1; }
 show() {
   echo "-- records:";     ls "$state/qualification" 2>/dev/null | sed 's/^/   /'
   echo "-- descriptors:"; (cd "$state/descriptors" 2>/dev/null && find . -type f | sort | sed 's/^/   /')
@@ -136,11 +141,12 @@ install_pkg "$work/fakeplug-1.0.$fmt" || { cat "$work/err"; exit 2; }
 show
 check "a qualification record names the plugin" has_file_with "$state/qualification" "$uri_a"
 check "a descriptor names the plugin" has_file_with "$state/descriptors" "$uri_a"
-check "the pin file pins the plugin" grep -qF "$uri_a" "$state/qualified.pins"
+check "the sync pins the plugin" test -n "$(pin_of "$uri_a")"
+check "the sync wrote no pin file" absent test -e "$state/qualified.pins"
 if [ $fmt = rpm ]; then
   check "the /usr/lib64/lv2 plugin has a record" has_file_with "$state/qualification" "$uri_b"
   check "the /usr/lib64/lv2 plugin has a descriptor" has_file_with "$state/descriptors" "$uri_b"
-  check "the /usr/lib64/lv2 plugin is pinned" grep -qF "$uri_b" "$state/qualified.pins"
+  check "the /usr/lib64/lv2 plugin is pinned" test -n "$(pin_of "$uri_b")"
 fi
 pin1=$(pin_of "$uri_a")
 rec1=$(cat "$state/qualification"/* 2>/dev/null | sha256sum)
@@ -158,11 +164,11 @@ check "the descriptor is still there" has_file_with "$state/descriptors" "$uri_a
 say "remove the plugin package"
 remove_pkg fakeplug || { cat "$work/err"; exit 2; }
 show
-check "the pin is gone" absent grep -qF "$uri_a" "$state/qualified.pins"
+check "the pin is gone" test -z "$(pin_of "$uri_a")"
 check "the record is gone" absent has_file_with "$state/qualification" "$uri_a"
 check "the descriptor is gone" absent has_file_with "$state/descriptors" "$uri_a"
 if [ $fmt = rpm ]; then
-  check "the /usr/lib64/lv2 plugin's pin is gone" absent grep -qF "$uri_b" "$state/qualified.pins"
+  check "the /usr/lib64/lv2 plugin's pin is gone" test -z "$(pin_of "$uri_b")"
   check "the /usr/lib64/lv2 plugin's record is gone" absent has_file_with "$state/qualification" "$uri_b"
   check "the /usr/lib64/lv2 plugin's descriptor is gone" absent has_file_with "$state/descriptors" "$uri_b"
 fi

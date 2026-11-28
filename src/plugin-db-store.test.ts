@@ -228,10 +228,10 @@ describe.skipIf(!haveRealPluginDb)("against the plugin-db installed here, in a s
 });
 
 describe("the sync runs the store pass", () => {
-  it("runSync stores after it writes the pin file, only when its caller asks (options.store), with the host class", () => {
+  it("runSync stores after it writes the state, only when its caller asks (options.store), with the host class", () => {
     const src = readFileSync(new URL("./qualify-sync.ts", import.meta.url), "utf8");
     const run = src.slice(src.indexOf("export async function runSync("));
-    const pins = run.indexOf("writeFileWhole(settings.pinFile, after)");
+    const pins = run.indexOf("writeLv2Descriptors(ctx, lv2Pinned)");
     const store = run.indexOf("storeJudgedLayers(state,");
     expect(pins).toBeGreaterThan(0);
     expect(store).toBeGreaterThan(pins);

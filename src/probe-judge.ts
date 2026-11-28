@@ -17,7 +17,7 @@
  *   block count, and the schema holds the note sweep's counts but not its blocks.
  */
 import type { ResourceHintsCheck } from "./resource-hints-check.js";
-import { GROUPABLE_CONDITIONAL_CODES, sharesAWorker } from "./pin-grouping.js";
+import { groupableConditionalCodes, sharesAWorker } from "./pin-grouping.js";
 import { DEFAULT_HOSTING_POLICY } from "./qualify-declarations.js";
 import {
   rtSafetyDocument,
@@ -230,7 +230,7 @@ function decidingOf(reasons: readonly RecordReason[], rating: SuitabilityRating)
   // of equally rated reasons, a groupable one decides last (D20): a deciding own-threads then means nothing isolates
   return [...reasons]
     .sort((a, b) => RATING_SEVERITY[b.rating] - RATING_SEVERITY[a.rating]
-      || Number(GROUPABLE_CONDITIONAL_CODES.has(a.code)) - Number(GROUPABLE_CONDITIONAL_CODES.has(b.code)))
+      || Number(groupableConditionalCodes().has(a.code)) - Number(groupableConditionalCodes().has(b.code)))
     .find((r) => r.rating === rating);
 }
 

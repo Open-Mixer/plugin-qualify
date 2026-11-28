@@ -24,6 +24,7 @@ import { CLAP_NOTES, CLAP_RT, LV2_CLEAN, device, rejudge, removeDevices } from "
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 import { QualificationStore } from "./qualification-store.js";
 import { fakeStore } from "./store-fake.support.js";
+import { statePins } from "./sync-pins.support.js";
 
 afterAll(removeDevices);
 
@@ -144,9 +145,8 @@ describe("a sweep over CLAP plugins that ask for the pool and one that does not"
       const out = join(root, "out");
       const flags = [
         "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "none"), "--lv2-extra", "",
-        "--pin-file", join(out, "qualified.pins"),
         "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
-        "--grid-hosts", "--budget-s", "20", "--hostd-port", "0", "--hostd-feedback-port", "0",
+        "--grid-hosts", "--budget-s", "20",
       ];
       const sp = splitPathFlags(flags);
       const args = parseSyncArgs(sp.argv);
@@ -161,7 +161,7 @@ describe("a sweep over CLAP plugins that ask for the pool and one that does not"
       const fake = fakeStore();
       const summary = await runSync(r.settings, { qualificationStore: new QualificationStore("user", { run: fake.run }), poolRunner, isolatedRunner: () => ALONE, env: { ...process.env, OMX_PROBE_RUNNER: RUNNER, [PROBE_NOTES_CURVE_ENV]: "1" }, log: () => {} });
       expect(summary?.qualified).toBe(2);
-      const pins = readFileSync(join(out, "qualified.pins"), "utf8").split("\n").map(parsePinLine).filter((p) => p !== undefined);
+      const pins = statePins(join(out, "state.json"));
       expect(asked.length, JSON.stringify(asked)).toBe(2);
       expect(pins.find((p) => p!.uri.endsWith("pool-synth.clap#org.freemixer.plugin-qualify.fixture.pool-synth"))).toMatchObject({ pool: "cores" });
       expect(pins.find((p) => p!.uri.includes("pool-synth-serial.clap"))).not.toHaveProperty("pool");

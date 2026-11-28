@@ -34,6 +34,7 @@ const FAKE_HOST = process.env["PLUGIN_HOSTD_FAKE_HOST"];
 const URI = "urn:plugin-qualify:test:refresh";
 import { QualificationStore } from "./qualification-store.js";
 import { fakeStore } from "./store-fake.support.js";
+import { statePinsText } from "./sync-pins.support.js";
 const scratch = mkdtempSync(join(tmpdir(), "pin-refresh-"));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -142,16 +143,16 @@ describe("refreshPins: a pin from before 0.17.3, brought up to plugin-hostd's fi
 });
 
 describe("plugin-qualify-sync --refresh-pins", () => {
-  it("writes the refreshed pins into the pin file and the state, and measures nothing", async () => {
+  it("writes the refreshed pins into the state, and measures nothing and writes no pin file", async () => {
     const dir = bundle("refresh-d");
     const ctx = ctxOf(dir, []);
-    const settings = { ...ctx.settings, stateFile: join(scratch, "d.json"), pinFile: join(scratch, "d.pins"), hostdPort: 0 };
+    const settings = { ...ctx.settings, stateFile: join(scratch, "d.json") };
     writeFileSync(settings.stateFile, `${JSON.stringify(stateOf(dir, oldPin(dir)))}\n`);
-    writeFileSync(settings.pinFile, pinsFile([oldPin(dir)]).text);
     const logs: string[] = [];
     const summary = await runSync(settings, { refreshOnly: true, pinFilesRun: standIn(dir), log: (l) => logs.push(l) });
     expect(summary).toMatchObject({ qualified: 0, skipped: 0, refreshed: 1 });
-    const line = readFileSync(settings.pinFile, "utf8").split("\n").find((l) => l.includes(URI))!;
+    expect(readdirSync(scratch).filter((f) => f.endsWith(".pins"))).toEqual([]);
+    const line = statePinsText(settings.stateFile).split("\n").find((l) => l.includes(URI))!;
     expect(parsePinLine(line)!.files.map((f) => f.path)).toContain("presets.ttl");
     expect(JSON.stringify(JSON.parse(readFileSync(settings.stateFile, "utf8")))).toContain("presets.ttl");
     expect(logs).not.toContain("sync run begins");

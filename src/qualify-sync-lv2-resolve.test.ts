@@ -91,8 +91,8 @@ describe("the LV2 bundle the sync keys a plugin by is the one lilv loads (#199)"
     };
     writeFileSync(join(m.root, "state.json"), JSON.stringify(state));
     const sp = splitPathFlags(["--lv2-path", `${m.a}:${m.b}`, "--lv2-extra", "", "--clap-path", join(m.root, "no-clap"), "--clap-extra", "",
-      "--pin-file", join(m.root, "qualified.pins"), "--descriptor-dir", join(m.root, "d"),
-      "--state-file", join(m.root, "state.json"), "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed"]);
+      "--descriptor-dir", join(m.root, "d"),
+      "--state-file", join(m.root, "state.json"), "--settle-s", "0", "--no-distributed"]);
     const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);
     const r = resolveSyncSettings(new Map(), args.args, {}, m.root, undefined, undefined, sp.run);

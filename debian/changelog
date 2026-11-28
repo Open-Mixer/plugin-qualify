@@ -1,3 +1,15 @@
+plugin-qualify (0.23.0) unstable; urgency=medium
+
+  * sync: no pin file and no pin_set: plugin-hostd reads every pin and
+    verdict from the store
+  * spool: the quick check's verdict goes into the store; the groupable
+    codes are read from the qualification domain
+  * spool: a check that crashed, hit its memory limit or timed out is the
+    store's figure-less refusal of its files
+  * debian: python3-lilv is a plain Depends; Debian is trixie only
+
+ -- Pau Aliagas <linuxnow@gmail.com>  Sat, 28 Nov 2026 16:14:51 +0100
+
 plugin-qualify (0.22.1) unstable; urgency=medium
 
   * plugin-qualify-sync --queue lists what a run would measure and why; a

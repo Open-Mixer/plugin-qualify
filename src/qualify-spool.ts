@@ -9,20 +9,25 @@
  *   (`chrt -i`) and idle io (`ionice -c 3`), never in a worker. The audio cpus are the console's own declaration
  *   (`/console/rt-split` facts: the driver's cpu and every worker's); when they are not known the check is not run, said,
  *   and left for the next pass.
- * - A VERDICT, EVERY TIME: a pass is the verdict the run earned (`in-process` or `isolated`); a refusal, a prober
- *   killed by a signal, a memory-limit kill and the budget passing are each `verdict=refused`, with the probe's outcome
- *   code as the reason (`probe.crashed`, `probe.memory-limit`, `probe.timeout`), in the pin file and in a record beside
- *   the request (`<request>.verdict`, since a pin line has no word for a reason).
- * - ONE WRITER PER KIND: this writes pin files in the pins directory and nothing the daemon owns. The operator's
- *   `pin_accept` (the `.accepted` list) and `pin_clear` are the daemon's; a verdict never touches them, and one that
- *   finishes after a `pin_clear` of its files (the store no longer holds the plugin, or holds other files) is dropped.
- *   Every file is written by a temporary file in the same directory renamed over the target.
+ * - THE VERDICT GOES INTO THE STORE (the owner's ruling of 2026-11-28, plugin-hostd's spec of that day): the check is
+ *   `plugin-qualify-sync --plugin <uri>`, the one-plugin qualification, which puts the plugin's record into the
+ *   qualification store through its writer; plugin-hostd reads the verdict from there at its next tick. Nothing is
+ *   written into the pins directory, which holds the packages' pins alone.
+ * - A CHECK THAT RAN AND ENDED WITH NO FIGURES (killed by a signal, at its memory limit, or past its budget) is a
+ *   refusal in the store: the spool writes the store's figure-less record of the files the daemon hashed, its reason
+ *   `probe.crashed`, `probe.memory-limit` or `probe.timeout` (QUALIFICATION_NO_FIGURES_REASONS), through the store's
+ *   writer (`plugin-qualification-db-write no-figures`), and plugin-hostd answers -516 for those files until the
+ *   operator's `pin_accept`, as the pin file made it (decided by the coordinator 2026-11-28, the owner to confirm).
+ *   A run that failed otherwise leaves the store as it was, and the plugin stays bypassed. Every end is kept beside the
+ *   request (`<request>.verdict`), so it is not run again.
+ * - ONE WRITER PER KIND: this writes nothing the daemon owns. The operator's `pin_accept` (the `.accepted` list) and
+ *   `pin_clear` are the daemon's, and the store's records are its writer's. Every file is written by a temporary file
+ *   in the same directory renamed over the target.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import { pinLineUri, pinWords } from "./pins-file.js";
 
 export interface SpoolRequest {
   readonly uri: string;
@@ -73,7 +78,7 @@ export function isolatedArgv(iso: Isolated, argv: readonly string[]): string[] {
 }
 
 export type SpoolProbeEnd =
-  | { readonly kind: "exited"; readonly code: number; readonly stdout?: string; readonly pinsText?: string }
+  | { readonly kind: "exited"; readonly code: number; readonly stdout?: string }
   | { readonly kind: "signaled"; readonly signal: string }
   | { readonly kind: "memory-limit" }
   | { readonly kind: "timeout" };
@@ -123,12 +128,11 @@ export function writeAtomic(target: string, text: string, beforeRename?: () => v
 
 export interface SpoolConfig {
   readonly spoolDir: string;
-  /** plugin-hostd's pins directory: the verdicts are one file of it. */
-  readonly pinsDir: string;
-  /** plugin-hostd's pin store, which holds the pin the daemon learned; read, never written. */
-  readonly storePath: string;
+  /** The store's writer (`plugin-qualification-db-write`) and the scope it writes, for a figure-less record. */
+  readonly writer: readonly string[];
+  readonly scope: "user" | "system";
   readonly budgetMs: number;
-  /** The quick check's command, `plugin-qualify` and the arguments that make it quick (the plugin's uri is appended). */
+  /** The check's command, `plugin-qualify-sync` and its arguments (the store's scope); `--plugin <uri>` is appended. */
   readonly quick: readonly string[];
 }
 
@@ -137,48 +141,48 @@ export interface SpoolDeps {
   readonly onlineCpus: () => readonly number[];
   /** Runs the isolated check of one request; the default starts the quick check, isolated. */
   readonly probe: (request: SpoolRequest, iso: Isolated, cfg: SpoolConfig) => Promise<SpoolProbeEnd>;
+  /** Writes the store's figure-less record of a request; the default runs the writer. undefined, or the writer's refusal. */
+  readonly noFigures?: (request: SpoolRequest, reason: string, cfg: SpoolConfig) => string | undefined;
 }
+
+/** The store's names of a plugin-hostd uri: a CLAP by `clap` and the id after `#`, an LV2 plugin by `lv2` and its URI. */
+export function storeKeyOf(uri: string): { readonly format: "clap" | "lv2"; readonly uri: string } {
+  if (uri.startsWith("clap:")) return { format: "clap", uri: uri.slice(uri.lastIndexOf("#") + 1) };
+  return { format: "lv2", uri: uri.startsWith("lv2:") ? uri.slice(4) : uri };
+}
+
+/** The writer's argv for the figure-less record of a request: its files in byte order of the path. */
+export function noFiguresArgv(cfg: SpoolConfig, request: SpoolRequest, reason: string): string[] {
+  const key = storeKeyOf(request.uri);
+  const files = [...request.files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return [...cfg.writer, "no-figures", "--scope", cfg.scope, "--format", key.format, "--uri", key.uri, "--host", "omx-clap-host", "--reason", reason,
+    ...files.flatMap((f) => ["--file", `${f.path}=${f.sha256}`])];
+}
+
+/** The default: the writer run, its refusal (its standard error) when it refuses. */
+export const defaultNoFigures: NonNullable<SpoolDeps["noFigures"]> = (request, reason, cfg) => {
+  const [cmd, ...args] = noFiguresArgv(cfg, request, reason);
+  const r = spawnSync(cmd!, args, { encoding: "utf8" });
+  return r.status === 0 ? undefined : (r.stderr || r.error?.message || `exit ${String(r.status)}`).trim();
+};
 
 export type SpoolOutcome =
-  | { readonly uri: string; readonly verdict: "in-process" | "isolated" }
-  | { readonly uri: string; readonly verdict: "refused"; readonly reason: string }
-  | { readonly uri: string; readonly deferred: string }
-  | { readonly uri: string; readonly dropped: string };
+  /** The check ran to its end: its record is in the store, and plugin-hostd reads the verdict there. */
+  | { readonly uri: string; readonly stored: true }
+  /** The check ran and ended with no figures: the store's figure-less record refuses its files. */
+  | { readonly uri: string; readonly refused: string }
+  /** The check ended with no record (a failed run, or a figure-less record the writer refused): the store is as it was. */
+  | { readonly uri: string; readonly unstored: string }
+  | { readonly uri: string; readonly deferred: string };
 
-const VERDICT_FILE = "90-qualify-spool.pins";
-
-/** hostd's `PHD_PIN_LAYOUT_UNKNOWN`: a verdict about files whose layout no worker has read yet. */
-const LAYOUT_UNKNOWN = "-";
-
-function outcomeOf(end: SpoolProbeEnd): { verdict: "in-process" | "isolated" | "refused"; reason?: string; line?: string } {
+/** How a check ended: a record in the store, or the outcome code of an end that left none. */
+function outcomeOf(end: SpoolProbeEnd): { stored: true } | { stored: false; reason: string } {
   switch (end.kind) {
-    case "signaled": return { verdict: "refused", reason: "probe.crashed" };
-    case "memory-limit": return { verdict: "refused", reason: "probe.memory-limit" };
-    case "timeout": return { verdict: "refused", reason: "probe.timeout" };
-    case "exited": {
-      const line = (end.pinsText ?? "").split("\n").find((l) => l.trim() !== "");
-      const word = line === undefined ? undefined : pinWords(line).find((w) => w.startsWith("verdict="))?.slice(8);
-      if (end.code === 0 && (word === "in-process" || word === "isolated")) return { verdict: word, line };
-      // a run that ended with no passing verdict: the check itself refused, or the plugin would not instantiate
-      return { verdict: "refused", reason: end.code === 0 ? "qualify.compare.rt-unsafe" : "probe.refused-instantiation" };
-    }
+    case "signaled": return { stored: false, reason: "probe.crashed" };
+    case "memory-limit": return { stored: false, reason: "probe.memory-limit" };
+    case "timeout": return { stored: false, reason: "probe.timeout" };
+    case "exited": return end.code === 0 ? { stored: true } : { stored: false, reason: "probe.refused-instantiation" };
   }
-}
-
-/** The store's line of the uri: the pin the daemon holds for it, undefined once `pin_clear` took it away. */
-function storedLine(storePath: string, uri: string): string | undefined {
-  if (!existsSync(storePath)) return undefined;
-  return readFileSync(storePath, "utf8").split("\n").find((l) => l.trim() !== "" && pinLineUri(l) === uri);
-}
-
-/** The path=digest word of a pin line, as a comparable list. */
-function filesOf(line: string): string {
-  const w = pinWords(line);
-  return (w[0] === "pin_set" ? w[2] : w[1]) ?? "";
-}
-
-function pinsFileLines(path: string): string[] {
-  return existsSync(path) ? readFileSync(path, "utf8").split("\n").filter((l) => l.trim() !== "") : [];
 }
 
 /** One pass over the spool: each request without a verdict is qualified, one at a time. */
@@ -199,40 +203,29 @@ export async function runSpoolOnce(cfg: SpoolConfig, deps: SpoolDeps): Promise<S
     }
     const end = await deps.probe(request, iso, cfg);
     const result = outcomeOf(end);
-    // the verdict is about the files the daemon hashed: it stands only while the store still holds them
-    const held = storedLine(cfg.storePath, request.uri);
-    const asked = request.files.map((f) => `${f.path}=${f.sha256}`).join(",");
-    if (held === undefined) {
-      out.push({ uri: request.uri, dropped: "the pin store no longer holds the plugin" });
+    if (result.stored) {
+      writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, stored: true }) + "\n");
+      out.push({ uri: request.uri, stored: true });
       continue;
     }
-    if (filesOf(held) !== asked) {
-      out.push({ uri: request.uri, dropped: "the pin store holds other files than the request named" });
+    const figureless = end.kind === "signaled" || end.kind === "memory-limit" || end.kind === "timeout";
+    const refusal = figureless ? (deps.noFigures ?? defaultNoFigures)(request, result.reason, cfg) : undefined;
+    if (figureless && refusal === undefined) {
+      writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, stored: true, refused: result.reason }) + "\n");
+      out.push({ uri: request.uri, refused: result.reason });
       continue;
     }
-    const line = result.line ?? `${pinPrefix(request.uri)} ${asked} ${LAYOUT_UNKNOWN} verdict=${result.verdict}`;
-    const target = join(cfg.pinsDir, VERDICT_FILE);
-    const kept = pinsFileLines(target).filter((l) => pinLineUri(l) !== request.uri);
-    writeAtomic(target, [...kept, line.replace(/^pin_set /, "")].join("\n") + "\n");
-    writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, verdict: result.verdict, ...(result.reason ? { reason: result.reason } : {}) }) + "\n");
-    out.push(result.verdict === "refused" ? { uri: request.uri, verdict: "refused", reason: result.reason! } : { uri: request.uri, verdict: result.verdict });
+    if (refusal !== undefined) process.stderr.write(`plugin-qualify-spool: ${request.uri}: the store's writer refused the record of ${result.reason}: ${refusal}\n`);
+    writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, stored: false, reason: result.reason }) + "\n");
+    out.push({ uri: request.uri, unstored: result.reason });
   }
   return out;
 }
 
-/** A pin line in a pins directory file has no verb; its uri is one word. */
-function pinPrefix(uri: string): string {
-  return /[ "]/.test(uri) ? `"${uri.replaceAll('"', '\\"')}"` : uri;
-}
-
-/** The default probe: the quick `plugin-qualify` run of the request's plugin, isolated, its pin line read back. */
+/** The default check: the one-plugin qualification of the request's plugin, isolated, which puts its record in the store. */
 export const defaultProbe: SpoolDeps["probe"] = async (request, iso, cfg) => {
-  const tmp = join(cfg.spoolDir, `.probe-${process.pid}.pins`);
-  const end = await spawnIsolated(iso, [...cfg.quick, request.uri, "--pins", tmp], { timeoutMs: cfg.budgetMs });
-  let pinsText: string | undefined;
-  try { pinsText = readFileSync(tmp, "utf8"); } catch { /* the run wrote none */ }
-  try { unlinkSync(tmp); } catch { /* none */ }
-  return end.kind === "exited" ? { kind: "exited", code: end.code, ...(pinsText === undefined ? {} : { pinsText }) } : end;
+  const end = await spawnIsolated(iso, [...cfg.quick, "--plugin", request.uri], { timeoutMs: cfg.budgetMs });
+  return end.kind === "exited" ? { kind: "exited", code: end.code } : end;
 };
 
 /** The audio cpus as the console serves them (`GET /console/rt-split`, its `facts`), or undefined when it cannot be read. */

@@ -16,7 +16,7 @@
  * own. So every dimension here fails CLOSED: no measurement means `unknown`, and `unknown`
  * means isolated.
  */
-import { GROUPABLE_CONDITIONAL_CODES } from "./pin-grouping.js";
+import { groupableConditionalCodes } from "./pin-grouping.js";
 import {
   RATING_SEVERITY,
   worstRating,
@@ -1167,7 +1167,7 @@ export function classifyPluginHosting(
     .sort(
       (a, b) =>
         RATING_SEVERITY[contributedHostingRating(b)] - RATING_SEVERITY[contributedHostingRating(a)] ||
-        Number(GROUPABLE_CONDITIONAL_CODES.has(a.code)) - Number(GROUPABLE_CONDITIONAL_CODES.has(b.code)),
+        Number(groupableConditionalCodes().has(a.code)) - Number(groupableConditionalCodes().has(b.code)),
     )
     .find((r) => contributedHostingRating(r) === rating);
   return {

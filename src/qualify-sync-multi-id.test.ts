@@ -16,6 +16,7 @@ import { parseSyncArgs, resolveSyncSettings, runSync } from "./qualify-sync.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 import { QualificationStore } from "./qualification-store.js";
 import { fakeStore } from "./store-fake.support.js";
+import { statePins } from "./sync-pins.support.js";
 
 /** The qualification store of the test: a stand-in that follows the commands' documented interface. */
 let fake = fakeStore();
@@ -70,9 +71,8 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
     out,
     flags: [
       "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "lv2"), "--lv2-extra", "",
-      "--pin-file", join(out, "qualified.pins"),
       "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
-      "--budget-s", "4", "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed",
+      "--budget-s", "4", "--settle-s", "0", "--no-distributed",
     ],
   };
 }
@@ -90,7 +90,7 @@ describe("a .clap that declares two plugin ids", () => {
     const summary = await runSync(r.settings, { qualificationStore: store(), env: m.env, log: (l) => lines.push(l) });
     const said = lines.join("\n");
     const file = join(m.clap, "multi.clap");
-    const pins = readFileSync(join(m.out, "qualified.pins"), "utf8").split("\n").map((l) => parsePinLine(l)).filter((p) => p !== undefined);
+    const pins = statePins(join(m.out, "state.json"));
     expect(pins.map((p) => p!.uri).sort(), said).toEqual(ids.map((id) => `clap:${file}#${id}`).sort());
     // the files of each pin are plugin-hostd's (plugin-qualify#228), not the probe's: the one it adds is held
     for (const p of pins) expect(p!.files.map((f) => f.path).sort(), said).toEqual(["multi.clap", "multi.clap.resources"]);
@@ -111,7 +111,7 @@ describe("a .clap that declares two plugin ids", () => {
     const r = resolveSyncSettings(new Map(), args.args, m.env, "/home/u", undefined, undefined, sp.run);
     if (!r.ok) throw new Error(r.error);
     const summary = await runSync(r.settings, { qualificationStore: store(), env: m.env, log: () => {} });
-    const pins = readFileSync(join(m.out, "qualified.pins"), "utf8").split("\n").map((l) => parsePinLine(l)).filter((p) => p !== undefined);
+    const pins = statePins(join(m.out, "state.json"));
     expect(pins.map((p) => p!.uri)).toEqual([`clap:${join(m.clap, "multi.clap")}#org.example.one`]);
     expect(summary?.qualified).toBe(1);
     expect(fake.user().map((r) => r.uri)).toEqual(["org.example.one"]);

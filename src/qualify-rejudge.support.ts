@@ -16,6 +16,7 @@ import { fakeStore, type FakeStore } from "./store-fake.support.js";
 import { storeExport } from "./store-export.support.js";
 import type { QualificationRecord } from "./qualification-record.js";
 import { SYNC_STATE_SCHEMA, parseSyncArgs, resolveSyncSettings, runSync, type SyncEntry, type SyncPlugin, type SyncSettings, type SyncState } from "./qualify-sync.js";
+import { statePins } from "./sync-pins.support.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 
 export const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "records-0.16.1");
@@ -93,9 +94,7 @@ export function device(stems: readonly string[], options: { patch?: (r: Qualific
   if (!args.ok) throw new Error(args.error);
   const conf = new Map([
     ["state_file", stateFile],
-    ["pin_file", join(root, "qualified.pins")],
     ["descriptor_dir", join(root, "descriptors")],
-    ["hostd_port", "0"],
     ["budget_s", "17"],
     ["memory_limit", "2G"],
     ["host_class", "x86-64"],
@@ -113,7 +112,7 @@ export function device(stems: readonly string[], options: { patch?: (r: Qualific
       if (found === undefined) throw new Error(`${stem}: no record in the store`);
       return found.record;
     },
-    pins: () => readFileSync(r.settings.pinFile, "utf8").split("\n").map(parsePinLine).filter((p) => p !== undefined),
+    pins: () => statePins(r.settings.stateFile),
     state: () => readJson<SyncState>(stateFile),
   };
 }

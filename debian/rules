@@ -27,7 +27,7 @@ override_dh_auto_install:
 	rm -r $(CURDIR)/debian/plugin-qualify/usr/lib/node_modules/@openmixer/plugin-qualify/catalogs
 
 # the units are handed to dh_installsystemd as its own files, so it installs them where this release's systemd
-# reads them (/lib/systemd/system on bookworm, /usr/lib/systemd/system on trixie). The timer and the path unit are
+# reads them (/usr/lib/systemd/system on Debian trixie). The timer and the path unit are
 # enabled and none is started here, so no sweep runs inside the package transaction; postinst arms the path unit,
 # which runs nothing until a plugin directory changes. The timer's first run is at the next boot.
 SYNC_UNITS = service timer path
@@ -37,14 +37,6 @@ execute_before_dh_installsystemd:
 
 override_dh_installsystemd:
 	dh_installsystemd --name=plugin-qualify-sync --no-start --no-stop-on-upgrade
-
-# python3-lilv writes the LV2 descriptors. Debian 12 (bookworm) does not carry it, so a package built there must stay
-# installable: the dependency is filled in for any other release, read from /etc/os-release (the build container has it,
-# and no apt index or network is needed).
-LILV_DEPENDS := $(shell . /etc/os-release && if [ "$$VERSION_ID" = 12 ]; then :; else echo python3-lilv; fi)
-
-override_dh_gencontrol:
-	dh_gencontrol -- -Vlilv:Depends="$(LILV_DEPENDS)"
 
 override_dh_auto_clean:
 	$(MAKE) -C native clean

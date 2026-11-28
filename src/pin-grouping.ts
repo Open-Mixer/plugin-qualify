@@ -5,10 +5,19 @@
  * only conditional reasons are groupable. Only an RT-unsafe reason isolates; a plugin that started threads of its own
  * (hosting.rt-safety.own-threads) is not RT-unsafe. The one rule the pin, the judgment's hosting and the tiers read.
  */
-import { HOSTING_CODE } from "./hosting-codes.generated.js";
+import { qualificationDomain } from "./qualification-domain.js";
 
-/** The conditional reasons that leave a plugin groupable. */
-export const GROUPABLE_CONDITIONAL_CODES: ReadonlySet<string> = new Set([HOSTING_CODE.rtSafetyOwnThreads]);
+/** The item of the qualification domain that declares the groupable codes, once, for this package and the store's reader. */
+export const GROUPABLE_CODES_ITEM = "QUALIFICATION_GROUPABLE_CONDITIONAL_CODES";
+
+let held: { readonly domain: ReturnType<typeof qualificationDomain>; readonly codes: ReadonlySet<string> } | undefined;
+
+/** The conditional reasons that leave a plugin groupable: the words of the domain's item, read at the first use and kept. */
+export function groupableConditionalCodes(): ReadonlySet<string> {
+  const domain = qualificationDomain();
+  if (held?.domain !== domain) held = { domain, codes: new Set(domain.words(GROUPABLE_CODES_ITEM)) };
+  return held.codes;
+}
 
 /** A reason as the rule reads it: its contributed rating and its code. */
 export interface GroupingReason {
@@ -21,5 +30,5 @@ export function sharesAWorker(rating: string, reasons?: readonly GroupingReason[
   if (rating === "suitable") return true;
   if (rating !== "conditional") return false;
   const conditional = (reasons ?? []).filter((r) => r.rating === "conditional");
-  return conditional.length > 0 && conditional.every((r) => GROUPABLE_CONDITIONAL_CODES.has(r.code));
+  return conditional.length > 0 && conditional.every((r) => groupableConditionalCodes().has(r.code));
 }
