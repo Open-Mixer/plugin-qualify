@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 // One isolated step (plugin-qualify#249): a plugin-hostd of its own on the JACK server the environment names, the plugin
-// added alone, worker_list read, a sine through it for a window, and worker_list read again. Prints one JSON line for
+// added alone and accepted (pin_accept: it has no verdict yet), worker_list read, a sine through it for a window, and worker_list read again. Prints one JSON line for
 // src/qualify-isolated.ts to judge. A host that never listened says started: false: nothing was learned about the plugin.
 import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
@@ -106,6 +106,16 @@ async function main() {
   if (added === undefined || added.code < 0) {
     const why = daemonReason();
     const answered = added === undefined ? "the host gave no answer to add" : `add answered ${String(added.code)}`;
+    return { started: true, added: false, problem: why === "" ? answered : `${answered}: ${why}` };
+  }
+  // a plugin with no verdict is bypassed after its add, held by no worker (plugin-hostd 0.22.1, R-112) until a verdict
+  // lands or pin_accept takes it as it is: this step is what gives the verdict, so it accepts the plugin, which then runs
+  // alone in a worker of its own, the isolation the step measures
+  const accepted = await send(`pin_accept ${pinWord(uri)}`);
+  if (accepted?.code === WORKER_SPAWN) return { started: false, problem: `no worker came up: pin_accept answered ${String(WORKER_SPAWN)}` };
+  if (accepted === undefined || accepted.code < 0) {
+    const why = daemonReason();
+    const answered = accepted === undefined ? "the host gave no answer to pin_accept" : `pin_accept answered ${String(accepted.code)}`;
     return { started: true, added: false, problem: why === "" ? answered : `${answered}: ${why}` };
   }
   const before = workersOf(await send("worker_list"));
