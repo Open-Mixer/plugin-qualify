@@ -8,7 +8,7 @@ Licence: GPL-3.0-or-later (`LICENSE`).
 ## Install
 
 plugin-qualify is published, signed, in the OpenMixer package channel, for Fedora 45 (x86_64)
-and for Debian bookworm and trixie, including Raspberry Pi OS (amd64, arm64).
+and for Debian trixie, including Raspberry Pi OS (amd64, arm64).
 
 Fedora:
 
