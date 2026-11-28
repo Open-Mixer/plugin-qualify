@@ -113,7 +113,7 @@ jobs:
     container:
       image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git nodejs26 nodejs26-bin nodejs26-npm nodejs26-npm-bin pkgconf-pkg-config
+      - run: dnf install -y --setopt=install_weak_deps=False git nodejs26 nodejs26-bin nodejs26-npm nodejs26-npm-bin pkgconf-pkg-config make
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Add the OpenMixer channel
