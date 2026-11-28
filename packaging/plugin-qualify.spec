@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.22.0
+Version:        0.22.1
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -241,6 +241,10 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Fri Nov 27 2026 Pau Aliagas <linuxnow@gmail.com> - 0.22.1-1
+- plugin-qualify-sync --queue lists what a run would measure and why; a
+  record the writer refuses is skipped and named (#207)
+
 * Fri Nov 27 2026 Pau Aliagas <linuxnow@gmail.com> - 0.22.0-1
 - Resource hints: a plugin's declared hints compared with what the run
   measured, per hint, in the record (#198).

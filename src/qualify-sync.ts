@@ -26,7 +26,7 @@ import { withRunHome } from "./run-home.js";
 import { clapQualifyTools } from "./clap-qualify.js";
 import { hostClassOf, outcomeOfVerdict, readBoardModel, readMachine, recordCells } from "./distributed-records.js";
 import { matchStored, pinOfStored, storedUri } from "./pin-match.js";
-import { QualificationStore, keyId, keyLabel, shadowKeyOf, type ShadowKey, type StoredRecord } from "./qualification-store.js";
+import { QualificationStore, StoreError, keyId, keyLabel, shadowKeyOf, type ShadowKey, type StoredRecord, type StoredResult } from "./qualification-store.js";
 import { rowsUnreadable } from "./row-judge.js";
 import { parseClapScan } from "./clap-loader.js";
 import { SPAWNED_SEARCH_PATH, hostdSearchPath, searchPathWarnings, type SearchPathRun } from "./hostd-search-path.js";
@@ -153,6 +153,8 @@ export interface SyncArgs {
   readonly plugin?: string;
   /** `--under-load`: the engine runs while the plugin is measured; its run condition is {@link MEASURED_UNDER_LOAD}. */
   readonly underLoad: boolean;
+  /** `--queue`: list the installed plugins a run would measure, with the reason; measure and write nothing (#204). */
+  readonly queue: boolean;
   readonly help: boolean;
   /** The settings given as flags, by key. */
   readonly values: ReadonlyMap<string, string>;
@@ -176,6 +178,7 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
   let poolOnly = false;
   let plugin: string | undefined;
   let underLoad = false;
+  let queue = false;
   let help = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -190,6 +193,7 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
     else if (a === "--isolated-only") isolatedOnly = true;
     else if (a === "--pool-only") poolOnly = true;
     else if (a === "--under-load") underLoad = true;
+    else if (a === "--queue") queue = true;
     else if (a === "--plugin") {
       const v = argv[++i];
       if (v === undefined) return { ok: false, error: `${a} needs a value` };
@@ -208,7 +212,8 @@ export function parseSyncArgs(argv: readonly string[]): { ok: true; args: SyncAr
   if ([memoryOnly, adapterOnly, isolatedOnly, poolOnly, refreshPinsOnly].filter(Boolean).length > 1) return { ok: false, error: "--memory-only, --adapter-only, --isolated-only, --pool-only and --refresh-pins are different runs: one at a time" };
   if (underLoad && plugin === undefined) return { ok: false, error: "--under-load marks plugin-hostd's ask: it goes with --plugin only" };
   if (plugin !== undefined && (rejudge || memoryOnly || adapterOnly || isolatedOnly || poolOnly || refreshPinsOnly)) return { ok: false, error: "--plugin qualifies one plugin as a scan does: it goes with none of --rejudge, --memory-only, --adapter-only, --isolated-only, --pool-only and --refresh-pins" };
-  return { ok: true, args: { ...(config === undefined ? {} : { config }), ...(plugin === undefined ? {} : { plugin }), underLoad, system, force, noDistributed, noWait, refreshPins: refreshPinsOnly, rejudge, memoryOnly, adapterOnly, isolatedOnly, poolOnly, help, values } };
+  if (queue && (plugin !== undefined || underLoad || force || rejudge || memoryOnly || adapterOnly || isolatedOnly || poolOnly || refreshPinsOnly)) return { ok: false, error: "--queue measures nothing: it goes with none of --plugin, --under-load, --force, --rejudge, --memory-only, --adapter-only, --isolated-only, --pool-only and --refresh-pins" };
+  return { ok: true, args: { ...(config === undefined ? {} : { config }), ...(plugin === undefined ? {} : { plugin }), underLoad, queue, system, force, noDistributed, noWait, refreshPins: refreshPinsOnly, rejudge, memoryOnly, adapterOnly, isolatedOnly, poolOnly, help, values } };
 }
 
 export function syncHelpText(): string {
@@ -233,12 +238,13 @@ function syncHelpTextBody(): string {
     "  --adapter-only                      run each LV2 plugin only under omx-clap-host's LV2 adapter at the Pi's cells, on private JACK servers, and merge it; with --force, those already done too",
     "  --plugin <target>                   qualify this one plugin (a CLAP clap:<path>#<id> or an LV2 uri) as a scan does, and no other",
     "  --under-load                        with --plugin: the engine runs meanwhile; no figure is stored as a quiet machine's, the next scan measures it again",
+    "  --queue                             list, for this machine's class and cells, every installed plugin a run would measure and why (no-record, cell-unmeasured, host-unmeasured, rules-newer, unmeasured-at-source, unmeasured-here, file-unreadable); measures and writes nothing",
     "  --grid-hosts                        the fast grid, the same as --grid hosts (7 cells with the shipped hosts)",
     "  --help                              this text",
     ...rows,
     "",
     "every setting is also a line of the settings file, its key as the first word",
-    "exit 0 the run went through (whatever the verdicts), 2 it could not run",
+    "exit 0 the run went through (whatever the verdicts), 1 every plugin measured was left unmeasured by the machine or a record was refused by the store's writer (each named, the rest stored and pinned), 2 it could not run",
     "",
   ].join("\n");
 }
@@ -674,6 +680,8 @@ export interface SyncContext {
   readonly poolRunner?: PoolRunner;
   /** The engine runs meanwhile ({@link MEASURED_UNDER_LOAD}): no record is put into the store. */
   readonly underLoad?: boolean;
+  /** The records the store's writer refused this run, by key label: named and skipped, never the end of the run (#205). */
+  readonly refusedRecords?: string[];
 }
 
 /**
@@ -798,7 +806,7 @@ function judgedPlugins(ctx: SyncContext, item: SyncItem, runs: readonly { bytes:
     // when plugin-hostd could not name them
     const files = pin?.integrity.files ?? record.binary.files;
     // figures measured under load are no quiet machine's: the store holds none of them (the planner's cost is unknown)
-    if (ctx.underLoad !== true) ctx.store.put(key, storedForm({ ...record, binary: { ...record.binary, files }, run: { id: judgment.output.run.id, steps } }));
+    if (ctx.underLoad !== true) putRecord(ctx, key, storedForm({ ...record, binary: { ...record.binary, files }, run: { id: judgment.output.run.id, steps } }));
     const plugin: SyncPlugin = { uri: pin?.uri ?? judgment.output.plugin.id, outcome, ...(code === undefined ? {} : { code }), ...(pin === undefined ? {} : { pin }), ...(ctx.underLoad === true ? {} : { record: key }) };
     return { plugin, judgedHere: judgment.hosts.some((h) => h.verdict.host === host) };
   });
@@ -1024,64 +1032,85 @@ export function syncCells(settings: Pick<SyncSettings, "grid" | "hostProfile">):
  * descriptors are written as a measured item's are: a `.clap` is scanned for them (the scan lists the plugins and
  * measures nothing), an LV2 plugin joins the run's descriptor pass.
  */
-function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest[]): SyncEntry | undefined {
-  const started = Date.now();
+/** The reasons a plugin is measured rather than taken from the records (the re-qualify queue, #204). */
+export const REQUALIFY_REASONS = ["no-record", "cell-unmeasured", "host-unmeasured", "rules-newer", "unmeasured-at-source", "unmeasured-here", "file-unreadable"] as const;
+export type RequalifyReason = (typeof REQUALIFY_REASONS)[number];
+
+type StoredTaken = { key: ShadowKey; whole: StoredRecord; record: QualificationRecord; result: StoredResult };
+
+/**
+ * What the store's records decide for the item, writing nothing: the records taken, or the reason it is measured here.
+ * Each reason is said on `ctx.log` as the sync says it. {@link takeStored} applies a decision; the queue reads one.
+ */
+function storedDecision(ctx: SyncContext, item: SyncItem): { readonly taken: readonly StoredTaken[] } | { readonly reason: RequalifyReason; readonly detail: string } {
   const host = ctx.settings.hostProfile.id;
+  const noRecord = { reason: "no-record", detail: `no record of these bytes for the class ${ctx.settings.hostClass ?? "(none)"}` } as const;
   const results = ctx.store.results({ format: item.format, hostClass: ctx.settings.hostClass, ...(item.format === "clap" ? { binaryPath: item.files[0]! } : { uri: item.uri! }) });
-  if (results.length === 0) return undefined;
+  if (results.length === 0) return noRecord;
   // the set compared is plugin-hostd's pin list for the item, as withHostdFiles takes it (the store spec's section 3.7), not the sync's own discovery
   const named = hostdPinFiles(item.format === "clap" ? clapPinUri(join(item.root, item.files[0]!), `urn:clap:${results[0]!.uri}`) : item.uri!, ctx.settings.lv2Dirs, ctx.env, ...(ctx.pinFilesRun === undefined ? [] : [ctx.pinFilesRun]));
   const match = matchStored(results, item, host, named.ok ? named.files : undefined, syncCells(ctx.settings));
-  if (match.status === "none") return undefined;
+  if (match.status === "none") return noRecord;
   for (const line of match.lines) ctx.log(line);
-  if (match.status === "ignored") return undefined;
+  if (match.status === "ignored") {
+    const detail = match.lines.join("; ");
+    return match.why === "bytes" ? { reason: "no-record", detail } : match.why === "cell" ? { reason: "cell-unmeasured", detail } : match.why === "host" ? { reason: "host-unmeasured", detail } : { reason: "unmeasured-at-source", detail };
+  }
   // The records were judged by the plugin-qualify that measured them. Their figures are carried across and judged again
   // under today's rules from their rows, as an upgrade's are (`--rejudge`): a verdict of an older judge is never taken as
   // it stands. A record today's judge cannot decide for this host is measured here.
   const by = rejudgeToolName();
-  const at = new Date(started).toISOString();
+  const at = new Date().toISOString();
   const cells = syncCells(ctx.settings);
   const machineCell = cells[0]!;
-  const taken: { key: ShadowKey; whole: StoredRecord; record: QualificationRecord; result: (typeof results)[number] }[] = [];
+  const taken: StoredTaken[] = [];
+  const said = (reason: RequalifyReason, line: string) => {
+    ctx.log(line);
+    return { reason, detail: line };
+  };
   for (const key of match.keys) {
     const label = keyLabel(key);
     const whole = ctx.store.recordAt(key, machineCell);
-    if (whole === undefined) {
-      ctx.log(`stored: ${label}: no record of it answers ${cellKey(machineCell)}; measured here`);
-      return undefined;
-    }
+    if (whole === undefined) return said("cell-unmeasured", `stored: ${label}: no record of it answers ${cellKey(machineCell)}; measured here`);
     const held = new Set(recordCells(whole.record).map(cellKey));
-    if (!cells.every((c) => held.has(cellKey(c)))) {
-      ctx.log(`stored: ${label}: set ${whole.set ?? whole.layer} claims ${cellKey(machineCell)}, measured at ${[...held].join(", ")} only; measured here`);
-      return undefined;
-    }
+    if (!cells.every((c) => held.has(cellKey(c)))) return said("cell-unmeasured", `stored: ${label}: set ${whole.set ?? whole.layer} claims ${cellKey(machineCell)}, measured at ${[...held].join(", ")} only; measured here`);
     const missing = missingSteps(whole.record);
-    if (missing.length > 0) {
-      ctx.log(`stored: ${label}: its record lacks the step${missing.length === 1 ? "" : "s"} ${missing.join(", ")}; measured here`);
-      return undefined;
-    }
-    if (latencyNeverTaken(whole.record)) {
-      ctx.log(`stored: ${label}: its record never took the latency figure (a probe from before that pass); measured here`);
-      return undefined;
-    }
+    if (missing.length > 0) return said("rules-newer", `stored: ${label}: its record lacks the step${missing.length === 1 ? "" : "s"} ${missing.join(", ")}; measured here`);
+    if (latencyNeverTaken(whole.record)) return said("rules-newer", `stored: ${label}: its record never took the latency figure (a probe from before that pass); measured here`);
     let record: QualificationRecord;
     try {
       record = rejudgeFromRows(whole, { host, by, at }).record;
     } catch (e) {
-      ctx.log(`stored: ${label}: ${(e as Error).message}; measured here`);
-      return undefined;
+      return said("rules-newer", `stored: ${label}: ${(e as Error).message}; measured here`);
     }
     const v = record.verdicts.find((x) => x.host === host);
-    if (v !== undefined && outcomeOfVerdict(v) === "unmeasured") {
-      ctx.log(`stored: ${label}: judged again, ${v.deciding ?? "unknown"} for ${host}; measured here`);
-      return undefined;
-    }
+    if (v !== undefined && outcomeOfVerdict(v) === "unmeasured") return said("rules-newer", `stored: ${label}: judged again, ${v.deciding ?? "unknown"} for ${host}; measured here`);
     taken.push({ key, whole, record, result: results.find((r) => keyId(shadowKeyOf(r)) === keyId(key))! });
   }
+  return { taken };
+}
+
+/**
+ * The item's entry taken from the store's records, or `undefined` when it is to be measured: no record finds it, or the
+ * ones that do were not taken, each reason said ({@link storedDecision}). The match is the pin (`pin-match.ts`): the key
+ * and the exact set of the item's files. Of a key, the record taken is the one the store says answers the machine's cell
+ * (the first cell the sync runs at), whole: `QualificationStore.recordAt`, the store's claim. Two sets of the base may
+ * hold a key at one cell; which one answers is the store's rule (the reference tier, then the set measured later), read
+ * here and never decided here (#152). That record must hold every cell the sync runs at, as any record taken must (#317).
+ * Its descriptors are written as a measured item's are: a `.clap` is scanned for them (the scan lists the plugins and
+ * measures nothing), an LV2 plugin joins the run's descriptor pass.
+ */
+function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest[]): SyncEntry | undefined {
+  const started = Date.now();
+  const host = ctx.settings.hostProfile.id;
+  const decision = storedDecision(ctx, item);
+  if (!("taken" in decision)) return undefined;
+  const taken = decision.taken;
   const plugins: SyncPlugin[] = [];
   for (const { key, whole, record, result } of taken) {
-    // a record already in this scope's layer stands; one of the base is carried into the layer, judged again
-    if (whole.layer === "base" || JSON.stringify(whole.record) !== JSON.stringify(record)) ctx.store.put(key, record);
+    // a record already in this scope's layer stands; one of the base is carried into the layer, judged again. A record
+    // the writer refuses is named and skipped: the base still holds it, so its pin is the base record's (#205)
+    if (whole.layer === "base" || JSON.stringify(whole.record) !== JSON.stringify(record)) putRecord(ctx, key, record);
     const v = record.verdicts.find((x) => x.host === host);
     if (v === undefined) continue; // the other tier's record: carried, and no plugin of the sweep
     const pin = pinOfStored(item, { ...result, verdicts: [{ host, rating: v.rating, deciding: v.deciding ?? null, measured: v.measured ? 1 : 0, qualified: v.qualified ? 1 : 0 }] }, host, v.reasons);
@@ -1090,6 +1119,23 @@ function takeStored(ctx: SyncContext, item: SyncItem, files: readonly FileDigest
   if (item.format === "clap") scanClapDescriptors(ctx, item);
   const all = digestFiles(item.root, item.files, files) ?? [...files];
   return { format: item.format, root: item.root, files: all, plugins, qualifiedAt: new Date(started).toISOString(), seconds: (Date.now() - started) / 1000, distributed: taken.find((t) => typeof t.whole.set === "string")?.whole.set ?? "store" };
+}
+
+/**
+ * The record put into the run's layer, or, when the store's writer refuses it, the refusal named on the log and kept on
+ * the context, and the run goes on (#205): one record the writer refuses never ends a sync nor costs another plugin its
+ * pin. A writer that is missing or misused is no refusal of a record, and stops the run as before.
+ */
+function putRecord(ctx: SyncContext, key: ShadowKey, record: QualificationRecord): boolean {
+  try {
+    ctx.store.put(key, record);
+    return true;
+  } catch (e) {
+    if (!(e instanceof StoreError) || e.code === "command-missing" || e.code === "usage") throw e;
+    ctx.refusedRecords?.push(keyLabel(key));
+    ctx.log(`${keyLabel(key)}: the store's writer refused its record (${e.code}): ${e.message}; skipped, the run goes on`);
+    return false;
+  }
 }
 
 /** The descriptors of a `.clap` taken from the layer: the scanner lists its plugins, the descriptor writer writes them. */
@@ -1256,6 +1302,8 @@ export interface SyncSummary {
   readonly adapterOnly?: { readonly measured: number; readonly already: number; readonly failed: number };
   /** `--plugin`: the target no plugin on the search path is; nothing was measured. */
   readonly pluginAbsent?: string;
+  /** The records the store's writer refused, by key label: each skipped and named, the run went on (#205). */
+  readonly refusedRecords?: readonly string[];
 }
 
 /**
@@ -1437,6 +1485,64 @@ export async function runSync(settings: SyncSettings, options: SyncRunOptions = 
   }
 }
 
+/** One plugin of the re-qualify queue: an installed plugin a run would measure, and why (#204). */
+export interface QueuedPlugin {
+  readonly key: string;
+  readonly format: SyncItem["format"];
+  readonly reason: RequalifyReason;
+  readonly detail: string;
+}
+
+/** What `--queue` needs besides the settings: the stand-ins of a test, as a run takes them. */
+export type QueueOptions = Pick<SyncRunOptions, "qualificationStore" | "pinFilesRun" | "lv2Resolve" | "env">;
+
+/**
+ * The re-qualify queue (#204): for this machine's class and cells, every installed plugin a sync would measure rather
+ * than take, with the reason: no record of its bytes (new, or its bytes changed), records of its bytes at no cell or for
+ * no host this machine runs, a record from before a rule or pass of today's judge, one the source left unmeasured, one
+ * this machine left unmeasured, or a file that cannot be read. A plugin whose record stands, here or in the store, is not
+ * in it. Nothing is measured and nothing is written: no state, no pin, no record.
+ */
+export function requalifyQueue(settings: SyncSettings, options: QueueOptions = {}): { readonly queued: readonly QueuedPlugin[]; readonly installed: number; readonly lines: readonly string[] } {
+  const lines: string[] = [];
+  const env = options.env ?? process.env;
+  const ctx: SyncContext = { settings, env, log: (l) => lines.push(l), store: options.qualificationStore ?? new QualificationStore(settings.system ? "system" : "user", { env }), ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }) };
+  const state = readSyncState(settings.stateFile, ctx.log);
+  const discovered = discoverSyncItems(settings, options.lv2Resolve ?? LILV_RESOLVE);
+  lines.push(...discovered.problems);
+  const queued: QueuedPlugin[] = [];
+  const queue = (item: SyncItem, reason: RequalifyReason, detail: string) => queued.push({ key: item.key, format: item.format, reason, detail });
+  for (const item of discovered.items) {
+    const entry = state.entries[item.key];
+    const recorded = recordedAsIs(item, entry);
+    if (recorded.same) {
+      const retry = entry!.runCondition === MEASURED_UNDER_LOAD ? MEASURED_UNDER_LOAD : entry!.plugins.map(machineReason).find((r) => r !== undefined);
+      const owed = retry === undefined ? figureOwed(entry!, ctx.store) : undefined;
+      if (retry !== undefined) queue(item, "unmeasured-here", `left unmeasured here last run (${retry})`);
+      else if (owed !== undefined) queue(item, "rules-newer", `its record never took the ${owed} figure (a probe from before that pass)`);
+      continue;
+    }
+    if (sameBinaryElsewhere(item, entry) !== undefined) continue;
+    const files = recorded.files ?? digestFiles(item.root, item.files);
+    if (files === undefined) {
+      queue(item, "file-unreadable", "a file of it cannot be read");
+      continue;
+    }
+    if (!settings.distributed) {
+      queue(item, "no-record", "no record of these bytes here, and shipped records are off (distributed no)");
+      continue;
+    }
+    const decision = storedDecision(ctx, item);
+    if (!("taken" in decision)) queue(item, decision.reason, decision.detail);
+  }
+  return { queued, installed: discovered.items.length, lines };
+}
+
+/** The queue as `--queue` prints it: one line a plugin, its reason, its key and the detail, tab-separated. */
+export function queueText(queued: readonly QueuedPlugin[]): string {
+  return queued.map((q) => `${q.reason}\t${q.key}\t${q.detail}\n`).join("");
+}
+
 function addSummaries(a: SyncSummary, b: SyncSummary): SyncSummary {
   const refreshed = (a.refreshed ?? 0) + (b.refreshed ?? 0);
   return {
@@ -1449,6 +1555,7 @@ function addSummaries(a: SyncSummary, b: SyncSummary): SyncSummary {
     distributed: a.distributed + b.distributed,
     seconds: a.seconds + b.seconds,
     ...(refreshed === 0 ? {} : { refreshed }),
+    ...(a.refusedRecords === undefined && b.refusedRecords === undefined ? {} : { refusedRecords: [...(a.refusedRecords ?? []), ...(b.refusedRecords ?? [])] }),
     ...(b.rejudge === undefined ? (a.rejudge === undefined ? {} : { rejudge: a.rejudge }) : { rejudge: b.rejudge }),
     ...(b.memoryOnly === undefined ? (a.memoryOnly === undefined ? {} : { memoryOnly: a.memoryOnly }) : { memoryOnly: b.memoryOnly }),
     ...(b.isolatedOnly === undefined ? (a.isolatedOnly === undefined ? {} : { isolatedOnly: a.isolatedOnly }) : { isolatedOnly: b.isolatedOnly }),
@@ -1486,7 +1593,8 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
   {
     const started = Date.now();
     const dirs = [...settings.clapDirs, ...settings.lv2Dirs];
-    const ctx: SyncContext = { settings, env, log, store: options.qualificationStore ?? new QualificationStore(settings.system ? "system" : "user", { env }), ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }), ...(options.isolatedRunner === undefined ? {} : { isolatedRunner: options.isolatedRunner }), ...(options.poolRunner === undefined ? {} : { poolRunner: options.poolRunner }), ...(options.underLoad === true ? { underLoad: true } : {}) };
+    const refusedRecords: string[] = [];
+    const ctx: SyncContext = { settings, env, log, refusedRecords, store: options.qualificationStore ?? new QualificationStore(settings.system ? "system" : "user", { env }), ...(options.pinFilesRun === undefined ? {} : { pinFilesRun: options.pinFilesRun }), ...(options.isolatedRunner === undefined ? {} : { isolatedRunner: options.isolatedRunner }), ...(options.poolRunner === undefined ? {} : { poolRunner: options.poolRunner }), ...(options.underLoad === true ? { underLoad: true } : {}) };
     // an absent base is an empty base layer (the store spec, section 6.1): said once a run, when the reader first says it
     ctx.store.whenBaseAbsent((path) => log(`qualification store: base-absent: ${path}: the base layer is empty; the ${ctx.store.scope} layer's records alone are read`));
     // the pins first, before the quiet wait and any measurement: an upgrade of plugin-hostd that collects more files
@@ -1633,8 +1741,10 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     const [only] = byMachine.size === 1 ? [...byMachine] : [];
     const machineFailure = only !== undefined && only[1] === measuredHere ? only[0] : undefined;
     if (machineFailure !== undefined) log(`every plugin this run measured was left unmeasured by the machine (${machineFailure}): the run failed`);
+    if (refusedRecords.length > 0) log(`${String(refusedRecords.length)} record${refusedRecords.length === 1 ? "" : "s"} refused by the store's writer, each skipped: ${refusedRecords.join(", ")}`);
     return {
       ...count,
+      ...(refusedRecords.length === 0 ? {} : { refusedRecords }),
       ...(machineFailure === undefined ? {} : { machineFailure }),
       seconds: (Date.now() - started) / 1000,
       ...(fresh.refreshed.length === 0 ? {} : { refreshed: fresh.refreshed.length }),
