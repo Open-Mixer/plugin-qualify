@@ -124,6 +124,9 @@ async function main() {
   const signal = spawnSync(signalTool, [`effect_${String(INSTANCE)}`, String(windowMs)], { encoding: "utf8", timeout: windowMs + 15000, killSignal: "SIGKILL" });
   const ticksAfter = worker === undefined ? undefined : cpuTicks(worker.pid);
   const after = workersOf(await send("worker_list"));
+  // the instance is removed before the host is killed: a worker killed in the middle of a cycle leaves the private JACK
+  // server waiting on its client, and the server's stop took 6 s more for it (plugin-hostd 0.22.2, omx-clap-host 0.36.0)
+  await send(`remove ${String(INSTANCE)}`);
   sock.destroy();
   const alive = after.length > 0 && after[0].pid === worker?.pid && ticksAfter !== undefined;
   if (signal.error !== undefined || signal.status !== 0) {
