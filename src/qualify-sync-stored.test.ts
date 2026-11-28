@@ -15,6 +15,7 @@ import { FIXTURE_CLAP_ID, storedFixture, writeFakeClap } from "./distributed-rec
 import { parsePinLine } from "./pins-file.js";
 import { QualificationStore, shadowKeyOf, type StoredRecord } from "./qualification-store.js";
 import { parseSyncArgs, resolveSyncSettings, runSync, summaryLine, type SyncSettings } from "./qualify-sync.js";
+import { statePinsText } from "./sync-pins.support.js";
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 import { fakeStore, type FakeBaseRecord, type FakeStore } from "./store-fake.support.js";
 
@@ -32,7 +33,7 @@ function machine(name: string, flags: readonly string[] = []): { root: string; c
   const sp = splitPathFlags([
     "--clap-path", join(root, "clap"), "--lv2-path", join(root, "lv2"), "--lv2-extra", "",
     "--descriptor-dir", join(root, "state", "descriptors"), "--state-file", join(root, "state", "sync.json"),
-    "--pin-file", join(root, "state", "qualified.pins"), "--hostd-port", "0", "--budget-s", "5", "--host-class", CLASS,
+    "--budget-s", "5", "--host-class", CLASS,
     ...flags,
   ]);
   const args = parseSyncArgs(sp.argv);
@@ -80,7 +81,7 @@ describe("a stored record", () => {
     expect(fake.user()[0]!.record.binary.files).toEqual([{ path: "plate.clap", sha256: fake.user()[0]!.record.binary.sha256 }]);
     expect(fake.user()[0]!.record.rejudged).toBeDefined();
     expect(readdirSync(join(m.root, "state")).filter((f) => /\.(qualification|probe|unmeasured)\.json$/.test(f))).toEqual([]);
-    const pins = readFileSync(m.settings.pinFile, "utf8").split("\n").filter((l) => l.startsWith("pin_set"));
+    const pins = statePinsText(m.settings.stateFile).split("\n").filter((l) => l.startsWith("pin_set"));
     expect(pins).toHaveLength(1);
     const pin = parsePinLine(pins[0]!)!;
     expect(pin.uri).toBe(uri);
@@ -147,7 +148,7 @@ describe("a stored record", () => {
     const { summary, lines } = await sync(m.settings, fake);
     expect(summary.distributed, lines.join("\n")).toBe(1);
     expect(summary.refused).toBe(0);
-    const pins = readFileSync(m.settings.pinFile, "utf8").split("\n").filter((l) => l.startsWith("pin_set"));
+    const pins = statePinsText(m.settings.stateFile).split("\n").filter((l) => l.startsWith("pin_set"));
     expect(pins.map((l) => parsePinLine(l)!.verdict)).toEqual(["isolated"]);
     const record = fake.user()[0]!.record;
     expect(record.verdicts.find((v) => v.host === "omx-clap-host")).toMatchObject({ rating: "conditional", deciding: "hosting.rt-safety.violations-in-run" });

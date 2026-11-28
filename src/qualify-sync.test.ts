@@ -23,7 +23,6 @@ import { parsePinLine } from "./pins-file.js";
 import {
   SYNC_SETTINGS,
   SYNC_STATE_SCHEMA,
-  changedPinLines,
   digestFiles,
   discoverSyncItems,
   fileSha256,
@@ -42,6 +41,7 @@ import { searchPathClause, searchPathOf, splitPathFlags } from "./hostd-search-p
 
 import { QualificationStore } from "./qualification-store.js";
 import { fakeStore } from "./store-fake.support.js";
+import { statePins, statePinsText } from "./sync-pins.support.js";
 const PKG = join(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(PKG, "native", "build", "fixtures");
 const FAULTY = join(PKG, "native", "build", "fixtures-faulty");
@@ -101,13 +101,12 @@ describe("the settings", () => {
     if (!r.ok) throw new Error(r.error);
     expect(r.settings.budgetS).toBe(9);
     expect(r.settings.lv2Dirs).toEqual(["/x/lv2"]);
-    expect(r.settings.pinFile).toBe("/var/lib/omx/qualified.pins");
     expect(r.settings.system).toBe(true);
     expect(r.settings.descriptorDir).toBe("/var/lib/omx/descriptors");
     expect(r.settings.hostProfile.id).toBe("omx-clap-host");
   });
 
-  it("defaults: the directories plugin-hostd searches with its own settings file, a 60 s budget, port 5555", () => {
+  it("defaults: the directories plugin-hostd searches with its own settings file, a 60 s budget", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const asked: (string | undefined)[] = [];
@@ -117,8 +116,20 @@ describe("the settings", () => {
     expect(asked).toEqual([undefined]);
     expect(r.settings.lv2Dirs).toEqual(["/usr/lib/lv2", "/opt/lv2"]);
     expect(r.settings.clapDirs).toEqual(["/home/u/.clap", "/usr/lib/clap"]);
-    expect([r.settings.budgetS, r.settings.hostdPort, r.settings.hostdFeedbackPort, r.settings.settleS]).toEqual([60, 5555, 5556, 0]);
-    expect(r.settings.pinFile).toBe("/home/u/.local/state/omx/qualified.pins");
+    expect([r.settings.budgetS, r.settings.settleS]).toEqual([60, 0]);
+  });
+
+  it("knows no pin file and no daemon port: plugin-hostd reads the pins from the store (its spec of 2026-11-28)", () => {
+    const keys = SYNC_SETTINGS.map((s) => s.key);
+    for (const gone of ["pin_file", "hostd_port", "hostd_feedback_port"]) {
+      expect(keys).not.toContain(gone);
+      expect(parseSyncArgs([flagOf(gone), "v"]).ok, gone).toBe(false);
+      expect(parseSyncConf(`${gone} v\n`).ok, gone).toBe(false);
+    }
+    // the sync opens no socket: nothing is sent to a daemon, a store change is what it notices
+    const src = readFileSync(join(PKG, "src", "qualify-sync.ts"), "utf8");
+    expect(src).not.toMatch(/from "node:net"/);
+    expect(src).not.toMatch(/writeFileWhole\(settings\.pinFile/);
   });
 
   it("the grid is the full one by default, hosts (also --grid-hosts) or named cells when set, with a cell budget and a memory bound (#193)", () => {
@@ -146,10 +157,10 @@ describe("the settings", () => {
     }
   });
 
-  it("a budget, a port or a host that is not one is refused, never defaulted", () => {
+  it("a budget or a host that is not one is refused, never defaulted", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
-    for (const [k, v] of [["budget_s", "0"], ["hostd_port", "70000"], ["host_profile", "nobody"]] as const) {
+    for (const [k, v] of [["budget_s", "0"], ["host_profile", "nobody"]] as const) {
       expect(resolveSyncSettings(new Map([[k, v]]), args.args, {}, undefined, undefined, undefined, searchPathOf([], [])).ok).toBe(false);
     }
   });
@@ -236,19 +247,11 @@ describe("the file set", () => {
     expect(digestFiles(dir, ["x.clap"])![0]!.sha256).not.toBe(first[0]!.sha256);
     expect(digestFiles(dir, ["gone.clap"])).toBeUndefined();
   });
-
-  it("changedPinLines names a new pin and a changed one, not one held as it is", () => {
-    const a = "pin_set urn:a a.so=" + "1".repeat(64) + " omx-layout/1:" + "2".repeat(64);
-    const b = "pin_set urn:b b.so=" + "1".repeat(64) + " omx-layout/1:" + "2".repeat(64);
-    const b2 = `${b} verdict=in-process`;
-    expect(changedPinLines(`# c\n${a}\n${b}\n`, `# c\n${a}\n${b2}\n`)).toEqual([b2]);
-    expect(changedPinLines("", `${a}\n`)).toEqual([a]);
-  });
 });
 
-// --- the pin file, killed mid-write -------------------------------------------------------------------------------
+// --- a file written whole, killed mid-write ----------------------------------------------------------------------
 
-describe("the pin file", () => {
+describe("a file the sync writes whole", () => {
   it("is the old file or the whole new one when its writer is killed mid-write, never a half", async () => {
     const dir = mkdtempSync(join(scratch, "kill-"));
     const target = join(dir, "qualified.pins");
@@ -300,7 +303,7 @@ describe("the pin file", () => {
 // --- the sweep over the fixtures ----------------------------------------------------------------------------------
 
 /** The machine the sweep runs on: a CLAP directory, an LV2 one, and where its outputs go. */
-function machine(): { root: string; clap: string; lv2: string; out: string; flags: (port?: number, feedbackPort?: number) => string[] } {
+function machine(): { root: string; clap: string; lv2: string; out: string; flags: () => string[] } {
   const root = mkdtempSync(join(scratch, "machine-"));
   const clap = join(root, "clap");
   const lv2 = join(root, "lv2");
@@ -315,11 +318,10 @@ function machine(): { root: string; clap: string; lv2: string; out: string; flag
     clap,
     lv2,
     out,
-    flags: (port = 0, feedbackPort = 0) => [
+    flags: () => [
       "--config", "/dev/null", "--clap-path", clap, "--lv2-path", lv2, "--lv2-extra", "",
-      "--pin-file", join(out, "qualified.pins"),
       "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
-      "--grid-hosts", "--budget-s", "4", "--hostd-port", String(port), "--hostd-feedback-port", String(feedbackPort),
+      "--grid-hosts", "--budget-s", "4",
     ],
   };
 }
@@ -370,11 +372,7 @@ function sync(flags: readonly string[]): SyncRun {
   return { status: r.status, summary, stderr: r.stderr, ms: Date.now() - started };
 }
 
-const pinsOf = (out: string): ReturnType<typeof parsePinLine>[] =>
-  readFileSync(join(out, "qualified.pins"), "utf8")
-    .split("\n")
-    .map((l) => parsePinLine(l))
-    .filter((p) => p !== undefined);
+const pinsOf = (out: string): ReturnType<typeof parsePinLine>[] => statePins(join(out, "state.json"));
 
 const tools = { "native/build (make -C native deps all)": BUILT, "plugin-hostd-probe": RUNNER !== undefined };
 
@@ -415,11 +413,12 @@ describe("a sweep over a good CLAP, one that crashes at load, one that hangs and
     expect(readdirSync(join(m.out, "descriptors")).some((f) => f.startsWith(GOOD_ID))).toBe(true);
   });
 
-  needs(tools, "a second run skips everything and leaves the pin file as it was", () => {
-    const before = readFileSync(join(m.out, "qualified.pins"), "utf8");
+  needs(tools, "a second run skips everything and leaves the pins as they were, and no run writes a pin file", () => {
+    const before = statePinsText(join(m.out, "state.json"));
     const r = sync(m.flags());
     expect(r.summary).toEqual({ qualified: 0, skipped: 4, refused: 0, crashed: 0, hung: 0, unmeasured: 0 });
-    expect(readFileSync(join(m.out, "qualified.pins"), "utf8")).toBe(before);
+    expect(statePinsText(join(m.out, "state.json"))).toBe(before);
+    expect(readdirSync(m.out).filter((f) => f.endsWith(".pins"))).toEqual([]);
   });
 
   needs(tools, "touching a binary is no change; changing its bytes qualifies exactly that one again", () => {
@@ -480,80 +479,6 @@ function jack(): Promise<Record<string, string | undefined>> {
 
 const daemonTools = { ...tools, "plugin-hostd": HOSTD !== undefined, "omx-clap-host": CLAP_HOST !== undefined, jackd: JACKD !== undefined };
 
-describe("plugin-hostd in its default mode, on the pin file the sweep wrote", () => {
-  needs(
-    daemonTools,
-    "adds a qualified plugin and chains two; without the pin file the chain is refused (-501)",
-    async () => {
-      const m = machine();
-      expect(sync(m.flags()).summary).toMatchObject({ qualified: 2 });
-      const env = await jack();
-      const uri = `clap:${join(m.clap, "rt-safe.clap")}#${GOOD_ID}`;
-      // the daemon's defaults (require_pins 1, pin_mode first-use); only its own files are the test's, and its search
-      // paths are the ones the sync scanned, as on a device: first use learns nothing outside them (plugin-hostd 0.20.1)
-      const base = (d: string) => ({ clap_host: CLAP_HOST!, state_root: d, pin_store: join(d, "pins"), lv2_path: m.lv2, clap_path: m.clap });
-      const chainWith = async (conf: Record<string, string>): Promise<string[]> => {
-        const d = mkdtempSync(join(scratch, "state-"));
-        const daemon: RunningDaemon = await startDaemon(HOSTD!, scratch, { ...base(d), ...conf }, env);
-        try {
-          return [await daemon.control.send(`add ${uri} 0`), await daemon.control.send(`add ${uri} 1`), await daemon.control.send("chain 7 0 1")];
-        } finally {
-          daemon.close();
-        }
-      };
-      expect(await chainWith({})).toEqual(["resp 0", "resp 1", "resp -501"]);
-      expect(await chainWith({ pin_file: join(m.out, "qualified.pins") })).toEqual(["resp 0", "resp 1", "resp 0"]);
-    },
-    180_000,
-  );
-
-  needs(
-    daemonTools,
-    "a running daemon with its command socket free is sent the new pins, and chains them without a restart",
-    async () => {
-      const m = machine();
-      const env = await jack();
-      const d = mkdtempSync(join(scratch, "state-"));
-      const started = await launchDaemon(HOSTD!, scratch, { clap_host: CLAP_HOST!, state_root: d, pin_store: join(d, "pins") }, env);
-      try {
-        const r = sync(m.flags(started.port, started.feedbackPort));
-        expect(r.summary, r.stderr).toMatchObject({ qualified: 2 });
-        expect(r.stderr).toContain("2 sent to plugin-hostd");
-        const daemon = await started.connect();
-        const uri = `clap:${join(m.clap, "rt-safe.clap")}#${GOOD_ID}`;
-        expect([await daemon.control.send(`add ${uri} 0`), await daemon.control.send(`add ${uri} 1`), await daemon.control.send("chain 7 0 1")]).toEqual([
-          "resp 0",
-          "resp 1",
-          "resp 0",
-        ]);
-      } finally {
-        started.close();
-      }
-    },
-    180_000,
-  );
-
-  needs(
-    daemonTools,
-    "a daemon whose command socket a controller holds is named, and the pins wait for its next start",
-    async () => {
-      const m = machine();
-      const d = mkdtempSync(join(scratch, "state-"));
-      const daemon = await startDaemon(HOSTD!, scratch, { clap_host: CLAP_HOST!, state_root: d, pin_store: join(d, "pins") });
-      try {
-        const r = sync(m.flags(daemon.port, daemon.feedbackPort));
-        expect(r.summary).toMatchObject({ qualified: 2 });
-        expect(r.stderr).toContain("a controller holds its command socket; the 2 changed pins apply at its next start");
-      } finally {
-        daemon.close();
-      }
-    },
-    180_000,
-  );
-});
-
-// --- the lock (#222) --------------------------------------------------------------------------------------------------
-
 describe("a scoped run (#247)", () => {
   it("keeps the pins of what it did not scan, and drops one gone from a directory it scans", async () => {
     const root = mkdtempSync(join(scratch, "scoped-"));
@@ -561,8 +486,8 @@ describe("a scoped run (#247)", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const values = new Map([
-      ["pin_file", join(root, "q.pins")], ["descriptor_dir", join(root, "descriptors")],
-      ["state_file", join(root, "state", "qualify-sync.json")], ["hostd_port", "0"], ["host_class", ""], ["settle_s", "0"],
+      ["descriptor_dir", join(root, "descriptors")],
+      ["state_file", join(root, "state", "qualify-sync.json")], ["host_class", ""], ["settle_s", "0"],
     ]);
     const r = resolveSyncSettings(values, args.args, {}, root, undefined, undefined, searchPathOf([join(root, "lv2-scanned")], [join(root, "clap-scanned")]));
     if (!r.ok) throw new Error(r.error);
@@ -600,8 +525,8 @@ describe("the lock", () => {
     const args = parseSyncArgs([]);
     if (!args.ok) throw new Error(args.error);
     const values = new Map([
-      ["pin_file", join(root, "q.pins")], ["descriptor_dir", join(root, "descriptors")],
-      ["state_file", join(root, "state", "qualify-sync.json")], ["hostd_port", "0"], ["host_class", ""], ["settle_s", settleS],
+      ["descriptor_dir", join(root, "descriptors")],
+      ["state_file", join(root, "state", "qualify-sync.json")], ["host_class", ""], ["settle_s", settleS],
     ]);
     const r = resolveSyncSettings(values, args.args, {}, root, undefined, undefined, searchPathOf([join(root, "lv2")], [join(root, "clap")]));
     if (!r.ok) throw new Error(r.error);

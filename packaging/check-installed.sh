@@ -129,8 +129,8 @@ case "$(uname -m)" in
   aarch64) class=rpi5 ;;
   *) fail "no host class of the store for $(uname -m)" ;;
 esac
-bare_jack plugin-qualify-sync --hostd-conf "$out/sync/plugin-hostd.conf" --pin-file "$out/sync/qualified.pins" \
-  --host-class "$class" --descriptor-dir "$out/sync/d" --state-file "$out/sync/state.json" --hostd-port 0 > "$out/sync.txt" 2> "$out/sync.err" ||
+bare_jack plugin-qualify-sync --hostd-conf "$out/sync/plugin-hostd.conf" \
+  --host-class "$class" --descriptor-dir "$out/sync/d" --state-file "$out/sync/state.json" > "$out/sync.txt" 2> "$out/sync.err" ||
   fail "plugin-qualify-sync failed: $(cat "$out/sync.err")"
 cat "$out/sync.err"
 # with no base file the run says once that the base layer is empty; with one, it says nothing of it
@@ -144,11 +144,15 @@ fi
 ! grep -q 'cannot open shared object' "$out/sync.err" || fail "the sync could not load a library the package depends on"
 if [ -n "$jack" ]; then
   grep -q '^qualified 2, skipped 0, refused 0, crashed 0, hung 0, unmeasured 0, ' "$out/sync.txt" || fail "plugin-qualify-sync: $(cat "$out/sync.txt")"
-  [ "$(grep -c ' verdict=in-process$' "$out/sync/qualified.pins")" -eq 2 ] || fail "the sync's pin file does not pin both fixtures in-process"
+  [ "$(grep -o '"verdict": *"in-process"' "$out/sync/state.json" | wc -l)" -eq 2 ] || fail "the sync's state does not pin both fixtures in-process"
 else
   grep -q '^qualified 1, skipped 0, refused 0, crashed 0, hung 0, unmeasured 1, ' "$out/sync.txt" || fail "plugin-qualify-sync: $(cat "$out/sync.txt")"
   grep -q 'no JACK server' "$out/sync.err" || fail "the sync did not name the missing JACK server: $(cat "$out/sync.err")"
-  [ "$(grep -c ' verdict=in-process$' "$out/sync/qualified.pins")" -eq 1 ] || fail "the sync's pin file does not pin the CLAP fixture in-process"
+  [ "$(grep -o '"verdict": *"in-process"' "$out/sync/state.json" | wc -l)" -eq 1 ] || fail "the sync's state does not pin the CLAP fixture in-process"
+fi
+# plugin-hostd reads the pins from the store: the sync writes no pin file
+if find "$out/sync" -name '*.pins' | grep -q .; then
+  fail "the sync wrote a pin file: $(find "$out/sync" -name '*.pins')"
 fi
 # the records are in the store's user layer, and no record file was written anywhere the sync used
 [ -f "$layer" ] || fail "the sync wrote no user layer of the store at $layer"

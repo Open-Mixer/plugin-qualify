@@ -69,9 +69,8 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
     const env = { ...process.env, PATH: `${bin}:${process.env["PATH"] ?? ""}`, OMX_CLAP_QUALIFY: scanner, OMX_RT_INTERPOSE: interposer, OMX_PROBE_RUNNER: runner, PLUGIN_HOSTD: hostd } as Record<string, string>;
     const sp = splitPathFlags([
       "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "lv2"), "--lv2-extra", "",
-      "--pin-file", join(out, "qualified.pins"),
       "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
-      "--budget-s", "1", "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed",
+      "--budget-s", "1", "--settle-s", "0", "--no-distributed",
     ]);
     const args = parseSyncArgs(sp.argv);
     if (!args.ok) throw new Error(args.error);

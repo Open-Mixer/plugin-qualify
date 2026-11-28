@@ -705,12 +705,10 @@ with -509. The verdict is the first `--host-profile`'s. A run that took no pin l
 ### Qualifying every plugin on a machine
 
 `plugin-qualify-sync` qualifies every plugin installed on the machine, and again each one whose files
-change. With its pin file in plugin-hostd's settings, the daemon runs in its default mode (`require_pins 1`)
-and chains any plugin that qualified, the image's own and any installed later:
-
-```
-pin_file /var/lib/omx/qualified.pins          # in plugin-hostd.conf
-```
+change, and puts each record in the qualification store. plugin-hostd reads every pin and verdict from that store
+(plugin-hostd's spec of 2026-11-28, the pins from the store), so the daemon runs in its default mode (`require_pins 1`)
+and chains any plugin that qualified, the image's own and any installed later, with no pin file and nothing in its
+settings; a record the sync writes while the daemon runs is read at the daemon's next idle tick.
 
 The package ships it as a service that runs two minutes after boot and whenever a plugin directory
 changes, once the directory has been quiet for a minute. A run finds every `.clap` under the CLAP
@@ -721,8 +719,8 @@ qualification record and its descriptor. The soak is not part of it, and every r
 `notMeasured` (`hosting.stability.unsoaked`).
 
 Each run of the runner (one cell of an LV2 plugin, one quantum of a CLAP one) has `budget_s` seconds, under `memory_limit`. One that crashes or hangs is recorded as `crashed` or `hung`, one that
-fails the sweep is pinned `verdict=refused`, and the run goes on to the next. The pin file and the state are
-written whole after every plugin, so a run cut short keeps what it finished. The last line counts the run:
+fails the sweep is pinned `verdict=refused`, and the run goes on to the next. The record and the state are
+written after every plugin, so a run cut short keeps what it finished. The last line counts the run:
 
 ```
 qualified 2, skipped 0, refused 0, crashed 1, hung 1, unmeasured 0, distributed 0, 4.6 s
@@ -733,11 +731,7 @@ record (with the probe output copied beside it) and its descriptor are removed. 
 stay, and nothing is removed in a run that could not read a bundle, so a half-written install is no uninstall.
 A run looks only where its settings point: a plugin outside every directory of its format that the run scans is
 kept as it is (a run scoped to LV2 keeps every CLAP pin), and only one missing from a directory it scans is gone.
-A running plugin-hostd is told with `pin_clear`.
-
-When plugin-hostd answers on `hostd_port`, the changed pins are also sent to it with `pin_set` and apply at
-once. plugin-hostd serves one controller at a time, so while one is connected the run says so and the pins
-apply at the daemon's next start.
+The sync sends plugin-hostd nothing: a record removed from the store is a pin the daemon no longer reads.
 
 The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is also a flag
 (`--budget-s 30`):
@@ -745,7 +739,6 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 | key | default |
 | --- | --- |
 | `hostd_conf` | plugin-hostd's own settings file: `$XDG_CONFIG_HOME/plugin-hostd.conf`, else `~/.config/plugin-hostd.conf` |
-| `pin_file` | `/var/lib/omx/qualified.pins` |
 | `descriptor_dir` | `/var/lib/omx/descriptors` |
 | `state_file` | `/var/lib/omx/qualify-sync.json` |
 | `budget_s` | `60` |
@@ -754,7 +747,6 @@ The settings are `/etc/omx/qualify.conf`, one `key value` per line, and each is 
 | `cells_per_plugin_budget` | `0`, every cell of the grid |
 | `memory_limit` | half of the machine's RAM (`off` for none) |
 | `memory_notes` | `16`: the notes an instrument with no declared capacity holds in a `--memory-only` run |
-| `hostd_port`, `hostd_feedback_port` | `5555`, the next port |
 | `host_class` | the board's own, from the device tree (`rpi5`), else `x86-64` on an x86_64 machine; none elsewhere, and the run is refused until one is named |
 
 Those are the service's (`--system`); run by a user, the files go under `$XDG_STATE_HOME/omx`.
@@ -770,8 +762,8 @@ settings file makes them agree exactly, since the file is over the environment. 
 Every run starts by bringing each pin's files up to the ones `plugin-hostd --pin-files` names, measuring nothing: a pin
 written before 0.17.3 lacks the preset files an LV2's manifest names, which plugin-hostd 0.15.0 also checks, and its add
 answers -509 until then. The new list replaces the old one when no file both lists hold changed its hash, so the verdict
-stands; a changed file is measured again by the run. `--refresh-pins` does only that, writes the pin file and sends the
-changed pins to a running plugin-hostd; the package's upgrade runs it (plugin-qualify#239).
+stands; a changed file is measured again by the run. `--refresh-pins` does only that, in the state, measuring
+nothing (plugin-qualify#239).
 
 The path unit names the standard folders (`/usr/lib/lv2`, `/usr/lib64/lv2`, `/usr/local/lib/lv2`,
 `/usr/lib/clap`, `/usr/lib64/clap`). The other folders plugin-hostd searches (`plugin-hostd --search-path -c

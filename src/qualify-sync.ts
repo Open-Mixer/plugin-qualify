@@ -13,14 +13,12 @@
  *
  * What a run leaves: the state file (what was qualified, from which bytes, and how it ended), the qualification
  * records in the qualification store (put through `plugin-qualification-db-write`; no record is a file) and the descriptors in
- * their directory, and the pin file plugin-hostd loads as `pin_file`, written whole.
- * When a daemon answers on the command port, the pins that changed are also sent to it with `pin_set`, and the ones
- * of a plugin that is gone with `pin_clear`. What a gone plugin left in the records and the descriptors is removed.
+ * their directory. plugin-hostd reads every pin and verdict from the store (its spec of 2026-11-28, pins from the store):
+ * the sync writes no pin file and sends the daemon nothing. What a gone plugin left in the records and the descriptors is removed.
  */
 import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { createConnection } from "node:net";
 import { homedir, tmpdir } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 
@@ -73,7 +71,6 @@ export interface SyncSetting {
 /** Every setting, declared once: the settings file, the flags (`--pin-file` for `pin_file`) and `--help` read this. */
 export const SYNC_SETTINGS: readonly SyncSetting[] = [
   { key: "hostd_conf", meaning: "plugin-hostd's settings file: the LV2 and CLAP directories scanned are the ones plugin-hostd --search-path -c <file> prints", default: "plugin-hostd's own (its XDG_CONFIG_HOME/plugin-hostd.conf, else ~/.config/plugin-hostd.conf)" },
-  { key: "pin_file", meaning: "the pin file plugin-hostd loads as pin_file", default: "/var/lib/omx/qualified.pins (system), else $XDG_STATE_HOME/omx/qualified.pins" },
   { key: "descriptor_dir", meaning: "where the scanned descriptors go", default: `${DESCRIPTOR_DIR_SYSTEM} (system), else $XDG_STATE_HOME/${DESCRIPTOR_DIR_STATE_SUBDIR}` },
   { key: "state_file", meaning: "what was qualified, from which bytes, and how it ended", default: "/var/lib/omx/qualify-sync.json (system), else $XDG_STATE_HOME/omx/qualify-sync.json" },
   { key: "budget_s", meaning: "the wall clock one run gets (one cell of an LV2 plugin, one quantum of a CLAP one), in seconds; past it the plugin is recorded as hung", default: "60" },
@@ -82,8 +79,6 @@ export const SYNC_SETTINGS: readonly SyncSetting[] = [
   { key: "cells_per_plugin_budget", meaning: "measure at most the first n cells of the grid a plugin; 0 is every cell", default: "0" },
   { key: "memory_limit", meaning: "the memory bound of every run: bytes, or with K, M, G; off for none; past it a cell is probe.oom", default: "half of the RAM" },
   { key: "memory_notes", meaning: "the notes an instrument that declares no voice capacity holds in a --memory-only run, 1 to 128 (basis probe)", default: String(MEMORY_PASS_PROBE_NOTES) },
-  { key: "hostd_port", meaning: "plugin-hostd's command port the new pins are sent to; 0 sends none", default: "5555" },
-  { key: "hostd_feedback_port", meaning: "plugin-hostd's feedback port, connected before the command port; 0 is the command port's next", default: "0" },
   { key: "settle_s", meaning: "wait until the plugin directories have been quiet this long before a run", default: "0" },
   { key: "host_class", meaning: "the machine class the stored records are read and written for (a word of the store: rpi5, x86-64)", default: "the board's own from the device tree (rpi5 on a Raspberry Pi 5), else none" },
 ];
@@ -101,7 +96,6 @@ export interface SyncSettings {
   readonly lv2Dirs: readonly string[];
   /** The CLAP directories, as plugin-hostd searches them with hostd_conf. */
   readonly clapDirs: readonly string[];
-  readonly pinFile: string;
   readonly descriptorDir: string;
   readonly stateFile: string;
   readonly budgetS: number;
@@ -113,8 +107,6 @@ export interface SyncSettings {
   readonly memory?: MemoryBound;
   /** The notes an instrument with no declared capacity holds in a memory-only run. */
   readonly memoryNotes: number;
-  readonly hostdPort: number;
-  readonly hostdFeedbackPort: number;
   readonly settleS: number;
   /** The machine class of the records the store holds for this machine. */
   readonly hostClass: string;
@@ -278,12 +270,8 @@ export function resolveSyncSettings(
     return Number.isFinite(v) && v >= min ? v : undefined;
   };
   const budgetS = number("budget_s", 1);
-  const hostdPort = number("hostd_port", 0);
-  const feedbackPort = number("hostd_feedback_port", 0);
   const settleS = number("settle_s", 0);
   if (budgetS === undefined) return { ok: false, error: "budget_s must be a number of seconds, 1 or more" };
-  if (hostdPort === undefined || !Number.isInteger(hostdPort) || hostdPort > 65535) return { ok: false, error: "hostd_port must be a port number, or 0" };
-  if (feedbackPort === undefined || !Number.isInteger(feedbackPort) || feedbackPort > 65535) return { ok: false, error: "hostd_feedback_port must be a port number, or 0" };
   if (settleS === undefined) return { ok: false, error: "settle_s must be a number of seconds" };
   const gridText = get("grid");
   const grid = gridText === undefined || gridText === "" ? { ok: true as const, spec: GRID_FULL } : parseGridSpec(gridText);
@@ -311,7 +299,6 @@ export function resolveSyncSettings(
       system: args.system,
       lv2Dirs: once(search.path.lv2),
       clapDirs: once(search.path.clap),
-      pinFile: place("pin_file", "/var/lib/omx/qualified.pins", join("omx", "qualified.pins")),
       descriptorDir: place("descriptor_dir", DESCRIPTOR_DIR_SYSTEM, DESCRIPTOR_DIR_STATE_SUBDIR),
       stateFile: place("state_file", "/var/lib/omx/qualify-sync.json", join("omx", "qualify-sync.json")),
       budgetS,
@@ -320,8 +307,6 @@ export function resolveSyncSettings(
       cellsPerPluginBudget,
       ...(memory === undefined ? {} : { memory }),
       memoryNotes,
-      hostdPort,
-      hostdFeedbackPort: feedbackPort === 0 && hostdPort !== 0 ? hostdPort + 1 : feedbackPort,
       settleS,
       hostClass,
       distributed: !args.noDistributed,
@@ -1127,31 +1112,6 @@ function scanClapDescriptors(ctx: SyncContext, item: SyncItem): void {
 
 // --- the outputs ------------------------------------------------------------------------------------------------------
 
-/** The pin file's text: every whole pin of the state, the worse verdict kept for a uri pinned twice. */
-export function syncPinsText(state: SyncState): string {
-  const entries = Object.values(state.entries).flatMap((e) => e.plugins.flatMap((p) => (p.pin === undefined ? [] : [p.pin])));
-  return pinsFile(entries, "plugin-qualify-sync").text;
-}
-
-/** The pin lines, by uri. */
-function pinLinesOf(text: string): Map<string, string> {
-  const out = new Map<string, string>();
-  for (const line of text.split("\n")) if (line !== "" && !line.startsWith("#")) out.set(pinLineUri(line)!, line);
-  return out;
-}
-
-/** The pin lines of `after` that `before` does not hold as they are. */
-export function changedPinLines(before: string, after: string): string[] {
-  const was = pinLinesOf(before);
-  return [...pinLinesOf(after).entries()].filter(([uri, line]) => was.get(uri) !== line).map(([, line]) => line);
-}
-
-/** The uris `before` pins that `after` no longer does: the plugins that went away. */
-export function removedPinUris(before: string, after: string): string[] {
-  const now = pinLinesOf(after);
-  return [...pinLinesOf(before).keys()].filter((uri) => !now.has(uri));
-}
-
 /**
  * A stem's id and binary hash, its version segment dropped: what a record and its descriptor share even when their
  * version segments differ (a CLAP record is keyed `@unversioned` while its descriptor carries the plugin's declared
@@ -1222,51 +1182,6 @@ const keyOfId = (id: string): ShadowKey => {
 };
 const safeName = descriptorNamePart;
 
-/** What became of the pins sent to a daemon: its replies, or why none came. */
-export type SentPins =
-  | { readonly replies: readonly string[] }
-  /** `off`: hostd_port is 0. `absent`: nothing listens on the port. `held`: the port took the connection and no reply
-   * came: plugin-hostd serves one controller at a time, and one is connected. */
-  | { readonly unsent: "off" | "absent" | "held" };
-
-/**
- * The lines sent to plugin-hostd, one reply awaited for each, connected as a controller connects: the feedback port
- * first, then the command port, since the daemon answers commands only while its feedback port has a controller. Pins
- * that could not be sent apply at the daemon's next start, from the pin file.
- */
-export async function sendPins(port: number, feedbackPort: number, lines: readonly string[], timeoutMs = 5000): Promise<SentPins> {
-  if (lines.length === 0) return { replies: [] };
-  if (port === 0) return { unsent: "off" };
-  return new Promise((done) => {
-    const feedback = createConnection({ host: "127.0.0.1", port: feedbackPort });
-    const socket = createConnection({ host: "127.0.0.1", port });
-    const replies: string[] = [];
-    let buffer = "";
-    const timer = setTimeout(() => finish({ unsent: "held" }), timeoutMs);
-    const finish = (result: SentPins): void => {
-      clearTimeout(timer);
-      socket.destroy();
-      feedback.destroy();
-      done(result);
-    };
-    // the daemon's events on the feedback port are not this run's to read: they are drained and dropped
-    feedback.on("data", () => {});
-    feedback.once("error", () => finish({ unsent: "absent" }));
-    socket.setEncoding("utf8");
-    socket.once("error", () => finish({ unsent: "absent" }));
-    socket.once("connect", () => socket.write(`${lines[0]}\0`));
-    socket.on("data", (d: string) => {
-      buffer += d;
-      for (let nul = buffer.indexOf("\0"); nul >= 0; nul = buffer.indexOf("\0")) {
-        replies.push(buffer.slice(0, nul));
-        buffer = buffer.slice(nul + 1);
-        if (replies.length === lines.length) return finish({ replies });
-        socket.write(`${lines[replies.length]}\0`);
-      }
-    });
-  });
-}
-
 // --- waiting for quiet ------------------------------------------------------------------------------------------------
 
 /** What the plugin directories look like from outside: each entry's name, size and modification time, two levels down. */
@@ -1325,8 +1240,6 @@ export interface SyncSummary {
   /** The plugins taken from the distributed records, not measured. */
   readonly distributed: number;
   readonly seconds: number;
-  /** The pins a running daemon took, when one answered. */
-  readonly sent?: number;
   /** The pins whose files were refreshed from plugin-hostd without a measurement (plugin-qualify#239). */
   readonly refreshed?: number;
   /** `--rejudge`: the records whose verdicts changed, the ones that stood, and the ones that owe a measurement. */
@@ -1525,7 +1438,6 @@ export async function runSync(settings: SyncSettings, options: SyncRunOptions = 
 }
 
 function addSummaries(a: SyncSummary, b: SyncSummary): SyncSummary {
-  const sent = (a.sent ?? 0) + (b.sent ?? 0);
   const refreshed = (a.refreshed ?? 0) + (b.refreshed ?? 0);
   return {
     qualified: a.qualified + b.qualified,
@@ -1536,7 +1448,6 @@ function addSummaries(a: SyncSummary, b: SyncSummary): SyncSummary {
     unmeasured: a.unmeasured + b.unmeasured,
     distributed: a.distributed + b.distributed,
     seconds: a.seconds + b.seconds,
-    ...(sent === 0 ? {} : { sent }),
     ...(refreshed === 0 ? {} : { refreshed }),
     ...(b.rejudge === undefined ? (a.rejudge === undefined ? {} : { rejudge: a.rejudge }) : { rejudge: b.rejudge }),
     ...(b.memoryOnly === undefined ? (a.memoryOnly === undefined ? {} : { memoryOnly: a.memoryOnly }) : { memoryOnly: b.memoryOnly }),
@@ -1616,12 +1527,6 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     }
     await waitQuiet(dirs, settings.settleS, log);
     const count = { qualified: 0, skipped: 0, refused: 0, crashed: 0, hung: 0, unmeasured: 0, distributed: 0 };
-    let before: string;
-    try {
-      before = readFileSync(settings.pinFile, "utf8");
-    } catch {
-      before = "";
-    }
     let state = fresh.state;
     const stateBefore = state;
     let unreadable = false;
@@ -1673,7 +1578,6 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
           log(`${item.key}: loaded from ${item.root} now, with the binary it was qualified with; its record stands and its pin's files follow the bundle`);
           state = { schema: SYNC_STATE_SCHEMA, entries };
           writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
-          writeFileWhole(settings.pinFile, syncPinsText(state));
           continue;
         }
         if (loaded) log(`${item.key}: measured last run with the engine playing (${MEASURED_UNDER_LOAD}); measured again`);
@@ -1692,7 +1596,6 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
           for (const p of taken.plugins) log(`stored: ${p.uri}: applied (${taken.distributed!})`);
           state = { schema: SYNC_STATE_SCHEMA, entries };
           writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
-          writeFileWhole(settings.pinFile, syncPinsText(state));
           continue;
         }
         const measuredEntry = qualifyItem(ctx, item, files);
@@ -1710,15 +1613,12 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
         }
         state = { schema: SYNC_STATE_SCHEMA, entries };
         writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
-        writeFileWhole(settings.pinFile, syncPinsText(state));
       }
       state = { schema: SYNC_STATE_SCHEMA, entries };
       if (directoriesSignature(dirs) === signature) break;
       log("the plugin directories changed during the run; looking again");
     }
     writeFileWhole(settings.stateFile, `${JSON.stringify(state, null, 1)}\n`);
-    const after = syncPinsText(state);
-    if (after !== before) writeFileWhole(settings.pinFile, after);
     writeLv2Descriptors(ctx, lv2Pinned);
     for (const line of descriptorAccessProblems(settings.descriptorDir)) log(line);
     if (options.store !== undefined) {
@@ -1729,20 +1629,6 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
     // an unreadable one is never taken for an uninstall
     if (unreadable) log("a plugin directory could not be read; no record or descriptor is removed this run");
     else for (const f of pruneStale(settings, ctx.store, stateBefore, state)) log(`${f}: removed, its plugin is gone or changed`);
-    // a plugin that was pinned and is not any more is also forgotten by a running daemon
-    const changed = [...changedPinLines(before, after), ...removedPinUris(before, after).map(pinClearLine)];
-    const sent = await sendPins(settings.hostdPort, settings.hostdFeedbackPort, changed);
-    if ("unsent" in sent) {
-      const why = {
-        off: "hostd_port is 0",
-        absent: `no plugin-hostd listens on port ${String(settings.hostdPort)}`,
-        held: `plugin-hostd on port ${String(settings.hostdPort)} did not answer: a controller holds its command socket`,
-      }[sent.unsent];
-      log(`${why}; the ${String(changed.length)} changed pins apply at its next start, from the pin file`);
-    }
-    const replies = "replies" in sent ? sent.replies : [];
-    for (let i = 0; i < replies.length; i++) if (replies[i] !== "resp 0") log(`plugin-hostd answered ${replies[i]!} to ${pinLineUri(changed[i]!)!}`);
-    const taken = replies.filter((r) => r === "resp 0").length;
     for (const [why, n] of byMachine) if (n > 1) log(`${String(n)} plugins unmeasured by the machine (${why}); each is named above`);
     const [only] = byMachine.size === 1 ? [...byMachine] : [];
     const machineFailure = only !== undefined && only[1] === measuredHere ? only[0] : undefined;
@@ -1751,28 +1637,16 @@ async function runLocked(settings: SyncSettings, options: SyncRunOptions): Promi
       ...count,
       ...(machineFailure === undefined ? {} : { machineFailure }),
       seconds: (Date.now() - started) / 1000,
-      ...(taken === 0 ? {} : { sent: taken }),
       ...(fresh.refreshed.length === 0 ? {} : { refreshed: fresh.refreshed.length }),
     };
   }
 }
 
-/** The end of a `--refresh-pins` run: the pin file from the refreshed state, and its changed pins to a running daemon. */
-async function sendRefreshed(settings: SyncSettings, state: SyncState, refreshed: number, started: number, log: (line: string) => void): Promise<SyncSummary> {
-  let before = "";
-  try {
-    before = readFileSync(settings.pinFile, "utf8");
-  } catch {
-    before = "";
-  }
-  const after = syncPinsText(state);
-  if (after !== before) writeFileWhole(settings.pinFile, after);
-  const changed = changedPinLines(before, after);
-  const sent = await sendPins(settings.hostdPort, settings.hostdFeedbackPort, changed);
-  const taken = "replies" in sent ? sent.replies.filter((r) => r === "resp 0").length : 0;
-  if ("unsent" in sent && changed.length > 0) log(`the ${String(changed.length)} changed pins apply at plugin-hostd's next start, from the pin file`);
+/** The end of a run that measures nothing: what it refreshed. plugin-hostd reads the pins from the qualification store, so
+ * nothing is written for it and nothing is sent to it (plugin-hostd's spec of 2026-11-28, pins from the store). */
+function sendRefreshed(_settings: SyncSettings, _state: SyncState, refreshed: number, started: number, _log: (line: string) => void): Promise<SyncSummary> {
   const zero = { qualified: 0, skipped: 0, refused: 0, crashed: 0, hung: 0, unmeasured: 0, distributed: 0 };
-  return { ...zero, seconds: (Date.now() - started) / 1000, ...(taken === 0 ? {} : { sent: taken }), ...(refreshed === 0 ? {} : { refreshed }) };
+  return Promise.resolve({ ...zero, seconds: (Date.now() - started) / 1000, ...(refreshed === 0 ? {} : { refreshed }) });
 }
 
 /** What a failed descriptor pass says: plainly, once, when the lilv binding is what is missing (a suite without python3-lilv). */

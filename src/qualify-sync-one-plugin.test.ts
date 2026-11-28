@@ -19,6 +19,7 @@ import { fileSha256, MEASURED_UNDER_LOAD, parseSyncArgs, readSyncState, resolveS
 import { searchPathOf, splitPathFlags } from "./hostd-search-path.support.js";
 import { QualificationStore } from "./qualification-store.js";
 import { fakeStore } from "./store-fake.support.js";
+import { statePins } from "./sync-pins.support.js";
 
 let fake = fakeStore();
 beforeEach(() => {
@@ -72,8 +73,8 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
   const env = { ...process.env, OMX_CLAP_QUALIFY: scanner, OMX_RT_INTERPOSE: interposer, OMX_PROBE_RUNNER: runner, PLUGIN_HOSTD: hostd } as Record<string, string>;
   const flags = [
     "--config", "/dev/null", "--clap-path", clap, "--lv2-path", join(root, "lv2"), "--lv2-extra", "",
-    "--pin-file", join(out, "qualified.pins"), "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
-    "--budget-s", "4", "--hostd-port", "0", "--hostd-feedback-port", "0", "--settle-s", "0", "--no-distributed",
+    "--descriptor-dir", join(out, "descriptors"), "--state-file", join(out, "state.json"),
+    "--budget-s", "4", "--settle-s", "0", "--no-distributed",
   ];
   const settings = (extra: readonly string[] = []) => {
     const sp = splitPathFlags([...flags, ...extra]);
@@ -84,9 +85,9 @@ sed -e "s|\\"id\\": \\"org.example.plate\\"|\\"id\\": \\"$id\\"|" -e "s|/usr/lib
     return { settings: r.settings, args: args.args };
   };
   const pins = (): string[] => {
-    const file = join(out, "qualified.pins");
+    const file = join(out, "state.json");
     if (!existsSync(file)) return [];
-    return readFileSync(file, "utf8").split("\n").map((l) => parsePinLine(l)).filter((p) => p !== undefined).map((p) => p!.uri);
+    return statePins(file).map((p) => p.uri);
   };
   const descriptors = (): string[] => (existsSync(join(out, "descriptors")) ? readdirSync(join(out, "descriptors")) : []);
   const measuredFiles = (): string[] => (existsSync(measured) ? [...new Set(readFileSync(measured, "utf8").split("\n").filter((l) => l !== ""))] : []);
@@ -133,7 +134,7 @@ describe("plugin-qualify-sync --plugin: one plugin, never a scan", () => {
     const r = resolveSyncSettings(new Map(), args.args, { XDG_STATE_HOME: "" }, "/home/u", undefined, undefined, searchPathOf(sp.lv2, sp.clap));
     if (!r.ok) throw new Error(r.error);
     expect(r.settings.system).toBe(false);
-    for (const p of [r.settings.stateFile, r.settings.pinFile, r.settings.descriptorDir]) expect(p.startsWith("/home/u/"), p).toBe(true);
+    for (const p of [r.settings.stateFile, r.settings.descriptorDir]) expect(p.startsWith("/home/u/"), p).toBe(true);
   });
 
   it("--under-load marks the run measured-under-load: no figure reaches the store, and the next idle scan measures it again whole", async () => {

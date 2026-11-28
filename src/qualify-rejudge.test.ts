@@ -263,7 +263,7 @@ describe("--rejudge: a second run", () => {
     const stems = [CLAP_RT, CLAP_NOTES, LV2_RT, LV2_CRASHED, LV2_CLEAN];
     const d = device(stems, { host: "omx-clap-host" });
     await rejudge(d);
-    const paths = [d.settings.stateFile, d.settings.pinFile, owedFile(d.settings.stateFile)];
+    const paths = [d.settings.stateFile, owedFile(d.settings.stateFile)];
     const before = paths.map((p) => [p, readFileSync(p, "utf8"), statSync(p).mtimeMs]);
     const puts = d.fake.calls.filter((c) => c.startsWith("write put")).length;
     const records = JSON.stringify(d.fake.user());
