@@ -7,14 +7,14 @@ plugin installed on a machine, rescanning when a plugin directory changes.
 
 ## Install
 
-Fedora 45 (x86_64):
+Fedora 45 (x86_64, aarch64):
 
 ```
 sudo dnf install https://www.openmixer.org/rpm/openmixer-release.noarch.rpm
 sudo dnf install plugin-qualify
 ```
 
-Debian trixie, including Raspberry Pi OS (arm64):
+Debian trixie (amd64, arm64), also Raspberry Pi OS and Zynthian:
 
 ```
 curl -fsSLO https://www.openmixer.org/deb/openmixer-release.deb && sudo apt install ./openmixer-release.deb
