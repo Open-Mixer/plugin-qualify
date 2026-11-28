@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 // One isolated step (plugin-qualify#249): a plugin-hostd of its own on the JACK server the environment names, the plugin
-// added alone, worker_list read, a sine through it for a window, and worker_list read again. Prints one JSON line for
+// added alone and accepted (pin_accept: it has no verdict yet), worker_list read, a sine through it for a window, and worker_list read again. Prints one JSON line for
 // src/qualify-isolated.ts to judge. A host that never listened says started: false: nothing was learned about the plugin.
 import "../dist/qualification-cli-start.js";
 import { spawn, spawnSync } from "node:child_process";
@@ -108,12 +108,25 @@ async function main() {
     const answered = added === undefined ? "the host gave no answer to add" : `add answered ${String(added.code)}`;
     return { started: true, added: false, problem: why === "" ? answered : `${answered}: ${why}` };
   }
+  // a plugin with no verdict is bypassed after its add, held by no worker (plugin-hostd 0.22.1, R-112) until a verdict
+  // lands or pin_accept takes it as it is: this step is what gives the verdict, so it accepts the plugin, which then runs
+  // alone in a worker of its own, the isolation the step measures
+  const accepted = await send(`pin_accept ${pinWord(uri)}`);
+  if (accepted?.code === WORKER_SPAWN) return { started: false, problem: `no worker came up: pin_accept answered ${String(WORKER_SPAWN)}` };
+  if (accepted === undefined || accepted.code < 0) {
+    const why = daemonReason();
+    const answered = accepted === undefined ? "the host gave no answer to pin_accept" : `pin_accept answered ${String(accepted.code)}`;
+    return { started: true, added: false, problem: why === "" ? answered : `${answered}: ${why}` };
+  }
   const before = workersOf(await send("worker_list"));
   const worker = before[0];
   const ticksBefore = worker === undefined ? undefined : cpuTicks(worker.pid);
   const signal = spawnSync(signalTool, [`effect_${String(INSTANCE)}`, String(windowMs)], { encoding: "utf8", timeout: windowMs + 15000, killSignal: "SIGKILL" });
   const ticksAfter = worker === undefined ? undefined : cpuTicks(worker.pid);
   const after = workersOf(await send("worker_list"));
+  // the instance is removed before the host is killed: a worker killed in the middle of a cycle leaves the private JACK
+  // server waiting on its client, and the server's stop took 6 s more for it (plugin-hostd 0.22.2, omx-clap-host 0.36.0)
+  await send(`remove ${String(INSTANCE)}`);
   sock.destroy();
   const alive = after.length > 0 && after[0].pid === worker?.pid && ticksAfter !== undefined;
   if (signal.error !== undefined || signal.status !== 0) {

@@ -194,6 +194,9 @@ describe("QUALIFICATION_MEMORY_BOUND_OUTCOMES", () => {
 });
 
 describe("x-since names the version of the domain document that first carried the item", () => {
+  // every domain started again at 0.1.0, info.version and each x-since (owner ruling 2026-11-25, plugin-hostd cb7f8b51):
+  // the items the domain carried before 1.0.0, the record store's (1.2.0), the adapter's (1.3.0), its hosts' (1.4.0) and the
+  // unit provenances (1.5.0) are all 0.1.0 now; the document rose to 0.1.1 by a word of its own (be53b5c1, unmeasuredReason)
   const V120 = [
     "HOST_CLASSES", "SET_TIERS", "HOST_PROFILES", "SYNC_SETTINGS", "OFFERS", "PACKAGE_FORMATS", "PACKAGE_DISTROS", "PACKAGE_ARCHES",
     "VERDICT_HOSTINGS", "VERDICT_ARMS", "REASON_PARAMS", "REASON_PARAM_WORDS", "RECORD_TIERS", "MEMORY_LIMIT_MECHANISMS", "NOTE_SWEEP_DIALECTS",
@@ -201,6 +204,7 @@ describe("x-since names the version of the domain document that first carried th
   ].map((n) => `QUALIFICATION_${n}`);
   const V130 = [KINDS, OUTCOMES];
   const V140 = ["ADAPTER_HOSTS", "PIN_VERDICTS", "HISTORY_MOVES", "HISTORY_REASONS", "HISTORY_BLOCKERS"].map((n) => `QUALIFICATION_${n}`);
+  const V150 = ["UNIT_PROVENANCES"].map((n) => `QUALIFICATION_${n}`);
   const semver = (v: string) => v.split(".").map(Number);
   const above = (a: string, b: string) => {
     const [x, y] = [semver(a), semver(b)];
@@ -213,16 +217,16 @@ describe("x-since names the version of the domain document that first carried th
       expect(above(schema["x-since"] as string, original.info.version), `${item} x-since ${String(schema["x-since"])} is above ${original.info.version}`).toBe(false);
     }
   });
-  it("is 1.0.0 for the items the domain was created with, 1.2.0 for the record store's, 1.3.0 for the adapter's, 1.4.0 for its hosts", () => {
+  it("is 0.1.0 for every item the domain started again with: those it was created with, the record store's, the adapter's, its hosts', the unit provenances", () => {
     for (const [item, schema] of Object.entries(original.components.schemas)) {
-      const want = V140.includes(item) ? "1.4.0" : V130.includes(item) ? "1.3.0" : V120.includes(item) ? "1.2.0" : "1.0.0";
-      expect(schema["x-since"], item).toBe(want);
+      expect(schema["x-since"], item).toBe("0.1.0");
     }
     // plugin-hostd 0.21.0 ships the domain without QUALIFICATION_MACHINE_CLASSES, which nothing reads (ownership map rows 5 and 20): 16 created with it
-    expect(Object.keys(original.components.schemas)).toHaveLength(16 + V120.length + V130.length + V140.length);
+    expect(Object.keys(original.components.schemas)).toHaveLength(16 + V120.length + V130.length + V140.length + V150.length);
+    for (const item of [...V120, ...V130, ...V140, ...V150]) expect(original.components.schemas[item], item).toBeDefined();
     expect(original.components.schemas.QUALIFICATION_MACHINE_CLASSES).toBeUndefined();
   });
-  it("the domain is 1.4.0", () => {
-    expect(original.info.version).toBe("1.4.0");
+  it("the domain is 0.1.1", () => {
+    expect(original.info.version).toBe("0.1.1");
   });
 });

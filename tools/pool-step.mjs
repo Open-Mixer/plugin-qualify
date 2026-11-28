@@ -157,10 +157,17 @@ async function main() {
   const first = await send(`add ${pinWord(uri)} ${String(INSTANCE)}`);
   if (first?.code === WORKER_SPAWN) return { started: false, problem: `no worker came up: add answered ${String(WORKER_SPAWN)}` };
   if (first === undefined || first.code < 0) return { started: true, added: false, problem: first === undefined ? "the host gave no answer to add" : `add answered ${String(first.code)}` };
+  // a plugin with no verdict is bypassed after its add (plugin-hostd 0.22.1, R-112): no worker holds it, so none tells the
+  // daemon its layout and the store keeps "-" for it, which pin_set refuses (-902). pin_accept takes the plugin as it is
+  // (this run is what gives the verdict): a worker of its own loads it and the layout is learned before the remove
+  const accepted = await send(`pin_accept ${pinWord(uri)}`);
+  if (accepted?.code === WORKER_SPAWN) return { started: false, problem: `no worker came up: pin_accept answered ${String(WORKER_SPAWN)}` };
+  if (accepted === undefined || accepted.code < 0) return { started: true, added: false, problem: accepted === undefined ? "the host gave no answer to pin_accept" : `pin_accept answered ${String(accepted.code)}` };
   await send(`remove ${String(INSTANCE)}`);
   await sleep(300);
   const pin = learnedPin();
   if (pin === undefined) return { started: false, problem: "the daemon kept no pin of the plugin" };
+  if (pin.layout === "-") return { started: false, problem: "the daemon learned no layout of the plugin: no worker held it" };
   // the two modes alternate, and each is read at its best window: the cost of a block only ever grows with what else runs on
   // the machine, so the lowest load of a mode is the one least disturbed, and a pool that causes xruns causes them in
   // every window it runs

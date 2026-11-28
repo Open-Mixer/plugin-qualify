@@ -84,7 +84,7 @@ describe("the consumers compare a probe's output with the probe domain's words",
 
   it("(b) the golden words are the installed domain's own", async () => {
     const { openDomainAt } = await import("@openmixer/omx-contract/domain-reader");
-    const domain = openDomainAt(PROBE_DIR, "probe", "1.0.0");
+    const domain = openDomainAt(PROBE_DIR, "probe", "0.1.0");
     for (const [title, word] of Object.entries(GOLDEN_OUTCOMES)) {
       expect(domain.words("PROBE_OUTCOMES").find((w) => w.title === title)?.word, title).toBe(word);
     }

@@ -109,6 +109,12 @@ jobs:
     uses: Open-Mixer/.github/.github/workflows/build-rpm.yml@openmixer-v1
     with:
       staged: ${{ inputs.staged == true }}
+      # a dispatch off main in a wave (the dry run ci.yml calls this with) builds against that wave's devel channel above
+      # staging, as its install checks below read it: the shared build reads OMX_DEVEL_CHANNEL by itself only on a pull
+      # request into devel or a push to it, and a dispatch read the real channel alone, which serves none of the wave's
+      # build dependencies (Open-Mixer/.github#329). A staging dry run publishes nothing; never a release, a tag or staged
+      staging: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.publish != true && inputs.staged != true && !inputs.source-ref && vars.OMX_DEVEL_CHANNEL != '' }}
+      channel-level: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.publish != true && inputs.staged != true && !inputs.source-ref) && vars.OMX_DEVEL_CHANNEL || '' }}
       package-name: plugin-qualify
       publish: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
@@ -129,6 +135,12 @@ jobs:
     uses: Open-Mixer/.github/.github/workflows/build-deb.yml@openmixer-v1
     with:
       staged: ${{ inputs.staged == true }}
+      # a dispatch off main in a wave (the dry run ci.yml calls this with) builds against that wave's devel channel above
+      # staging, as its install checks below read it: the shared build reads OMX_DEVEL_CHANNEL by itself only on a pull
+      # request into devel or a push to it, and a dispatch read the real channel alone, which serves none of the wave's
+      # build dependencies (Open-Mixer/.github#329). A staging dry run publishes nothing; never a release, a tag or staged
+      staging: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.publish != true && inputs.staged != true && !inputs.source-ref && vars.OMX_DEVEL_CHANNEL != '' }}
+      channel-level: ${{ (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && inputs.publish != true && inputs.staged != true && !inputs.source-ref) && vars.OMX_DEVEL_CHANNEL || '' }}
       package-name: plugin-qualify
       publish: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) || inputs.publish == true }}
       source-ref: ${{ github.event_name == 'workflow_dispatch' && inputs.source-ref || '' }}
