@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 Pau Aliagas <linuxnow@gmail.com>
 Name: plugin-qualify
-Version:        0.22.1
+Version:        0.23.0
 Release: 1%{?dist}
 License: GPL-3.0-or-later
 Summary: Find out whether an audio plugin is safe to run in a live mixing console
@@ -241,6 +241,15 @@ the English source sentence.
 # END langpacks
 
 %changelog
+* Sat Nov 28 2026 Pau Aliagas <linuxnow@gmail.com> - 0.23.0-1
+- sync: no pin file and no pin_set: plugin-hostd reads every pin and verdict
+  from the store
+- spool: the quick check's verdict goes into the store; the groupable codes
+  are read from the qualification domain
+- spool: a check that crashed, hit its memory limit or timed out is the
+  store's figure-less refusal of its files
+- debian: python3-lilv is a plain Depends; Debian is trixie only
+
 * Fri Nov 27 2026 Pau Aliagas <linuxnow@gmail.com> - 0.22.1-1
 - plugin-qualify-sync --queue lists what a run would measure and why; a
   record the writer refuses is skipped and named (#207)
