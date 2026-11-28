@@ -66,7 +66,7 @@ PLUGIN_HOSTD_CFLAGS ?= -Ideps/plugin-db/include -Ideps/plugin-hostd-protocol/inc
 PLUGIN_HOSTD_LIBS ?= $(shell $(PKG_CONFIG) --libs libcrypto)
 endif
 
-# the measurer's rates are omx-contract's OMX_DECLARED_RATES, from <omxcontract/omx_contract_limits.h>; the JSON string
+# the measurer's rates are omx-contract's OMX_DECLARED_RATES, from <omxcontract/omx_contract.h>; the JSON string
 # literals of every tool are spelled by <omxcontract/omx_json_write.h> (src/no-json-escape-loop.test.ts)
 ifeq ($(shell $(PKG_CONFIG) --exists omx-contract && echo true),true)
 OMX_CONTRACT_CFLAGS ?= $(shell $(PKG_CONFIG) --cflags omx-contract)

@@ -36,7 +36,7 @@ function contractInclude(): string {
 /** The rates the measurer probes, as omx-contract's limits header declares them. Empty until the build exists to be tested. */
 const DECLARED_RATES = !BUILT
   ? []
-  : (/OMX_DECLARED_RATES\[[^\]]*\] = \{([^}]*)\}/.exec(readFileSync(join(contractInclude(), "omxcontract", "omx_contract_limits.h"), "utf8"))?.[1] ?? "")
+  : (/OMX_DECLARED_RATES\[[^\]]*\] = \{([^}]*)\}/.exec(readFileSync(join(contractInclude(), "omxcontract", "omx_contract.h"), "utf8"))?.[1] ?? "")
       .split(",")
       .map((r) => String(Number.parseFloat(r)));
 const URN = (n: string): string => `urn:plugin-qualify:fixture:${n}`;

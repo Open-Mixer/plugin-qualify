@@ -8,7 +8,7 @@
  * 96000` and `DEFAULT_BLOCK = 1024` — a mirror `rate-quantum-declaration-conformance.test.ts`
  * named but, until this file, never ratcheted (a declared exclusion is still a gap). This proves
  * `tools/_declarations.py` is byte-identical to `tools/gen-python-declarations.mjs`'s
- * output, on the same committed-and-verified footing `omx_contract_limits.h` and
+ * output, on the same committed-and-verified footing `omx_contract.h` and
  * `rta-resolution-line-gen.mjs` already stand on.
  */
 import { readFileSync } from 'node:fs';
