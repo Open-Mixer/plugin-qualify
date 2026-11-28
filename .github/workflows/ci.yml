@@ -62,6 +62,9 @@ jobs:
 
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a pull request into devel, or a dispatch off main, in a wave reads that wave's devel channel above staging (Open-Mixer/.github#329)
+          devel-channel: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_CHANNEL || '' }}
 
       # before the install, so the build's generators read omx-clap's and omx-dsp's installed data, as the RPM build does
       - uses: ./.github/actions/build-native
@@ -110,11 +113,14 @@ jobs:
     container:
       image: fedora:45
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git nodejs26 nodejs26-bin nodejs26-npm nodejs26-npm-bin pkgconf-pkg-config
+      - run: dnf install -y --setopt=install_weak_deps=False git nodejs26 nodejs26-bin nodejs26-npm nodejs26-npm-bin pkgconf-pkg-config make
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a pull request into devel, or a dispatch off main, in a wave reads that wave's devel channel above staging (Open-Mixer/.github#329)
+          devel-channel: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_CHANNEL || '' }}
       - run: dnf install -y --setopt=install_weak_deps=False omx-contract omx-contract-devel omx-contract-data plugin-hostd-contract plugin-hostd
       # the store's reader and writer, and the contract packages whose domains the writer checks a record's words against
       - run: >-
@@ -162,6 +168,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a pull request into devel, or a dispatch off main, in a wave reads that wave's devel channel above staging (Open-Mixer/.github#329)
+          devel-channel: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_CHANNEL || '' }}
       - run: dnf install -y --setopt=install_weak_deps=False omx-contract omx-contract-data
       # an ordinary run builds against the channel: name where each omx package came from, refuse one from staging (D25,
       # plugin-hostd-protocol#27: a stale staged contract package outranked the channel)

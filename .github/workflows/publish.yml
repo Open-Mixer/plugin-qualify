@@ -65,6 +65,9 @@ jobs:
 
       - name: Add the OpenMixer channel
         uses: Open-Mixer/.github/.github/actions/add-openmixer@openmixer-v1
+        with:
+          # a pull request into devel, or a dispatch off main, in a wave reads that wave's devel channel above staging (Open-Mixer/.github#329)
+          devel-channel: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_CHANNEL || '' }}
 
       # the same steps ci.yml runs: the suite on a tag needs what the suite on a branch needs. Before the install, so
       # the build's generators read omx-clap's and omx-dsp's installed data, as the RPM build does

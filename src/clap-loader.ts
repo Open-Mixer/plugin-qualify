@@ -17,6 +17,7 @@ import { type Dirent, existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 
+import { readScanResourceHints, type DeclaredResourceHints } from "./resource-hints-check.js";
 import { withRunHome } from "./run-home.js";
 import type { PluginLoader, PluginTarget } from "./loader.js";
 import { lv2BundlesOnPath, lv2Loader } from "./lv2-loader.js";
@@ -98,6 +99,8 @@ export interface ClapScanPlugin {
   readonly note_ports: { readonly inputs: number; readonly outputs: number };
   /** Frames, present only when the plugin reported more than 0 before it was activated. */
   readonly latency?: number;
+  /** What the plugin declares of its own footprint (`org.openmixer.resource-hints.draft/0`); absent when it states none. */
+  readonly resource_hints?: DeclaredResourceHints;
 }
 
 /** A plugin whose descriptor was read but which could not be created or initialised. */
@@ -165,6 +168,13 @@ function parsePage(v: unknown, where: string): ClapScanRemotePage {
   return { id: num(v, "id", where), section: str(v, "section", where), name: str(v, "name", where), params: slots, forPreset };
 }
 
+/** The scan's `resource_hints`, read whole; absent when the plugin states none, and refused when it is not that object. */
+function resourceHintsOf(v: Record<string, unknown>, where: string): { resource_hints?: DeclaredResourceHints } {
+  if (v["resource_hints"] === undefined) return {};
+  const hints = readScanResourceHints(v["resource_hints"]);
+  return hints === undefined ? bad(`${where} has resource_hints that are not the scan's`) : { resource_hints: hints };
+}
+
 function parsePlugin(v: unknown, where: string): ClapScanPlugin | ClapScanPluginError {
   if (!isRecord(v)) return bad(`${where} is not an object`);
   const id = str(v, "id", where);
@@ -205,6 +215,7 @@ function parsePlugin(v: unknown, where: string): ClapScanPlugin | ClapScanPlugin
     note_ports: { inputs: num(notes, "inputs", `${where} note_ports`), outputs: num(notes, "outputs", `${where} note_ports`) },
     ...(pages === undefined ? {} : { remote_controls: pages }),
     ...(v["latency"] === undefined ? {} : { latency: num(v, "latency", where) }),
+    ...resourceHintsOf(v, where),
   };
 }
 
@@ -275,6 +286,8 @@ export interface ClapDescriptorRow {
   readonly latency?: { readonly reportedFrames: number };
   /** The plugin's remote-control pages (presets' own pages excluded), where the scan read them. */
   readonly remoteControls?: readonly ClapDescriptorRemotePage[];
+  /** The resource hints the plugin declares, where it states any. */
+  readonly resourceHints?: DeclaredResourceHints;
 }
 
 function isPlugin(p: ClapScanPlugin | ClapScanPluginError): p is ClapScanPlugin {
@@ -328,6 +341,7 @@ export function clapScanDescriptors(doc: ClapScanDocument): ClapDescriptorRow[] 
         binaryPath,
         ...(p.latency === undefined ? {} : { latency: { reportedFrames: p.latency } }),
         ...(p.remote_controls === undefined ? {} : { remoteControls: p.remote_controls.filter((r) => !r.forPreset).map(pageOf) }),
+        ...(p.resource_hints === undefined ? {} : { resourceHints: p.resource_hints }),
       });
     }
   }
@@ -421,6 +435,7 @@ export function clapLoader(options: ClapLoaderOptions = {}): PluginLoader {
         bundle: dirname(row.binaryPath),
         binary: basename(row.binaryPath),
         binaryPath: row.binaryPath,
+        ...(row.resourceHints === undefined ? {} : { resourceHints: row.resourceHints }),
       }));
     },
   };

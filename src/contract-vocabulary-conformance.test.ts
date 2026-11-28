@@ -37,7 +37,7 @@ const PKG = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SELF = "src/contract-vocabulary-conformance.test.ts";
 
 /** omx-clap's two TypeScript modules, read independently of `tools/gen-hosting-codes.mjs`'s loader. */
-const CLAP_TS_MODULES = ["omx-clap-vocabulary.js", "omx-clap-hosting.js"] as const;
+const CLAP_TS_MODULES = ["omx-clap-vocabulary.js", "omx-clap-hosting-codes.js"] as const;
 
 function locateClapCoreTsDir(): string {
   const dir = clapTsDirCandidates().find((d) => CLAP_TS_MODULES.every((m) => existsSync(join(d, m))));
@@ -51,6 +51,7 @@ async function loadContractCodes(): Promise<ReadonlySet<string>> {
   const codes = new Set<string>();
   for (const name of CLAP_TS_MODULES) {
     const mod: Record<string, unknown> = await import(pathToFileURL(join(dir, name)).href);
+    if (!Object.keys(mod).some(isHostingTableName)) throw new Error(`${join(dir, name)} exports no hosting table: omx-clap's codes moved`);
     for (const [exportName, table] of Object.entries(mod)) {
       if (!isHostingTableName(exportName)) continue;
       for (const entry of Object.values(table as Record<string, { readonly code: string }>)) codes.add(entry.code);

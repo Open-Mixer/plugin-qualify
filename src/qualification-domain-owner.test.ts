@@ -3,8 +3,9 @@
 /**
  * The `qualification` domain is plugin-hostd's (contract.d/qualification/ of plugin-hostd, the vocabulary sorting pass, row V5):
  * this package keeps no copy, reads the installed one, and requires plugin-hostd-contract for it. The words are frozen in
- * fixtures/qualification-golden.json (item -> [title, word] pairs), taken from this package's own domain 1.4.0 at 2d6aefc;
- * QUALIFICATION_MACHINE_CLASSES, which nothing reads, is dropped by plugin-hostd 0.21.0: the golden file lacks it and the domain
+ * fixtures/qualification-golden.json (item -> [title, word] pairs), taken from this package's own domain 1.4.0 at 2d6aefc and
+ * grown with plugin-hostd's additions since (QUALIFICATION_UNIT_PROVENANCES, the reason param unmeasuredReason, the param word
+ * remove: the domain 0.1.1 of plugin-hostd 0.22.2, after every domain started again at 0.1.0); QUALIFICATION_MACHINE_CLASSES, which nothing reads, is dropped by plugin-hostd 0.21.0: the golden file lacks it and the domain
  * must too.
  *
  *  a. golden: the domain the package reads holds the golden words;
