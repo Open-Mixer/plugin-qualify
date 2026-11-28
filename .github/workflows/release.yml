@@ -216,6 +216,8 @@ jobs:
           # a pull request into devel, a push to it (a wave's merge, whose build the shared workflows already made against that
           # channel) or a dispatch off main, in a wave, reads that wave's devel channel above staging (Open-Mixer/.github#329)
           devel-channel: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'push' && github.ref == 'refs/heads/devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_CHANNEL || '' }}
+          # and the wave's base wave below it, above staging: what the wave does not rebuild comes from there (.github#337)
+          devel-base: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'push' && github.ref == 'refs/heads/devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_BASE || '' }}
 
       - name: Install the package (Fedora)
         if: matrix.cell.fedora && steps.pkgs.outcome == 'success'
@@ -266,6 +268,8 @@ jobs:
           # a pull request into devel, a push to it (a wave's merge, whose build the shared workflows already made against that
           # channel) or a dispatch off main, in a wave, reads that wave's devel channel above staging (Open-Mixer/.github#329)
           devel-channel: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'push' && github.ref == 'refs/heads/devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_CHANNEL || '' }}
+          # and the wave's base wave below it, above staging: what the wave does not rebuild comes from there (.github#337)
+          devel-base: ${{ ((startsWith(github.event_name, 'pull_request') && github.base_ref == 'devel') || (github.event_name == 'push' && github.ref == 'refs/heads/devel') || (github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main')) && vars.OMX_DEVEL_BASE || '' }}
 
       - name: Install the package (Debian)
         if: matrix.cell.suite && steps.pkgs.outcome == 'success'
