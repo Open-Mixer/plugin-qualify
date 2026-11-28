@@ -18,6 +18,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   audioCpusOf,
   defaultProbe,
+  noFiguresArgv,
+  storeKeyOf,
   isolatedArgv,
   isolationFor,
   parseRequest,
@@ -47,13 +49,17 @@ function desk(): { cfg: SpoolConfig; files: { spool: string; pins: string; store
   mkdirSync(pins, { recursive: true });
   writeFileSync(join(spool, "fx-0001.request"), `uri ${URI}\nfile fx.clap ${SHA}\n`);
   writeFileSync(store, `pin_set ${URI} fx.clap=${SHA} -\n`);
-  return { cfg: { spoolDir: spool, budgetMs: 1000, quick: ["plugin-qualify-sync"] }, files: { spool, pins, store, accepted: `${store}.accepted` } };
+  return { cfg: { spoolDir: spool, budgetMs: 1000, quick: ["plugin-qualify-sync"], writer: ["plugin-qualification-db-write"], scope: "user" }, files: { spool, pins, store, accepted: `${store}.accepted` } };
 }
 
+/** The figure-less records the spool asked the writer for: (uri, reason) */
+const written: [string, string][] = [];
+afterEach(() => written.splice(0));
 const deps = (end: SpoolProbeEnd, extra: Partial<SpoolDeps> = {}): SpoolDeps => ({
   audioCpus: () => [0],
   onlineCpus: () => [0, 1, 2, 3],
   probe: async () => end,
+  noFigures: (request, reason) => (written.push([request.uri, reason]), undefined),
   ...extra,
 });
 /** Whatever a pass left in the pins directory: the packages' alone, so nothing. */
@@ -114,7 +120,7 @@ describe("a spool request is qualified into the store, never into the pins direc
     writeFileSync(sync, `#!/bin/sh\nprintf '%s\\n' "$@" > ${said}\n`, { mode: 0o755 });
     const iso = isolationFor([0], [0, 1]);
     if (!iso.ok) throw new Error(iso.error);
-    const end = await defaultProbe({ uri: URI, files: [] }, iso, { spoolDir: root, budgetMs: 10_000, quick: [sync, "--system"] });
+    const end = await defaultProbe({ uri: URI, files: [] }, iso, { spoolDir: root, budgetMs: 10_000, quick: [sync, "--system"], writer: [], scope: "user" });
     expect(end).toEqual({ kind: "exited", code: 0 });
     expect(readFileSync(said, "utf8").trim().split("\n")).toEqual(["--system", "--plugin", URI]);
   });
@@ -123,13 +129,32 @@ describe("a spool request is qualified into the store, never into the pins direc
     ["a check killed by a signal", { kind: "signaled", signal: "SIGSEGV" } as SpoolProbeEnd, "probe.crashed"],
     ["an OOM kill", { kind: "memory-limit" } as SpoolProbeEnd, "probe.memory-limit"],
     ["the budget passing", { kind: "timeout" } as SpoolProbeEnd, "probe.timeout"],
-    ["a run that failed", { kind: "exited", code: 1 } as SpoolProbeEnd, "probe.refused-instantiation"],
-  ])("%s leaves no record, and is kept beside the request with %s", async (_n, end, reason) => {
+  ])("%s is the store's figure-less record of the files, refused with %s (decided by the coordinator)", async (_n, end, reason) => {
     const { cfg, files } = desk();
     const out = await runSpoolOnce(cfg, deps(end));
-    expect(out).toEqual([{ uri: URI, unstored: reason }]);
+    expect(out).toEqual([{ uri: URI, refused: reason }]);
+    expect(written).toEqual([[URI, reason]]);
     expect(pinsDirFiles(files.pins)).toEqual([]);
-    expect(JSON.parse(readFileSync(join(files.spool, "fx-0001.verdict"), "utf8"))).toEqual({ uri: URI, stored: false, reason });
+    expect(JSON.parse(readFileSync(join(files.spool, "fx-0001.verdict"), "utf8"))).toEqual({ uri: URI, stored: true, refused: reason });
+  });
+
+  it("the figure-less record is the writer's no-figures verb, the files the daemon hashed in byte order", () => {
+    const argv = noFiguresArgv({ spoolDir: "/s", budgetMs: 1, quick: [], writer: ["plugin-qualification-db-write"], scope: "system" },
+      { uri: URI, files: [{ path: "z.ttl", sha256: SHA }, { path: "a.so", sha256: SHA }] }, "probe.timeout");
+    expect(argv).toEqual(["plugin-qualification-db-write", "no-figures", "--scope", "system", "--format", "clap", "--uri", "org.example.fx",
+      "--host", "omx-clap-host", "--reason", "probe.timeout", "--file", `a.so=${SHA}`, "--file", `z.ttl=${SHA}`]);
+    expect(storeKeyOf("lv2:urn:x")).toEqual({ format: "lv2", uri: "urn:x" });
+  });
+
+  it("a run that failed otherwise, or a record the writer refused, leaves the store as it was", async () => {
+    const { cfg, files } = desk();
+    const out = await runSpoolOnce(cfg, deps({ kind: "exited", code: 1 }));
+    expect(out).toEqual([{ uri: URI, unstored: "probe.refused-instantiation" }]);
+    expect(written).toEqual([]);
+    expect(JSON.parse(readFileSync(join(files.spool, "fx-0001.verdict"), "utf8"))).toEqual({ uri: URI, stored: false, reason: "probe.refused-instantiation" });
+    const again = desk();
+    const refused = await runSpoolOnce(again.cfg, deps({ kind: "timeout" }, { noFigures: () => "refused: no-figures-reason" }));
+    expect(refused).toEqual([{ uri: URI, unstored: "probe.timeout" }]);
   });
 
   it("a request that has its end is not qualified again", async () => {

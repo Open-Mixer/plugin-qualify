@@ -13,15 +13,18 @@
  *   `plugin-qualify-sync --plugin <uri>`, the one-plugin qualification, which puts the plugin's record into the
  *   qualification store through its writer; plugin-hostd reads the verdict from there at its next tick. Nothing is
  *   written into the pins directory, which holds the packages' pins alone.
- * - A RUN THAT ENDS WITH NO RECORD (a check killed by a signal, a memory-limit kill, the budget passing, a run that
- *   failed) leaves the store as it was: the plugin stays bypassed until the operator's `pin_accept`. Its end is kept
- *   beside the request (`<request>.verdict`, with the probe's outcome code as the reason: `probe.crashed`,
- *   `probe.memory-limit`, `probe.timeout`, `probe.refused-instantiation`), so it is not run again.
+ * - A CHECK THAT RAN AND ENDED WITH NO FIGURES (killed by a signal, at its memory limit, or past its budget) is a
+ *   refusal in the store: the spool writes the store's figure-less record of the files the daemon hashed, its reason
+ *   `probe.crashed`, `probe.memory-limit` or `probe.timeout` (QUALIFICATION_NO_FIGURES_REASONS), through the store's
+ *   writer (`plugin-qualification-db-write no-figures`), and plugin-hostd answers -516 for those files until the
+ *   operator's `pin_accept`, as the pin file made it (decided by the coordinator 2026-11-28, the owner to confirm).
+ *   A run that failed otherwise leaves the store as it was, and the plugin stays bypassed. Every end is kept beside the
+ *   request (`<request>.verdict`), so it is not run again.
  * - ONE WRITER PER KIND: this writes nothing the daemon owns. The operator's `pin_accept` (the `.accepted` list) and
  *   `pin_clear` are the daemon's, and the store's records are its writer's. Every file is written by a temporary file
  *   in the same directory renamed over the target.
  */
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, unlinkSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
 
@@ -125,6 +128,9 @@ export function writeAtomic(target: string, text: string, beforeRename?: () => v
 
 export interface SpoolConfig {
   readonly spoolDir: string;
+  /** The store's writer (`plugin-qualification-db-write`) and the scope it writes, for a figure-less record. */
+  readonly writer: readonly string[];
+  readonly scope: "user" | "system";
   readonly budgetMs: number;
   /** The check's command, `plugin-qualify-sync` and its arguments (the store's scope); `--plugin <uri>` is appended. */
   readonly quick: readonly string[];
@@ -135,12 +141,37 @@ export interface SpoolDeps {
   readonly onlineCpus: () => readonly number[];
   /** Runs the isolated check of one request; the default starts the quick check, isolated. */
   readonly probe: (request: SpoolRequest, iso: Isolated, cfg: SpoolConfig) => Promise<SpoolProbeEnd>;
+  /** Writes the store's figure-less record of a request; the default runs the writer. undefined, or the writer's refusal. */
+  readonly noFigures?: (request: SpoolRequest, reason: string, cfg: SpoolConfig) => string | undefined;
 }
+
+/** The store's names of a plugin-hostd uri: a CLAP by `clap` and the id after `#`, an LV2 plugin by `lv2` and its URI. */
+export function storeKeyOf(uri: string): { readonly format: "clap" | "lv2"; readonly uri: string } {
+  if (uri.startsWith("clap:")) return { format: "clap", uri: uri.slice(uri.lastIndexOf("#") + 1) };
+  return { format: "lv2", uri: uri.startsWith("lv2:") ? uri.slice(4) : uri };
+}
+
+/** The writer's argv for the figure-less record of a request: its files in byte order of the path. */
+export function noFiguresArgv(cfg: SpoolConfig, request: SpoolRequest, reason: string): string[] {
+  const key = storeKeyOf(request.uri);
+  const files = [...request.files].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+  return [...cfg.writer, "no-figures", "--scope", cfg.scope, "--format", key.format, "--uri", key.uri, "--host", "omx-clap-host", "--reason", reason,
+    ...files.flatMap((f) => ["--file", `${f.path}=${f.sha256}`])];
+}
+
+/** The default: the writer run, its refusal (its standard error) when it refuses. */
+export const defaultNoFigures: NonNullable<SpoolDeps["noFigures"]> = (request, reason, cfg) => {
+  const [cmd, ...args] = noFiguresArgv(cfg, request, reason);
+  const r = spawnSync(cmd!, args, { encoding: "utf8" });
+  return r.status === 0 ? undefined : (r.stderr || r.error?.message || `exit ${String(r.status)}`).trim();
+};
 
 export type SpoolOutcome =
   /** The check ran to its end: its record is in the store, and plugin-hostd reads the verdict there. */
   | { readonly uri: string; readonly stored: true }
-  /** The check ended with no record: the store is as it was, and the plugin stays bypassed until pin_accept. */
+  /** The check ran and ended with no figures: the store's figure-less record refuses its files. */
+  | { readonly uri: string; readonly refused: string }
+  /** The check ended with no record (a failed run, or a figure-less record the writer refused): the store is as it was. */
   | { readonly uri: string; readonly unstored: string }
   | { readonly uri: string; readonly deferred: string };
 
@@ -172,8 +203,21 @@ export async function runSpoolOnce(cfg: SpoolConfig, deps: SpoolDeps): Promise<S
     }
     const end = await deps.probe(request, iso, cfg);
     const result = outcomeOf(end);
-    writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, ...(result.stored ? { stored: true } : { stored: false, reason: result.reason }) }) + "\n");
-    out.push(result.stored ? { uri: request.uri, stored: true } : { uri: request.uri, unstored: result.reason });
+    if (result.stored) {
+      writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, stored: true }) + "\n");
+      out.push({ uri: request.uri, stored: true });
+      continue;
+    }
+    const figureless = end.kind === "signaled" || end.kind === "memory-limit" || end.kind === "timeout";
+    const refusal = figureless ? (deps.noFigures ?? defaultNoFigures)(request, result.reason, cfg) : undefined;
+    if (figureless && refusal === undefined) {
+      writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, stored: true, refused: result.reason }) + "\n");
+      out.push({ uri: request.uri, refused: result.reason });
+      continue;
+    }
+    if (refusal !== undefined) process.stderr.write(`plugin-qualify-spool: ${request.uri}: the store's writer refused the record of ${result.reason}: ${refusal}\n`);
+    writeAtomic(verdictPath, JSON.stringify({ uri: request.uri, stored: false, reason: result.reason }) + "\n");
+    out.push({ uri: request.uri, unstored: result.reason });
   }
   return out;
 }

@@ -17,6 +17,8 @@ import { consoleAudioCpus, defaultProbe, runSpoolOnce } from "../dist/index.js";
 const state = join(process.env.XDG_STATE_HOME ?? join(process.env.HOME ?? "", ".local/state"), "plugin-hostd");
 const cfg = {
   spoolDir: join(state, "qualify"),
+  writer: ["plugin-qualification-db-write"],
+  scope: process.getuid?.() === 0 ? "system" : "user",
   budgetMs: Number(process.env.PLUGIN_QUALIFY_BUDGET_S ?? 600) * 1000,
   quick: ["plugin-qualify-sync", "--cells-per-plugin-budget", "1", ...(process.getuid?.() === 0 ? ["--system"] : [])],
 };
